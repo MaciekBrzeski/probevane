@@ -42,6 +42,7 @@ async function main() {
     takeoverBrain: takeoverOverride && takeoverOverride !== 'none' ? anthropicBrain(takeoverOverride) : undefined,
     maxSteps,
     maxTargets,
+    only: flag(args, '--only'),
     minTests,
     minCoverage,
     mutation,

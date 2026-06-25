@@ -23,6 +23,7 @@ export interface GenerateOpts {
   model?: string;
   maxSteps?: number;
   maxTargets?: number;
+  only?: string; // filter discovered targets by path substring
   minTests?: number;
   minCoverage?: number;
   mutation?: boolean;
@@ -37,7 +38,9 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
   const { dir, kind, adapter } = opts;
   const log = opts.log ?? (() => {});
 
-  const targets = (await adapter.discover(dir, kind)).slice(0, opts.maxTargets ?? 8);
+  let discovered = await adapter.discover(dir, kind);
+  if (opts.only) discovered = discovered.filter((t) => t.sourcePath.includes(opts.only!));
+  const targets = discovered.slice(0, opts.maxTargets ?? 8);
   const probes = [];
   const probedTargets = [];
   for (const t of targets) {
