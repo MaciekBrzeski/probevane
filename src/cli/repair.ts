@@ -17,6 +17,7 @@ async function main() {
   const since = flag(args, '--since') ?? 'HEAD';
   const model = flag(args, '--model') ?? cfg.model ?? 'auto';
   const maxSteps = parseInt(flag(args, '--max-steps') ?? String(cfg.maxSteps ?? 30), 10);
+  const budgetRaw = flag(args, "--budget"); const budget = budgetRaw ? parseInt(budgetRaw, 10) : cfg.budget;
 
   const adapter = await selectAdapterOrThrow(dir);
   const changed = (await changedFiles(dir, since)).filter(isSourceFile);
@@ -45,7 +46,7 @@ async function main() {
     ...pairs.map((p) => `- ${p.source}${p.specs.length ? ` → ${p.specs.join(', ')}` : ' (no test found — add one if the behavior is now untested)'}`),
   ].join('\n');
 
-  const outcome = await runPath({ dir, adapter, profileName: 'repair', task: fullTask, model, maxSteps, log: (l) => console.error(l) });
+  const outcome = await runPath({ dir, adapter, profileName: "repair", task: fullTask, model, maxSteps, budget, log: (l) => console.error(l) });
   console.log(
     `[probevane] ${outcome.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} (${outcome.stopReason}) steps=${outcome.steps} ` +
       `tokens=${outcome.tokensIn}/${outcome.tokensOut} cacheRead=${outcome.cacheRead}${outcome.tookOver ? ' (took over)' : ''}`,

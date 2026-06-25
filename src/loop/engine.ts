@@ -37,6 +37,7 @@ export interface RunOptions {
   task: string;
   maxSteps?: number;
   forceStopAfter?: number; // barren-turn ceiling before giving up
+  budget?: number; // hard ceiling on output tokens — stop (budget) when exceeded
   consultAfter?: number; // barren turns before the consult/takeover escalation
   /** Stronger model to take over a bounded window when stuck (optional). */
   takeoverBrain?: Brain;
@@ -50,7 +51,7 @@ export interface RunOutcome {
   steps: number;
   toolCalls: number;
   gateBlocks: number;
-  stopReason: 'accepted' | 'max_steps' | 'stuck' | 'error';
+  stopReason: 'accepted' | 'max_steps' | 'stuck' | 'error' | 'budget';
   tokensIn: number;
   tokensOut: number;
   cacheRead: number;
@@ -193,6 +194,13 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     if (started && ctx.barren >= forceStopAfter) {
       log(`[engine] giving up: ${ctx.barren} barren turns (forceStopAfter=${forceStopAfter})`);
       stopReason = 'stuck';
+      break;
+    }
+
+    // Hard cost ceiling — never let a stuck loop drain the budget.
+    if (opts.budget && tokensOut >= opts.budget) {
+      log(`[engine] budget reached: ${tokensOut} >= ${opts.budget} output tokens`);
+      stopReason = 'budget';
       break;
     }
   }

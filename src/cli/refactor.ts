@@ -19,6 +19,7 @@ async function main() {
   }
   const model = flag(args, '--model') ?? cfg.model ?? 'auto';
   const maxSteps = parseInt(flag(args, '--max-steps') ?? String(cfg.maxSteps ?? 30), 10);
+  const budgetRaw = flag(args, "--budget"); const budget = budgetRaw ? parseInt(budgetRaw, 10) : cfg.budget;
 
   const adapter = await selectAdapterOrThrow(dir);
   console.error(`[probevane] refactor adapter=${adapter.id} dir=${dir}`);
@@ -31,7 +32,7 @@ async function main() {
     `make the refactor, then ensure typecheck passes and every test that passed before still passes.`,
   ].join('\n');
 
-  const outcome = await runPath({ dir, adapter, profileName: 'refactor', task: fullTask, model, maxSteps, log: (l) => console.error(l) });
+  const outcome = await runPath({ dir, adapter, profileName: "refactor", task: fullTask, model, maxSteps, budget, log: (l) => console.error(l) });
   console.log(
     `[probevane] ${outcome.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} (${outcome.stopReason}) steps=${outcome.steps} ` +
       `tokens=${outcome.tokensIn}/${outcome.tokensOut} cacheRead=${outcome.cacheRead}${outcome.tookOver ? ' (took over)' : ''}`,

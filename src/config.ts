@@ -17,6 +17,7 @@ export interface ProbevaneConfig {
   mutation?: boolean;
   flakeGuard?: boolean;
   takeover?: string;
+  budget?: number; // hard output-token ceiling per run
 }
 
 const NAMES = ['probevane.config.ts', 'probevane.config.js', 'probevane.config.mjs', 'probevane.config.json'];

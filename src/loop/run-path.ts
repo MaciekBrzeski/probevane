@@ -14,6 +14,7 @@ export interface RunPathOpts {
   task: string;
   model?: string; // auto | haiku | sonnet | opus | <id>
   maxSteps?: number;
+  budget?: number;
   log?: (l: string) => void;
 }
 
@@ -37,6 +38,7 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
     task: opts.task,
     maxSteps: opts.maxSteps ?? 30,
     forceStopAfter: 8,
+    budget: opts.budget,
     log,
   });
 }

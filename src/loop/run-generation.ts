@@ -27,6 +27,7 @@ export interface GenerateOpts {
   minCoverage?: number;
   mutation?: boolean;
   flakeGuard?: boolean;
+  budget?: number;
   mock?: boolean; // synthesize + inject mocks (network/deps), enforce hermeticity
   targetGaps?: boolean; // run coverage first + steer the model at uncovered lines
   log?: (l: string) => void;
@@ -129,6 +130,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     task,
     maxSteps: opts.maxSteps ?? 30,
     forceStopAfter: 8, // real apps need a few more barren turns to converge before giving up
+    budget: opts.budget,
     log,
   });
 }

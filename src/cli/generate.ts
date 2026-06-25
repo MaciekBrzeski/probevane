@@ -23,6 +23,7 @@ async function main() {
   const mock = args.includes('--mock') || (!args.includes('--no-mock') && (cfg.mock ?? kind === 'unit'));
   const targetGaps = args.includes('--target-gaps');
   const flakeGuard = args.includes('--flake-guard') || cfg.flakeGuard === true;
+  const budget = pick(num(flag(args, '--budget')), cfg.budget);
 
   const adapter = await selectAdapterOrThrow(dir);
   // --model auto (default) detects complex code and routes it to a stronger
@@ -44,6 +45,7 @@ async function main() {
     minCoverage,
     mutation,
     flakeGuard,
+    budget,
     mock,
     targetGaps,
     log: (l) => console.error(l),
