@@ -218,6 +218,15 @@ describe('brain replay (record → replay identical, offline)', () => {
   });
 });
 
+describe('validation_gate tsc error counting', () => {
+  it('counts error TS diagnostics (so a dirty baseline cannot mask new errors)', async () => {
+    const { countTsErrors } = await import('../src/loop/runes/validation_gate.js');
+    expect(countTsErrors('all good')).toBe(0);
+    expect(countTsErrors('x.ts(14,20): error TS2554: Expected 1 arguments, but got 0.')).toBe(1);
+    expect(countTsErrors('a error TS1\nb error TS2554\nnote: not an error')).toBe(2);
+  });
+});
+
 describe('playwright-test-import audit rule', () => {
   it('flags bare playwright/test, allows @playwright/test', () => {
     const bad = auditSource('e2e/a.spec.ts', `import { test } from 'playwright/test';`, jsAuditRules());

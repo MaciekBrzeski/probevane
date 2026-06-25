@@ -10,25 +10,28 @@ import { sh } from '../../util/exec.js';
 // anti-pattern promoted to a hard gate). Block => loop continues with feedback.
 // Scope-aware: a unit run validates the unit suite; an e2e run the e2e suite.
 export function validationGate(scope: RunScope = 'unit', full = false): Rune {
-  // Captured once before any edits: did the project typecheck cleanly to begin
-  // with? If not (common in big real apps with their own build setup), we don't
-  // block on typecheck — a pre-existing failure isn't ours to fix; we rely on
-  // the test suite being green instead.
+  // Captured once before any edits: the project's baseline type-error COUNT.
+  // We don't demand a clean project (big real apps often aren't) — but we DO
+  // block if our edits INCREASE the error count, i.e. the tests we wrote added
+  // type errors. Count-based, not all-or-nothing, so a dirty baseline can't mask
+  // a tsc-dirty new test (the bug a loop-written gates.test.ts slipped through).
+  let baselineErrors = 0;
   let baselineTypecheckOk = true;
 
   return {
     name: 'validation_gate',
 
     systemPromptAddition(): string {
-      return 'FINISH RULE: You may only stop once typecheck passes (if the project was clean to begin with) AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix it and continue.';
+      return 'FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix it and continue.';
     },
 
     async prepare(ctx: RunCtx): Promise<string | undefined> {
       const tc = await sh(ctx.adapter.commands().typecheck, ctx.workdir);
       baselineTypecheckOk = tc.ok;
+      baselineErrors = countTsErrors(tc.stdout + tc.stderr);
       return baselineTypecheckOk
         ? undefined
-        : 'NOTE: the project does not typecheck cleanly on its own; the typecheck gate is relaxed — focus on writing green tests.';
+        : `NOTE: the project has ${baselineErrors} pre-existing type error(s) on its own; that's not yours to fix — but your tests must not ADD any.`;
     },
 
     async shouldStop(ctx: RunCtx): Promise<RuneDecision> {
@@ -40,14 +43,13 @@ export function validationGate(scope: RunScope = 'unit', full = false): Rune {
       }
 
       const cmds = ctx.adapter.commands();
-      if (baselineTypecheckOk) {
-        const tc = await sh(cmds.typecheck, ctx.workdir);
-        if (!tc.ok) {
-          return block(
-            'validation_gate: typecheck failed',
-            `Typecheck (\`${cmds.typecheck}\`) failed:\n${tail(tc.stdout + tc.stderr)}`,
-          );
-        }
+      const tc = await sh(cmds.typecheck, ctx.workdir);
+      const errs = countTsErrors(tc.stdout + tc.stderr);
+      if (!tc.ok && errs > baselineErrors) {
+        return block(
+          `validation_gate: typecheck added ${errs - baselineErrors} new type error(s)`,
+          `Your changes introduced type errors (\`${cmds.typecheck}\`, ${baselineErrors}→${errs}):\n${tail(tc.stdout + tc.stderr)}`,
+        );
       }
 
       // Scope to the specs we wrote — a real app's pre-existing suite may be
@@ -70,6 +72,11 @@ export function validationGate(scope: RunScope = 'unit', full = false): Rune {
 
 function tail(s: string, n = 2500): string {
   return s.length > n ? s.slice(-n) : s;
+}
+
+/** Count `error TSxxxx` diagnostics in a tsc run (dedup-free, one per occurrence). */
+export function countTsErrors(output: string): number {
+  return (output.match(/error TS\d+/g) ?? []).length;
 }
 
 const SPEC_RE = /(\.(test|spec)\.[tj]sx?$)|((^|\/)test_\w+\.py$)|(_test\.py$)/;
