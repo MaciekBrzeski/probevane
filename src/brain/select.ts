@@ -1,6 +1,7 @@
 import type { Brain } from './brain.js';
 import { anthropicBrain } from './anthropic-sdk.js';
 import { openaiCompatBrain } from './openai-compat.js';
+import { claudeCodeBrain } from './claude-code.js';
 import { recordingBrain, replayBrain } from './replay.js';
 
 // Resolve a model id to a brain.
@@ -17,6 +18,8 @@ const ALIAS: Record<string, string> = {
 export function brainFor(model?: string): Brain {
   let brain: Brain;
   if (model?.startsWith('replay:')) return replayBrain(model.slice('replay:'.length));
+  else if (model === 'claude-code') brain = claudeCodeBrain();
+  else if (model?.startsWith('cc:')) brain = claudeCodeBrain(model.slice('cc:'.length));
   else if (model?.startsWith('local:')) brain = openaiCompatBrain(model.slice('local:'.length));
   else if (model?.startsWith('openai:')) brain = openaiCompatBrain(model.slice('openai:'.length));
   else brain = anthropicBrain(model && model !== 'auto' ? (ALIAS[model] ?? model) : undefined);

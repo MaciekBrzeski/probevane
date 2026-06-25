@@ -5,6 +5,7 @@ import { toApiMsg, withCacheBreakpoint } from '../src/brain/anthropic-sdk.js';
 import { tokenize, similarity, pickSimilarTrace } from '../src/library/similar.js';
 import { kindFor, categoryFor, scoreFor, slugFor } from '../src/loop/runes/library_promote.js';
 import { extractTestBlock, conventionalSpecPath } from '../src/loop/extract.js';
+import { parseDecision, extractJson } from '../src/brain/claude-code.js';
 import { RunCtx } from '../src/loop/ctx.js';
 import type { Trace } from '../src/distill/collect.js';
 
@@ -168,6 +169,31 @@ describe('conventionalSpecPath', () => {
     expect(conventionalSpecPath('go-test', 'calc.go')).toBe('calc_test.go');
     expect(conventionalSpecPath('rust-cargo', 'src/lib.rs')).toBe('tests/lib.rs');
     expect(conventionalSpecPath('angular', 'src/counter.service.ts')).toBe('src/counter.service.spec.ts');
+  });
+});
+
+// ---- claude-code brain (per-turn JSON decision) -----------------------------
+describe('brain.claude-code parseDecision', () => {
+  it('parses a raw JSON tool-call decision', () => {
+    const d = parseDecision('{"text":"reading","tool_calls":[{"name":"read_file","input":{"path":"a.ts"}}]}');
+    expect(d.text).toBe('reading');
+    expect(d.toolCalls).toEqual([{ id: 'cc-0', name: 'read_file', input: { path: 'a.ts' } }]);
+  });
+  it('parses a fenced + prose-wrapped decision', () => {
+    const d = parseDecision('Sure, next step:\n```json\n{"tool_calls":[{"name":"plan","input":{"text":"x"}}]}\n```');
+    expect(d.toolCalls[0].name).toBe('plan');
+  });
+  it('treats {"tool_calls": []} as a stop (no calls)', () => {
+    expect(parseDecision('{"tool_calls":[]}').toolCalls).toEqual([]);
+  });
+  it('falls back to text when no JSON present', () => {
+    const d = parseDecision('I think the tests are complete.');
+    expect(d.toolCalls).toEqual([]);
+    expect(d.text).toContain('complete');
+  });
+  it('extractJson handles nested braces + strings with braces', () => {
+    const o = extractJson('noise {"a":{"b":"}{"},"c":1} trailing');
+    expect(o).toEqual({ a: { b: '}{' }, c: 1 });
   });
 });
 
