@@ -27,6 +27,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `eval` | Run probevane's fixture eval (self-test of the harness); --live regenerates. |
 | `watch` | Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop. |
 | `skill` | Generate/check the probevane control skill (this doc). --check fails on drift. |
+| `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
 
 ## Reference
 
@@ -196,4 +197,12 @@ Generate/check the probevane control skill (this doc). --check fails on drift.
 ```bash
 probevane skill [--check]
 # e.g. probevane skill --check
+```
+
+### distill
+Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:.
+
+```bash
+probevane distill <build|stats|train> [--execute]
+# e.g. probevane distill build
 ```

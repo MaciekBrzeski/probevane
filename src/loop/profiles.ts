@@ -15,6 +15,7 @@ import { behaviorLock } from './runes/behavior_lock.js';
 import { redFirst } from './runes/red_first.js';
 import { sessionDiary } from './runes/session_diary.js';
 import { caveatHarvest } from './runes/caveat_harvest.js';
+import { distillTrace } from './runes/distill_trace.js';
 
 // Profiles — ordered Rune pipelines per task type (ported from runestone
 // profiles.rs). beforeToolCall order: plan_first → no_regression. shouldStop
@@ -54,6 +55,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         ...(opts.a11y ? [a11yGate] : []),
         sessionDiary,
         caveatHarvest,
+        distillTrace,
       ];
     case 'refactor':
       // Characterization-first: tests are the contract, source is what changes.
@@ -72,6 +74,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         acceptanceGate({ scope: 'unit', minTests: opts.minTests ?? 1 }),
         sessionDiary,
         caveatHarvest,
+        distillTrace,
       ];
     case 'repair':
       // Update affected specs so the whole suite is green again after a source change.
@@ -84,6 +87,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         hermeticGate,
         sessionDiary,
         caveatHarvest,
+        distillTrace,
       ];
     case 'fix':
       // Apply review findings (source or tests), keep the whole suite green + clean.
@@ -96,6 +100,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         hermeticGate,
         sessionDiary,
         caveatHarvest,
+        distillTrace,
       ];
     case 'bare':
       return [];

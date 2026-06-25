@@ -36,6 +36,7 @@ export const COMMANDS: Command[] = [
   { name: 'eval', summary: "Run probevane's fixture eval (self-test of the harness); --live regenerates.", usage: 'probevane eval [--live] [--flake N]', example: 'probevane eval' },
   { name: 'watch', summary: 'Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop.', usage: 'probevane watch <dir> [--run] [--debounce ms]', example: 'probevane watch ./app --run' },
   { name: 'skill', summary: 'Generate/check the probevane control skill (this doc). --check fails on drift.', usage: 'probevane skill [--check]', example: 'probevane skill --check' },
+  { name: 'distill', summary: "Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:.", usage: 'probevane distill <build|stats|train> [--execute]', example: 'probevane distill build' },
 ];
 
 /** Commands accepted by bin/probevane that intentionally aren't user-facing skill entries. */

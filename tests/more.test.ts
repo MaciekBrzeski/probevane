@@ -10,6 +10,8 @@ import { jsAuditRules } from '../src/audit/rules-js.js';
 import { goAuditRules } from '../src/audit/rules-go.js';
 import { pyAuditRules } from '../src/audit/rules-py.js';
 import { a11yRules } from '../src/a11y/rules.js';
+import { buildExamples, splitExamples, statsByStack } from '../src/distill/dataset.js';
+import type { Trace } from '../src/distill/collect.js';
 import { selectBest, scoreSuite, type SuiteScore } from '../src/loop/passk.js';
 import { reactAdapter } from '../src/adapters/react-vitest-playwright/index.js';
 import { recordingBrain, replayBrain } from '../src/brain/replay.js';
@@ -89,6 +91,30 @@ describe('passk.scoreSuite (real fixture)', () => {
     expect(s.green).toBe(true);
     expect(s.value).toBeGreaterThan(0);
   }, 60_000);
+});
+
+describe('distillation dataset', () => {
+  const mk = (stack: string, spec: string, task = 't'): Trace => ({ ts: '2026-01-01', stack, task, specPath: 'a.test.ts', spec });
+  it('filters low-quality + dedups, builds chat examples', () => {
+    const traces = [
+      mk('react', `import x; it('t', () => { expect(add(1,2)).toBe(3); });`),
+      mk('react', `import x; it('t', () => { expect(add(1,2)).toBe(3); });`), // dup
+      mk('go', 'short'), // too short + no assertion → filtered
+    ];
+    const ex = buildExamples(traces);
+    expect(ex).toHaveLength(1);
+    expect(ex[0].messages[0].role).toBe('system');
+    expect(ex[0].messages[2].content).toContain('expect');
+  });
+  it('splits 90/10 deterministically', () => {
+    const ex = Array.from({ length: 20 }, (_, i) => ({ messages: [{ role: 'user' as const, content: `e${i}` }] }));
+    const { train, val } = splitExamples(ex);
+    expect(train).toHaveLength(18);
+    expect(val).toHaveLength(2);
+  });
+  it('counts by stack', () => {
+    expect(statsByStack([mk('react', 'a'), mk('react', 'b'), mk('go', 'c')])).toEqual({ react: 2, go: 1 });
+  });
 });
 
 describe('a11y rules', () => {
