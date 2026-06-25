@@ -7,6 +7,7 @@ import { TOOL_SPECS, execTool } from './tools.js';
 import { capOutput } from '../util/exec.js';
 import type { Msg, ToolResult } from './types.js';
 import { formatEvent } from './events.js';
+import { recordRun } from '../cost/ledger.js';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -48,6 +49,8 @@ export interface RunOptions {
   onConsult?: (ctx: RunCtx) => Promise<string | undefined>;
   /** Stable id for the live event log file (defaults to a timestamp id). */
   runId?: string;
+  /** Human label for the cost ledger, e.g. "generate:fixtures/x" (path:target). */
+  label?: string;
   log?: (line: string) => void;
 }
 
@@ -234,6 +237,10 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   ctx.accepted = accepted;
   ctx.stopReason = stopReason;
   emit({ stopReason, accepted });
+  await recordRun({
+    ts: new Date().toISOString(), runId, label: opts.label ?? 'run', model: brain.model,
+    tokensIn, tokensOut, cacheRead, accepted, tookOver, stopReason, steps: ctx.step,
+  });
   for (const r of runes) await r.onStop?.(ctx);
 
   return {

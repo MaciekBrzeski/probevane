@@ -36,6 +36,7 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
     takeoverBrain,
     runes: profile(opts.profileName, { kind: 'unit' }),
     task: opts.task,
+    label: `${opts.profileName}:${opts.dir.split('/').pop()}`,
     maxSteps: opts.maxSteps ?? 30,
     forceStopAfter: 8,
     budget: opts.budget,

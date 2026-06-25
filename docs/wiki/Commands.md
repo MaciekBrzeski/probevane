@@ -30,6 +30,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
+| `history` | Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown. |
 | `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
 
 ## Reference
@@ -224,6 +225,14 @@ Screenshot-driven visual improvement loop — capture a page, a vision model jud
 ```bash
 probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload <cmd>] [--max N]
 # e.g. probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"
+```
+
+### history
+Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown.
+
+```bash
+probevane history [--limit N] [--json]
+# e.g. probevane history
 ```
 
 ### peek

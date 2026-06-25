@@ -147,6 +147,26 @@ describe('visual_gate decision', () => {
   });
 });
 
+describe('cost ledger', () => {
+  it('costOf prices haiku/sonnet + cache reads', async () => {
+    const { costOf } = await import('../src/cost/pricing.js');
+    expect(costOf('claude-haiku-4-5-20251001', { input: 100_000, output: 10_000 })).toBeCloseTo(0.15, 6);
+    expect(costOf('claude-sonnet-4-6', { input: 100_000, output: 10_000 })).toBeCloseTo(0.45, 6);
+    expect(costOf('claude-haiku-4-5', { input: 0, output: 0, cacheRead: 50_000 })).toBeCloseTo(0.005, 6);
+    expect(costOf('local:qwen', { input: 1_000_000, output: 1_000_000 })).toBe(0); // local is free
+  });
+  it('summarize splits harness-alone vs takeover vs hand', async () => {
+    const { summarize } = await import('../src/cost/ledger.js');
+    const r = (o: any) => ({ ts: 't', runId: 'x', label: 'generate:a', model: 'claude-haiku-4-5', tokensIn: 0, tokensOut: 0, cacheRead: 0, cost: 0.1, stopReason: 's', steps: 1, ...o });
+    const s = summarize([r({ accepted: true, tookOver: false }), r({ accepted: true, tookOver: true }), r({ accepted: false, tookOver: false })]);
+    expect(s.harnessOnly).toBe(1);
+    expect(s.withTakeover).toBe(1);
+    expect(s.needsHand).toBe(1);
+    expect(s.acceptRate).toBe(0.667);
+    expect(s.byPath.generate.runs).toBe(3);
+  });
+});
+
 describe('loop peek view-model', () => {
   it('collapses events to the latest per run', async () => {
     const { latestPerRun } = await import('../src/loop/observe.js');

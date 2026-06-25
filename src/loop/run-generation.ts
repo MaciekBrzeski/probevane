@@ -135,6 +135,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     onConsult,
     runes,
     task,
+    label: `${kind === 'e2e' ? 'generate-e2e' : 'generate'}:${dir.split('/').pop()}`,
     maxSteps: opts.maxSteps ?? 30,
     forceStopAfter: 8, // real apps need a few more barren turns to converge before giving up
     budget: opts.budget,
