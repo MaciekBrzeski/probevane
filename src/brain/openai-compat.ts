@@ -7,6 +7,7 @@ import type { BrainResponse, Msg, StopReason, ToolCall } from '../loop/types.js'
 // Ollama). Key: PROBEVANE_API_KEY / OPENAI_API_KEY (optional for local servers).
 
 const MAX_RETRIES = 4;
+const TIMEOUT_MS = Number(process.env.PROBEVANE_HTTP_TIMEOUT_MS ?? 120_000);
 
 export function openaiCompatBrain(model: string): Brain {
   const baseUrl = (process.env.PROBEVANE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
@@ -27,12 +28,15 @@ export function openaiCompatBrain(model: string): Brain {
       };
       let lastErr: unknown;
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
         try {
           const res = await fetch(`${baseUrl}/chat/completions`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
             body: JSON.stringify(body),
-          });
+            signal: ctl.signal,
+          }).finally(() => clearTimeout(timer));
           if (!res.ok) {
             if ([429, 500, 502, 503, 504].includes(res.status) && attempt < MAX_RETRIES) throw new Error(`retry ${res.status}`);
             throw new Error(`${res.status} ${await res.text().catch(() => '')}`);
