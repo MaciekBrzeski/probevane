@@ -7,6 +7,7 @@ import { kindFor, categoryFor, scoreFor, slugFor } from '../src/loop/runes/libra
 import { extractTestBlock, conventionalSpecPath } from '../src/loop/extract.js';
 import { parseDecision, extractJson } from '../src/brain/claude-code.js';
 import { summarize, type RunRecord } from '../src/cost/ledger.js';
+import { toResponse } from '../src/brain/bridge.js';
 import { RunCtx } from '../src/loop/ctx.js';
 import type { Trace } from '../src/distill/collect.js';
 
@@ -195,6 +196,21 @@ describe('brain.claude-code parseDecision', () => {
   it('extractJson handles nested braces + strings with braces', () => {
     const o = extractJson('noise {"a":{"b":"}{"},"c":1} trailing');
     expect(o).toEqual({ a: { b: '}{' }, c: 1 });
+  });
+});
+
+// ---- Bridge brain (subagent-in-host services each turn) ---------------------
+describe('brain.bridge toResponse', () => {
+  it('maps host tool_calls to ToolCalls with ids', () => {
+    const r = toResponse({ text: 'reading', tool_calls: [{ name: 'read_file', input: { path: 'a.ts' } }] });
+    expect(r.toolCalls).toEqual([{ id: 'bridge-0', name: 'read_file', input: { path: 'a.ts' } }]);
+    expect(r.stopReason).toBe('tool_use');
+  });
+  it('empty tool_calls is a stop; costUsd threads through', () => {
+    const r = toResponse({ tool_calls: [], costUsd: 0 });
+    expect(r.toolCalls).toEqual([]);
+    expect(r.stopReason).toBe('end_turn');
+    expect(r.usage.costUsd).toBe(0);
   });
 });
 
