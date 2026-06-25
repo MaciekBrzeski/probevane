@@ -18,7 +18,7 @@ import { caveatHarvest } from './runes/caveat_harvest.js';
 // Profiles — ordered Rune pipelines per task type (ported from runestone
 // profiles.rs). beforeToolCall order: plan_first → no_regression. shouldStop
 // order: validation (fast fail) → audit (static) → acceptance (count/coverage).
-export type ProfileName = 'write_tests' | 'refactor' | 'feature' | 'repair' | 'bare';
+export type ProfileName = 'write_tests' | 'refactor' | 'feature' | 'repair' | 'fix' | 'bare';
 
 export interface ProfileOpts {
   kind: TestKind;
@@ -77,6 +77,18 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         pathGuard,
         planFirst,
         validationGate('unit', true), // full suite must be green
+        auditGate,
+        hermeticGate,
+        sessionDiary,
+        caveatHarvest,
+      ];
+    case 'fix':
+      // Apply review findings (source or tests), keep the whole suite green + clean.
+      return [
+        contextInject('unit'),
+        pathGuard,
+        planFirst,
+        validationGate('unit', true), // full suite must stay green
         auditGate,
         hermeticGate,
         sessionDiary,
