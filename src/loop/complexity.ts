@@ -38,13 +38,17 @@ export function routeModels(choice: string, complex: boolean): { primary?: strin
   const HAIKU = 'claude-haiku-4-5-20251001';
   const SONNET = 'claude-sonnet-4-6';
   const OPUS = 'claude-opus-4-8';
+  // Takeover stays at Sonnet, never auto-escalates to Opus: the cost ledger
+  // showed Opus-takeover on already-stuck hard modules rarely converges and
+  // burns ~$1.20/run on re-sent input ($3.78 for 0 accepted in the self-cov
+  // experiment). Opus is opt-in via `--model opus`.
   if (choice === 'auto') {
     return complex
-      ? { primary: SONNET, takeover: OPUS } // start strong, escalate to Opus if stuck
+      ? { primary: SONNET, takeover: SONNET } // already strong; don't pay Opus to churn
       : { primary: HAIKU, takeover: SONNET };
   }
   if (choice === 'haiku') return { primary: HAIKU, takeover: SONNET };
-  if (choice === 'sonnet') return { primary: SONNET, takeover: OPUS };
+  if (choice === 'sonnet') return { primary: SONNET, takeover: SONNET };
   if (choice === 'opus') return { primary: OPUS, takeover: OPUS };
   return { primary: choice, takeover: SONNET }; // explicit model id
 }
