@@ -17,14 +17,21 @@ Skip style nits unless they change meaning. Reply with ONLY a JSON array of find
 { "file": string, "line": number|null, "severity": "error"|"warn"|"nit", "issue": string, "fix": string }
 No prose, no markdown fences — just the JSON array (or [] if the diff is clean).`;
 
-export async function reviewDiff(dir: string, base: string, brain: Brain): Promise<Finding[]> {
+export async function getDiff(dir: string, base: string): Promise<string> {
   const d = await sh(`git diff ${base} -- . ':(exclude)node_modules' ':(exclude)*.lock' ':(exclude)package-lock.json'`, dir);
-  const diff = (d.stdout || '').slice(0, 60_000);
+  return (d.stdout || '').slice(0, 60_000);
+}
+
+export async function reviewDiffText(diff: string, brain: Brain): Promise<Finding[]> {
   if (!diff.trim()) return [];
   const resp = await brain
     .complete({ system: SYSTEM, messages: [{ role: 'user', text: `Review this diff:\n\n${diff}` }], tools: [] })
     .catch(() => null);
   return parseFindings(resp?.text ?? '');
+}
+
+export async function reviewDiff(dir: string, base: string, brain: Brain): Promise<Finding[]> {
+  return reviewDiffText(await getDiff(dir, base), brain);
 }
 
 export function parseFindings(text: string): Finding[] {

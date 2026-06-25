@@ -12,6 +12,8 @@ import { pyAuditRules } from '../src/audit/rules-py.js';
 import { selectBest, scoreSuite, type SuiteScore } from '../src/loop/passk.js';
 import { reactAdapter } from '../src/adapters/react-vitest-playwright/index.js';
 import { recordingBrain, replayBrain } from '../src/brain/replay.js';
+import { groundFindings, parseVerdicts } from '../src/review/verify.js';
+import { parseFindings } from '../src/review/diff-review.js';
 
 describe('coverage.parseGaps', () => {
   let dir: string;
@@ -86,6 +88,31 @@ describe('passk.scoreSuite (real fixture)', () => {
     expect(s.green).toBe(true);
     expect(s.value).toBeGreaterThan(0);
   }, 60_000);
+});
+
+describe('review verification gate', () => {
+  it('parseFindings extracts findings from chatty text', () => {
+    const f = parseFindings('sure: [{"file":"a.ts","line":3,"severity":"error","issue":"bug","fix":"x"}]');
+    expect(f).toHaveLength(1);
+    expect(f[0].severity).toBe('error');
+  });
+  it('groundFindings drops references to nonexistent files', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gf-'));
+    writeFileSync(join(dir, 'real.ts'), 'line1\nline2\nline3\n');
+    const grounded = await groundFindings(dir, [
+      { file: 'real.ts', line: 2, severity: 'error', issue: 'x', fix: '' },
+      { file: 'ghost.ts', line: 1, severity: 'error', issue: 'hallucinated', fix: '' },
+      { file: 'real.ts', line: 999, severity: 'warn', issue: 'out of range', fix: '' },
+    ]);
+    expect(grounded.map((f) => f.file)).toEqual(['real.ts']);
+    expect(grounded[0].line).toBe(2);
+    rmSync(dir, { recursive: true, force: true });
+  });
+  it('parseVerdicts maps index→real', () => {
+    const v = parseVerdicts('[{"index":0,"real":true,"reason":"yes"},{"index":1,"real":false}]');
+    expect(v.get(0)).toBe(true);
+    expect(v.get(1)).toBe(false);
+  });
 });
 
 describe('brain replay (record → replay identical, offline)', () => {

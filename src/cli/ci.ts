@@ -3,7 +3,8 @@ import { access, appendFile } from 'node:fs/promises';
 import { selectAdapter } from '../adapters/registry.js';
 import { loadConfig } from '../config.js';
 import { changedFiles, isSourceFile, specCandidatesFor } from '../git.js';
-import { reviewDiff, findingsMarkdown, findingsTask } from '../review/diff-review.js';
+import { getDiff, reviewDiffText, findingsMarkdown, findingsTask } from '../review/diff-review.js';
+import { groundFindings, verifyFindings } from '../review/verify.js';
 import { brainFor } from '../brain/select.js';
 import { sh } from '../util/exec.js';
 
@@ -57,8 +58,15 @@ async function main() {
   // commit the remediation back to the branch.
   let reviewMd = '';
   if (reviewFix && process.env.ANTHROPIC_API_KEY) {
-    const brain = brainFor(cfg.model && cfg.model !== 'auto' ? cfg.model : 'sonnet');
-    const findings = await reviewDiff(dir, base, brain).catch(() => []);
+    const reviewer = brainFor(cfg.model && cfg.model !== 'auto' ? cfg.model : 'sonnet');
+    const diff = await getDiff(dir, base);
+    const raw = await reviewDiffText(diff, reviewer).catch(() => []);
+    // GATE issue-discovery: drop hallucinated refs, then an INDEPENDENT skeptic
+    // refutes; only verified findings are acted on.
+    const grounded = await groundFindings(dir, raw);
+    const verifier = brainFor('sonnet'); // fresh, independent
+    const findings = await verifyFindings(grounded, diff, verifier).catch(() => grounded);
+    if (raw.length !== findings.length) console.error(`[probevane] review: ${raw.length} raw → ${grounded.length} grounded → ${findings.length} verified`);
     reviewMd = '\n' + findingsMarkdown(findings);
     const actionable = findings.filter((f) => f.severity !== 'nit');
     if (actionable.length) {
