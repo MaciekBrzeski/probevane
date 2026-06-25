@@ -27,12 +27,23 @@ export function anthropicBrain(model = DEFAULT_MODEL): Brain {
         // breakpoint on the last tool caches everything before it (system + tools)
         ...(i === req.tools.length - 1 ? { cache_control: { type: 'ephemeral' } } : {}),
       }));
+      // Second breakpoint on the STABLE transcript prefix: once a message has
+      // been pruned to a stub it never changes again, so a cache_control there
+      // caches the whole growing prefix (system + tools is the first; this is the
+      // second of Anthropic's ≤4). The live tail after it is re-sent uncached but
+      // bounded by the prune window. Skips the very last message (the live turn).
+      const cpi = req.cachePrefixIndex;
+      const messages = req.messages.map((m, i) =>
+        cpi !== undefined && i === cpi && i < req.messages.length - 1
+          ? withCacheBreakpoint(toApiMsg(m))
+          : toApiMsg(m),
+      );
       const body = {
         model,
         max_tokens: 4096,
         system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
         tools,
-        messages: req.messages.map(toApiMsg),
+        messages,
       };
 
       let lastErr: unknown;
@@ -53,7 +64,19 @@ export function anthropicBrain(model = DEFAULT_MODEL): Brain {
   };
 }
 
-function toApiMsg(m: Msg): any {
+/** Mark the LAST content block of an already-built API message as a cache breakpoint. */
+export function withCacheBreakpoint(am: any): any {
+  let content = am.content;
+  if (typeof content === 'string') content = [{ type: 'text', text: content }];
+  if (!Array.isArray(content) || content.length === 0) return am;
+  const last = content.length - 1;
+  content = content.map((b: any, j: number) =>
+    j === last ? { ...b, cache_control: { type: 'ephemeral' } } : b,
+  );
+  return { ...am, content };
+}
+
+export function toApiMsg(m: Msg): any {
   const content: any[] = [];
   if (m.role === 'assistant') {
     if (m.text) content.push({ type: 'text', text: m.text });

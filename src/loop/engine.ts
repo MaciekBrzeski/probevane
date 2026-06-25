@@ -7,6 +7,7 @@ import { TOOL_SPECS, execTool } from './tools.js';
 import { capOutput } from '../util/exec.js';
 import type { Msg, ToolResult } from './types.js';
 import { formatEvent } from './events.js';
+import { isCircular, proposal as difficultyProposal } from './difficulty.js';
 import { recordRun } from '../cost/ledger.js';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -15,6 +16,19 @@ import { join } from 'node:path';
 // transcript (re-sent every turn) stays bounded. The files persist on disk —
 // the model can re-read if it needs them.
 const PRUNE_TOOL_RESULTS_AFTER = 8;
+
+// Index marking the end of the STABLE (already-pruned) transcript prefix, for the
+// brain's second cache_control breakpoint. The live window is ~2 messages per
+// turn (assistant + tool_results), so everything before `len - liveWindow` is
+// stubbed and immutable → safe to cache. Returns undefined when the transcript is
+// still too short to have a stable prefix worth caching.
+export function stableCacheIndex(
+  len: number,
+  liveWindowMsgs = PRUNE_TOOL_RESULTS_AFTER * 2,
+): number | undefined {
+  const idx = len - liveWindowMsgs - 1;
+  return idx > 0 ? idx : undefined;
+}
 
 function pruneOldToolResults(messages: Msg[], keepLast: number): void {
   // Find user turns carrying tool results, oldest first; stub all but the last `keepLast`.
@@ -59,11 +73,13 @@ export interface RunOutcome {
   steps: number;
   toolCalls: number;
   gateBlocks: number;
-  stopReason: 'accepted' | 'max_steps' | 'stuck' | 'error' | 'budget';
+  stopReason: 'accepted' | 'max_steps' | 'stuck' | 'error' | 'budget' | 'difficulty';
   tokensIn: number;
   tokensOut: number;
   cacheRead: number;
   tookOver: boolean;
+  /** Set when stopReason is "difficulty": what blocked + suggested next steps. */
+  proposal?: string;
 }
 
 const BASE_SYSTEM = `You are probevane, an agent that edits a codebase to satisfy a task.
@@ -122,6 +138,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   };
   let accepted = false;
   let stopReason: RunOutcome['stopReason'] = 'max_steps';
+  let proposalText: string | undefined;
 
   while (ctx.step < maxSteps) {
     ctx.step++;
@@ -129,7 +146,12 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
 
     let resp;
     try {
-      resp = await brain.complete({ system, messages, tools: TOOL_SPECS });
+      resp = await brain.complete({
+        system,
+        messages,
+        tools: TOOL_SPECS,
+        cachePrefixIndex: stableCacheIndex(messages.length),
+      });
     } catch (e) {
       log(`[engine] brain error: ${String(e)}`);
       stopReason = 'error';
@@ -220,6 +242,36 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
       continue;
     }
 
+    // Difficulty gate: once we've already escalated (consulted/took over) and the
+    // loop is still CIRCLING — same gate-block reason or identical tool call ≥3× —
+    // stop early and PROPOSE a way forward instead of burning the rest of the
+    // budget churning. Deterministic proposal first; one LLM proposal turn appended
+    // when there's budget headroom (skipped in deterministic/replay mode).
+    if (started && consulted && isCircular(ctx)) {
+      proposalText = difficultyProposal(ctx);
+      const outOfBudget = opts.budget ? tokensOut >= opts.budget : false;
+      if (!outOfBudget && process.env.PROBEVANE_DETERMINISTIC !== '1') {
+        try {
+          messages.push({
+            role: 'user',
+            text:
+              `${proposalText}\n\nYou appear stuck. In <=5 lines, propose a simpler target or ` +
+              `explain the exact blocker. Do NOT call tools.`,
+          });
+          const r = await brain.complete({
+            system, messages, tools: TOOL_SPECS, cachePrefixIndex: stableCacheIndex(messages.length),
+          });
+          tokensIn += r.usage.input;
+          tokensOut += r.usage.output;
+          cacheRead += r.usage.cacheRead ?? 0;
+          if (r.text.trim()) proposalText += `\n\nModel: ${r.text.trim()}`;
+        } catch { /* deterministic proposal still stands */ }
+      }
+      log(`[engine] difficulty: stopping + proposing — ${proposalText.split('\n')[0]}`);
+      stopReason = 'difficulty';
+      break;
+    }
+
     if (started && ctx.barren >= forceStopAfter) {
       log(`[engine] giving up: ${ctx.barren} barren turns (forceStopAfter=${forceStopAfter})`);
       stopReason = 'stuck';
@@ -236,7 +288,8 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
 
   ctx.accepted = accepted;
   ctx.stopReason = stopReason;
-  emit({ stopReason, accepted });
+  emit({ stopReason, accepted, proposal: proposalText });
+  if (proposalText) log(`[engine] PROPOSAL:\n${proposalText}`);
   await recordRun({
     ts: new Date().toISOString(), runId, label: opts.label ?? 'run', model: brain.model,
     tokensIn, tokensOut, cacheRead, accepted, tookOver, stopReason, steps: ctx.step,
@@ -253,5 +306,6 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     tokensOut,
     cacheRead,
     tookOver,
+    proposal: proposalText,
   };
 }

@@ -7,6 +7,14 @@ export interface BrainRequest {
   system: string;
   messages: Msg[];
   tools: ToolSpec[];
+  /**
+   * Index into `messages` marking the end of the STABLE transcript prefix
+   * (everything at or before it has been pruned to a stub and will never change
+   * again). A brain may set a second cache_control breakpoint on that message so
+   * the growing transcript is read from cache instead of re-billed each turn.
+   * Undefined → cache only the system+tools prefix (the old behaviour).
+   */
+  cachePrefixIndex?: number;
 }
 
 export interface Brain {

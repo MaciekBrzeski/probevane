@@ -23,8 +23,11 @@ export class RunCtx {
   stopReason = 'unknown';
   /** Distinct gate-block reasons seen this run (caveat_harvest feeds these back). */
   gateBlockReasons: string[] = [];
+  /** RAW (non-deduped) gate-block reasons — the difficulty gate counts repeats here. */
+  gateBlockHistory: string[] = [];
 
   noteBlock(reason: string) {
+    this.gateBlockHistory.push(reason);
     if (!this.gateBlockReasons.includes(reason)) this.gateBlockReasons.push(reason);
   }
 

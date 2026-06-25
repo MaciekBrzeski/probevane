@@ -27,6 +27,8 @@ export interface LoopEvent {
   stopReason?: string;
   /** Whether the run was ultimately accepted */
   accepted?: boolean;
+  /** Difficulty-gate proposal emitted when the loop stops circling (stopReason "difficulty"). */
+  proposal?: string;
 }
 
 /**
