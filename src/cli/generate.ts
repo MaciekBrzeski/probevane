@@ -24,6 +24,7 @@ async function main() {
   const targetGaps = args.includes('--target-gaps');
   const flakeGuard = args.includes('--flake-guard') || cfg.flakeGuard === true;
   const budget = pick(num(flag(args, '--budget')), cfg.budget);
+  const passk = parseInt(flag(args, '--passk') ?? '1', 10);
 
   const adapter = await selectAdapterOrThrow(dir);
   // --model auto (default) detects complex code and routes it to a stronger
@@ -33,8 +34,8 @@ async function main() {
   console.error(`[probevane] generate kind=${kind} adapter=${adapter.id} model=${model} dir=${dir}`);
 
   const takeoverOverride = flag(args, '--takeover');
-  const outcome = await generateTests({
-    dir,
+  const genOpts = (d: string) => ({
+    dir: d,
     kind,
     adapter,
     model,
@@ -48,8 +49,23 @@ async function main() {
     budget,
     mock,
     targetGaps,
-    log: (l) => console.error(l),
+    log: (l: string) => console.error(l),
   });
+
+  if (passk > 1) {
+    // pass@k: sample K candidate suites, keep the best-scoring one.
+    const { passKGenerate } = await import('../loop/passk.js');
+    const { best } = await passKGenerate({
+      dir, kind, adapter, k: passk,
+      generate: async (cand) => (await generateTests(genOpts(cand))).accepted,
+      log: (l) => console.error(l),
+    });
+    console.log(`[probevane] pass@${passk}: ${best ? `selected ${best.label} (value=${best.score.value}, tests=${best.score.tests}, cov=${best.score.coverage}%)` : 'no acceptable candidate'}`);
+    if (!best) process.exit(1);
+    return;
+  }
+
+  const outcome = await generateTests(genOpts(dir));
 
   console.log(
     `[probevane] ${outcome.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} (${outcome.stopReason}) ` +

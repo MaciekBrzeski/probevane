@@ -9,6 +9,8 @@ import { auditSource } from '../src/audit/core.js';
 import { jsAuditRules } from '../src/audit/rules-js.js';
 import { goAuditRules } from '../src/audit/rules-go.js';
 import { pyAuditRules } from '../src/audit/rules-py.js';
+import { selectBest, scoreSuite, type SuiteScore } from '../src/loop/passk.js';
+import { reactAdapter } from '../src/adapters/react-vitest-playwright/index.js';
 
 describe('coverage.parseGaps', () => {
   let dir: string;
@@ -60,6 +62,29 @@ describe('vitest-runner.mergeResults', () => {
     expect(m.failed).toBe(1);
     expect(m.green).toBe(false);
   });
+});
+
+describe('passk.selectBest (pass@k selection)', () => {
+  const mk = (v: number): SuiteScore => ({ green: v >= 0, tests: 5, coverage: 80, auditScore: 5, auditErrors: 0, value: v });
+  it('picks the highest-value candidate', () => {
+    const best = selectBest([
+      { label: 'a', score: mk(10), ref: 1 },
+      { label: 'b', score: mk(42), ref: 2 },
+      { label: 'c', score: mk(30), ref: 3 },
+    ]);
+    expect(best?.label).toBe('b');
+  });
+  it('returns null when all candidates are worthless', () => {
+    expect(selectBest([{ label: 'x', score: mk(-1), ref: 0 }])).toBeNull();
+  });
+});
+
+describe('passk.scoreSuite (real fixture)', () => {
+  it('a green golden suite scores positive', async () => {
+    const s = await scoreSuite('fixtures/react-todo', reactAdapter);
+    expect(s.green).toBe(true);
+    expect(s.value).toBeGreaterThan(0);
+  }, 60_000);
 });
 
 describe('audit rules (js/go/py)', () => {
