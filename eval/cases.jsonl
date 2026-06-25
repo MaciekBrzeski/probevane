@@ -5,3 +5,4 @@
 {"fixture": "go-calc", "kind": "unit"}
 {"fixture": "svelte-counter", "kind": "unit"}
 {"fixture":"rust-calc","kind":"unit"}
+{"fixture":"angular-counter","kind":"unit"}

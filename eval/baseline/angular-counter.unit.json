@@ -1,0 +1,1 @@
+{ "scope": "unit", "minTests": 3, "maxFlake": 0, "oracleAssertions": ["increment", "reset", "isPositive"] }
