@@ -223,6 +223,23 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     // lesson: don't fire during the read/plan phase).
     const started = ctx.editedFiles.size > 0;
 
+    // Never-edited stall: a model that never writes a file (e.g. a weak local
+    // agent that emits the test as prose instead of calling write_file) keeps
+    // hitting the SAME stop-block and — because consult/forceStop/difficulty all
+    // gate on `started` — would otherwise churn to max_steps. If we've burned
+    // forceStopAfter turns with zero edits and the same block is repeating, give
+    // up early + propose. Deterministic only (a non-tool-calling model can't
+    // produce a useful LLM proposal, and the run must stay free).
+    if (!started && ctx.barren >= forceStopAfter && isCircular(ctx)) {
+      proposalText =
+        `No test file produced in ${ctx.step} turns — the model isn't writing files ` +
+        `(it may not support tool calls, or the target is too hard for it). ` +
+        difficultyProposal(ctx);
+      log(`[engine] difficulty (never-edited): stopping early — ${proposalText.split('—')[0].trim()}`);
+      stopReason = 'difficulty';
+      break;
+    }
+
     // Consult ladder: when stalled, escalate once before giving up. Pull extra
     // guidance (e.g. a library exemplar via onConsult), nudge toward finish/cleanup,
     // and — if a stronger brain is supplied — hand it the window (takeover).
