@@ -1,0 +1,6 @@
+{
+  "scope": "unit",
+  "minTests": 4,
+  "maxFlake": 0,
+  "oracleAssertions": ["divide", "assert_eq", "is_even"]
+}

@@ -5,9 +5,10 @@ import { vueAdapter } from './vue-vitest-playwright/index.js';
 import { goAdapter } from './go-test/index.js';
 import { svelteAdapter } from './svelte-vitest/index.js';
 import { nodeAdapter } from './node-vitest/index.js';
+import { rustAdapter } from './rust-cargo/index.js';
 
 // Every known adapter. Order is irrelevant — selection is by detect() confidence.
-export const ADAPTERS: StackAdapter[] = [reactAdapter, pythonAdapter, vueAdapter, goAdapter, svelteAdapter, nodeAdapter];
+export const ADAPTERS: StackAdapter[] = [reactAdapter, pythonAdapter, vueAdapter, goAdapter, svelteAdapter, nodeAdapter, rustAdapter];
 
 /** Pick the adapter with the highest detect() confidence for `dir`. */
 export async function selectAdapter(dir: string): Promise<StackAdapter | null> {

@@ -4,3 +4,4 @@
 {"fixture": "vue-counter", "kind": "unit"}
 {"fixture": "go-calc", "kind": "unit"}
 {"fixture": "svelte-counter", "kind": "unit"}
+{"fixture":"rust-calc","kind":"unit"}
