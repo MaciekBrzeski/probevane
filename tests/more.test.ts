@@ -11,6 +11,7 @@ import { goAuditRules } from '../src/audit/rules-go.js';
 import { pyAuditRules } from '../src/audit/rules-py.js';
 import { selectBest, scoreSuite, type SuiteScore } from '../src/loop/passk.js';
 import { reactAdapter } from '../src/adapters/react-vitest-playwright/index.js';
+import { recordingBrain, replayBrain } from '../src/brain/replay.js';
 
 describe('coverage.parseGaps', () => {
   let dir: string;
@@ -85,6 +86,21 @@ describe('passk.scoreSuite (real fixture)', () => {
     expect(s.green).toBe(true);
     expect(s.value).toBeGreaterThan(0);
   }, 60_000);
+});
+
+describe('brain replay (record → replay identical, offline)', () => {
+  it('replays a recorded response and errors on a miss', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cass-'));
+    const cassette = join(dir, 'c.jsonl');
+    const fake = { id: 'fake', model: 'fake', async complete() { return { text: 'hi', toolCalls: [], stopReason: 'end_turn' as const, usage: { input: 1, output: 1 } }; } };
+    const rec = recordingBrain(fake, cassette);
+    const req = { system: 'S', messages: [{ role: 'user' as const, text: 'q' }], tools: [] };
+    const live = await rec.complete(req);
+    const replayed = await replayBrain(cassette).complete(req);
+    expect(replayed).toEqual(live);
+    await expect(replayBrain(cassette).complete({ ...req, system: 'OTHER' })).rejects.toThrow(/no cassette/);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe('audit rules (js/go/py)', () => {

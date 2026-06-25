@@ -1,11 +1,20 @@
 import type { Brain } from './brain.js';
 import { anthropicBrain } from './anthropic-sdk.js';
 import { openaiCompatBrain } from './openai-compat.js';
+import { recordingBrain, replayBrain } from './replay.js';
 
-// Resolve a model id to a brain. `local:<id>` (or a PROBEVANE_BASE_URL pointing
-// at a local server) → OpenAI-compatible backend; otherwise the Anthropic brain.
+// Resolve a model id to a brain.
+//   replay:<file>  → replay from a cassette (deterministic, offline)
+//   local:<id> / openai:<id> → OpenAI-compatible backend
+//   else → Anthropic brain
+// PROBEVANE_RECORD=<file> wraps any live brain to record a cassette.
 export function brainFor(model?: string): Brain {
-  if (model?.startsWith('local:')) return openaiCompatBrain(model.slice('local:'.length));
-  if (model?.startsWith('openai:')) return openaiCompatBrain(model.slice('openai:'.length));
-  return anthropicBrain(model);
+  let brain: Brain;
+  if (model?.startsWith('replay:')) return replayBrain(model.slice('replay:'.length));
+  else if (model?.startsWith('local:')) brain = openaiCompatBrain(model.slice('local:'.length));
+  else if (model?.startsWith('openai:')) brain = openaiCompatBrain(model.slice('openai:'.length));
+  else brain = anthropicBrain(model);
+
+  const rec = process.env.PROBEVANE_RECORD;
+  return rec ? recordingBrain(brain, rec) : brain;
 }
