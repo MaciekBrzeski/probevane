@@ -22,3 +22,4 @@ fixtures/**/cover.out
 *.log
 .probevane/
 SPEC.md
+.probevane-live/

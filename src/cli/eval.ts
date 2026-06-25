@@ -25,6 +25,7 @@ interface EvalCase {
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args.includes('--paths')) return runPathCases(args);
   const live = args.includes('--live');
   const flakeRuns = parseInt(flag(args, '--flake') ?? '3', 10);
   const stamp = new Date().toISOString();
@@ -95,6 +96,71 @@ async function main() {
   }
 
   console.log(`[eval] ${pass}/${cases.length} cases passed (${live ? 'live' : 'ci-baseline'}) → ${logPath}`);
+  if (pass < cases.length) process.exit(1);
+}
+
+interface PathCase {
+  fixture: string;
+  path: 'refactor' | 'feature' | 'repair';
+  task: string;
+  mutate?: { file: string; from: string; to: string };
+}
+
+// probevane eval --paths [--live] [--record]
+//   Regression-test the refactor/feature/repair PATHS. --live runs the real
+//   loop (needs a key); --record also saves a cassette to eval/cassettes/. With
+//   neither, each case REPLAYS its cassette → deterministic + credit-free (CI).
+async function runPathCases(args: string[]) {
+  const live = args.includes('--live');
+  const record = args.includes('--record');
+  process.env.PROBEVANE_DETERMINISTIC = '1'; // stable prompts → reproducible cassettes (record + replay)
+  const stamp = new Date().toISOString();
+  const logPath = join(ROOT, 'eval', 'improvement-log.csv');
+  const cases: PathCase[] = (await readFile(join(ROOT, 'eval', 'path-cases.jsonl'), 'utf8'))
+    .trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const { runPath } = await import('../loop/run-path.js');
+  const { writeFile } = await import('node:fs/promises');
+
+  let pass = 0;
+  for (const c of cases) {
+    const base = JSON.parse(await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.path}.json`), 'utf8')) as Baseline;
+    const cassette = join(ROOT, 'eval', 'cassettes', `${c.fixture}.${c.path}.jsonl`);
+
+    // Setup: copy fixture (keep golden tests — they protect behavior), then for
+    // repair break a test by mutating the source.
+    const src = join(ROOT, 'fixtures', c.fixture);
+    const dir = join(ROOT, '.probevane-live', `${c.fixture}-${c.path}`);
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+    await cp(src, dir, { recursive: true, filter: (p) => !p.includes('node_modules') && !p.includes('/coverage') });
+    await (await import('node:fs/promises')).symlink(join(src, 'node_modules'), join(dir, 'node_modules')).catch(() => {});
+    if (c.mutate) {
+      const f = join(dir, c.mutate.file);
+      const txt = await readFile(f, 'utf8');
+      await writeFile(f, txt.replace(c.mutate.from, c.mutate.to));
+    }
+
+    const adapter = await selectAdapterOrThrow(dir);
+    const model = live ? 'haiku' : `replay:${cassette}`;
+    if (record) {
+      await rm(cassette, { recursive: true, force: true }).catch(() => {});
+      process.env.PROBEVANE_RECORD = cassette;
+    }
+    console.log(`[eval] ${live ? (record ? 'recording' : 'live') : 'replay'} ${c.fixture}.${c.path}…`);
+    const outcome = await runPath({ dir, adapter, profileName: c.path, task: c.task, model, budget: 16000, log: (l) => console.error(l) }).catch((e) => {
+      console.error(`[eval] ${c.path} failed: ${e}`);
+      return null;
+    });
+    delete process.env.PROBEVANE_RECORD;
+
+    const score = await scoreFixture(dir, adapter, { scope: 'unit', flakeRuns: 1, oracleAssertions: base.oracleAssertions });
+    const verdict = judge(score, base);
+    const ok = !!outcome?.accepted && verdict.pass;
+    if (ok) pass++;
+    await appendLog(logPath, { timestamp: stamp, target: c.fixture, kind: c.path, pass: ok ? 1 : 0, audit_score: score.auditScore, tests: score.tests, coverage: score.coverage, flake: score.flake, note: live ? (record ? 'path-record' : 'path-live') : 'path-replay' });
+    console.log(`[eval] ${c.fixture}.${c.path}: ${ok ? 'PASS' : `FAIL (${outcome?.accepted ? verdict.reasons.join('; ') : 'did not accept'})`} — tests=${score.tests} green=${score.green} audit=${score.auditScore}/5`);
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+  console.log(`[eval] paths: ${pass}/${cases.length} passed (${live ? 'live' : 'replay'})`);
   if (pass < cases.length) process.exit(1);
 }
 

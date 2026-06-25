@@ -21,11 +21,16 @@ export function contextInject(kind: 'unit' | 'e2e'): Rune {
       const patterns = await ctx.adapter.patternsDoc(kind);
       if (patterns) parts.push(patterns);
 
-      const caveats = await recentCaveats(8).catch(() => []);
+      // Deterministic mode (record/replay eval): skip mutable cross-run state
+      // (caveats + learning-library few-shot) so the prompt — and thus the
+      // cassette request hash — is stable. Static quality+patterns stay.
+      const deterministic = process.env.PROBEVANE_DETERMINISTIC === '1';
+
+      const caveats = deterministic ? [] : await recentCaveats(8).catch(() => []);
       if (caveats.length)
         parts.push(`CAVEATS from past runs (avoid these gate failures):\n${caveats.join('\n')}`);
 
-      const examples = await retrieveFewShot({ stack: ctx.adapter.id, kind, topK: 3 }).catch(() => []);
+      const examples = deterministic ? [] : await retrieveFewShot({ stack: ctx.adapter.id, kind, topK: 3 }).catch(() => []);
       if (examples.length) {
         const blocks = examples
           .map((e, i) => `### Example ${i + 1} — ${e.meta.category} (score ${e.meta.score ?? '?'})\n${e.body}`)

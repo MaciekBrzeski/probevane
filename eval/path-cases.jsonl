@@ -1,0 +1,3 @@
+{"fixture":"react-todo","path":"refactor","task":"Extract the pure helpers (addTodo, toggleTodo, removeTodo, remaining) from src/App.tsx into a new file src/todos.ts and re-export them from App.tsx so existing imports keep working."}
+{"fixture":"py-calc","path":"feature","task":"Add a new function multiply(a, b) to calc.py that returns a*b, written test-first: first add a failing test for it in the test file, then implement it so the suite is green."}
+{"fixture":"py-calc","path":"repair","task":"The source behavior changed on purpose; update the affected (now-failing) tests so the whole suite is green again. Do not change the source.","mutate":{"file":"calc.py","from":"return a - b","to":"return b - a"}}
