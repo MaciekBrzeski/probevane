@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+fixtures/**/node_modules/
+fixtures/**/package-lock.json
+
+# build / coverage / test artifacts
+dist/
+coverage/
+fixtures/**/coverage/
+fixtures/**/test-fixtures/
+fixtures/**/src/mocks/
+**/.probevane-vitest.json
+**/.probevane-pytest.xml
+**/.probevane-cover.out
+**/.probevane-capture.mjs
+**/coverage-final.json
+
+# go
+fixtures/**/cover.out
+
+# logs / scratch
+*.log
+.probevane/
+SPEC.md

@@ -1,0 +1,7 @@
+{
+  "scope": "unit",
+  "minTests": 4,
+  "minCoverage": 90,
+  "maxFlake": 0,
+  "oracleAssertions": ["Divide", "t.Errorf", "IsEven"]
+}

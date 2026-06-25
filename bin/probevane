@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Probevane CLI — agentic harness that adds unit + e2e tests to a project.
+# Dispatches to src/cli/<command>.ts via tsx. Mirrors qaforge/bin/qaforge.
+
+set -euo pipefail
+
+PROBEVANE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PROBEVANE_ROOT
+
+cmd="${1:-help}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+  init|plan|generate|run|audit|coverage|learn|eval|status|mock|graph|spec|refactor|feature|repair|ci)
+    exec npx tsx "$PROBEVANE_ROOT/src/cli/$cmd.ts" "$@"
+    ;;
+  version|-v|--version)
+    node -e "console.log(require('$PROBEVANE_ROOT/package.json').version)"
+    ;;
+  help|-h|--help)
+    cat <<'HELP'
+Probevane — agentic harness that adds unit + e2e tests to a project
+
+Commands:
+  init <dir>              Detect stack, scaffold config, install test deps
+  plan <dir>              Probe the target + emit a grounded test plan (no edits)
+  generate <dir>          Run the gated loop to write tests (--kind unit|e2e|all)
+  run <dir>               Execute the suites via the detected adapter (--scope)
+  audit <dir>             Static quality gate over generated specs
+  coverage <dir>          Read coverage via the adapter
+  learn                   Curate the cross-project learning library
+  eval                    Run the eval suite over fixtures, append improvement-log
+  status <dir>            Coverage / test dashboard
+
+Options:
+  --kind unit|e2e|all     Which test layer to generate (generate)
+  --scope unit|e2e|all    Which suites to run (run)
+  -v, --version           Print version
+  -h, --help              This message
+
+Library: ~/.local/share/probevane/ (personal, cross-project)
+HELP
+    ;;
+  *)
+    echo "probevane: unknown command '$cmd' (try: probevane help)" >&2
+    exit 2
+    ;;
+esac

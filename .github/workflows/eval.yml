@@ -1,0 +1,64 @@
+name: eval
+
+# The harness's own no-regression gate. On every push/PR, score each fixture's
+# committed suite against eval/baseline/*.json (green, count, coverage, audit,
+# flake, shadow-oracle). No LLM calls — fast + deterministic.
+#
+# Live generation eval (needs ANTHROPIC_API_KEY + browsers) runs nightly.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 4 * * *' # nightly live eval
+  workflow_dispatch:
+
+jobs:
+  ci-baseline:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pytest pytest-cov
+      - run: npm ci || npm install
+      - run: npm run typecheck
+      - name: install node fixture deps
+        run: |
+          for f in fixtures/*/; do [ -f "$f/package.json" ] && (cd "$f" && npm install --no-fund --no-audit) || true; done
+      - name: eval (ci-baseline, no LLM)
+        run: ./bin/probevane eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: improvement-log
+          path: eval/improvement-log.csv
+
+  live:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci || npm install
+      - name: install fixture deps + browsers
+        run: |
+          for f in fixtures/*/; do (cd "$f" && npm install --no-fund --no-audit); done
+          npx playwright install --with-deps chromium
+      - name: eval (live generation)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: ./bin/probevane eval --live
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: improvement-log-live
+          path: eval/improvement-log.csv

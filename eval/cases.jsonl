@@ -1,0 +1,6 @@
+{"fixture": "react-todo", "kind": "unit"}
+{"fixture": "react-forms", "kind": "unit"}
+{"fixture": "py-calc", "kind": "unit"}
+{"fixture": "vue-counter", "kind": "unit"}
+{"fixture": "go-calc", "kind": "unit"}
+{"fixture": "svelte-counter", "kind": "unit"}

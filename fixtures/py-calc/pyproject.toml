@@ -1,0 +1,12 @@
+[project]
+name = "py-calc-fixture"
+version = "0.0.0"
+description = "Tiny calculator fixture for the probevane python-pytest adapter"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["test_*.py", "*_test.py"]

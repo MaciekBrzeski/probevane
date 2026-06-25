@@ -1,0 +1,7 @@
+{
+  "scope": "unit",
+  "minTests": 2,
+  "minCoverage": 80,
+  "maxFlake": 0,
+  "oracleAssertions": ["remaining count", "1 remaining", "addTodo"]
+}
