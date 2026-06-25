@@ -39,7 +39,7 @@ export const reactAdapter: StackAdapter = {
   guidance(kind: TestKind): string {
     return kind === 'unit'
       ? `(vitest + @testing-library/react) placed next to their source under src/ as src/<Name>.test.tsx. Cover happy paths, edge cases, and immutability for pure functions; user-visible behavior for components. PREFER pure functions / hooks / slices — they need the least setup. If a component requires context (Redux store, React Router, a Theme/Context provider), wrap it in the app's REAL providers via a render helper, e.g. render(<Provider store={makeStore()}><MemoryRouter>{ui}</MemoryRouter></Provider>) — import the app's store/router from its modules; do not reimplement them. Mock only the network. CSS/asset imports are ignored by the config, so don't worry about them.`
-      : `(Playwright @playwright/test) placed under the e2e/ directory as e2e/<name>.spec.ts. The app runs at the base URL; use page.goto('/') then drive it via getByRole/getByLabel using ONLY the labels/roles/buttons in the ground truth. Assert user-visible outcomes.`;
+      : `(Playwright @playwright/test) placed under the e2e/ directory as e2e/<name>.spec.ts. ALWAYS \`import { test, expect } from '@playwright/test'\` — NEVER the bare 'playwright/test' (it collects 0 tests → "No tests found"). The app runs at the base URL; use page.goto('/') then drive it via getByRole/getByLabel using ONLY the labels/roles/buttons in the ground truth. Assert user-visible outcomes.`;
   },
 
   patternsDoc(kind: TestKind): Promise<string> {

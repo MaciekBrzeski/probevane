@@ -32,7 +32,10 @@ const PAGE = (nav, file) => `<!doctype html><html><head><meta charset="utf-8">
  main{flex:1;padding:40px 56px;max-width:920px;overflow:auto}
  main img{max-width:100%}pre{background:var(--side);padding:14px;border-radius:8px;overflow:auto;border:1px solid var(--border)}
  code{background:var(--side);padding:.15em .4em;border-radius:5px;font-size:.9em}pre code{background:none;padding:0}
- pre.mermaid{background:none;border:none;text-align:center}
+ /* Diagrams: break out of the prose column, render at natural size, scroll + pan/zoom. */
+ pre.mermaid{background:var(--side);border:1px solid var(--border);border-radius:8px;padding:8px;overflow:auto;max-height:82vh;width:calc(100vw - 260px - 112px);max-width:calc(100vw - 260px - 112px);margin-left:calc((920px - (100vw - 260px - 112px))/2)}
+ pre.mermaid svg{max-width:none!important;height:auto}
+ .diagram-hint{color:var(--muted);font-size:12px;margin:-8px 0 18px}
  table{border-collapse:collapse;width:100%}th,td{border:1px solid var(--border);padding:7px 10px;text-align:left}
  h1,h2,h3{line-height:1.25}h2{border-bottom:1px solid var(--border);padding-bottom:.3em;margin-top:1.8em}
  a{color:var(--accent)}blockquote{border-left:3px solid var(--accent);margin:0;padding:.1em 1em;color:var(--muted)}

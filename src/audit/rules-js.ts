@@ -10,6 +10,16 @@ import type { AuditRule } from '../adapters/adapter.js';
 export function jsAuditRules(): AuditRule[] {
   return [
     {
+      // The Playwright runner package is `@playwright/test`; a bare `playwright/test`
+      // import loads zero tests ("No tests found"). Catch it so the loop self-corrects.
+      id: 'playwright-test-import',
+      severity: 'error',
+      check: (line) =>
+        /from\s+['"]playwright\/test['"]/.test(line)
+          ? `import from '@playwright/test', not 'playwright/test' (the bare import collects 0 tests)`
+          : null,
+    },
+    {
       id: 'no-wait-for-timeout',
       severity: 'error',
       check: (line) =>

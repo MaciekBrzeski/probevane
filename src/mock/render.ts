@@ -14,14 +14,44 @@ function label(n: ModuleNode): string {
   return `${base} (${n.kind})`;
 }
 
+/** Extract the top-level directory from a project-relative path like `src/cli/foo.ts` → `cli`. */
+function topDir(path: string): string {
+  const parts = path.split('/');
+  // paths are like "src/<dir>/…" — take the segment after "src"
+  return parts.length >= 2 ? (parts[0] === 'src' ? parts[1] : parts[0]) : parts[0];
+}
+
 export function toMermaid(graph: ModuleGraph): string {
   const lines = ['```mermaid', 'graph TD'];
-  for (const n of graph.nodes.values()) {
-    const net = n.callsNetwork ? ' 🌐' : '';
-    lines.push(`  ${id(n.path)}["${label(n)}${net}"]:::${n.kind}`);
+
+  if (graph.nodes.size > 40) {
+    // Group node declarations into subgraph blocks keyed by top-level directory
+    const byDir = new Map<string, ModuleNode[]>();
+    for (const n of graph.nodes.values()) {
+      const dir = topDir(n.path);
+      if (!byDir.has(dir)) byDir.set(dir, []);
+      byDir.get(dir)!.push(n);
+    }
+    for (const [dir, nodes] of byDir) {
+      lines.push(`  subgraph ${dir}`);
+      for (const n of nodes) {
+        const net = n.callsNetwork ? ' 🌐' : '';
+        lines.push(`    ${id(n.path)}["${label(n)}${net}"]:::${n.kind}`);
+      }
+      lines.push(`  end`);
+    }
+  } else {
+    // Flat output (≤40 nodes)
+    for (const n of graph.nodes.values()) {
+      const net = n.callsNetwork ? ' 🌐' : '';
+      lines.push(`  ${id(n.path)}["${label(n)}${net}"]:::${n.kind}`);
+    }
   }
+
+  // Edges always come after node/subgraph declarations
   for (const n of graph.nodes.values())
     for (const dep of n.imports) if (graph.nodes.has(dep)) lines.push(`  ${id(n.path)} --> ${id(dep)}`);
+
   lines.push(
     '  classDef fetcher fill:#fde2e2,stroke:#c0392b;',
     '  classDef hook fill:#e2ecfd,stroke:#2b6cb0;',

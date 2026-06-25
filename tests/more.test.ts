@@ -207,6 +207,15 @@ describe('brain replay (record → replay identical, offline)', () => {
   });
 });
 
+describe('playwright-test-import audit rule', () => {
+  it('flags bare playwright/test, allows @playwright/test', () => {
+    const bad = auditSource('e2e/a.spec.ts', `import { test } from 'playwright/test';`, jsAuditRules());
+    expect(bad.map((v) => v.rule)).toContain('playwright-test-import');
+    const ok = auditSource('e2e/a.spec.ts', `import { test } from '@playwright/test';`, jsAuditRules());
+    expect(ok.map((v) => v.rule)).not.toContain('playwright-test-import');
+  });
+});
+
 describe('audit rules (js/go/py)', () => {
   it('js: conditional-expect + unused-import + brittle-wait', () => {
     // probevane-allow: no-wait-for-timeout probevane-allow: conditional-expect (intentional bad-code fixture)
