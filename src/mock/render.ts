@@ -22,36 +22,19 @@ function topDir(path: string): string {
 }
 
 export function toMermaid(graph: ModuleGraph): string {
+  // Big graphs (whole repos) are illegible as one flat node-per-file diagram, so
+  // COLLAPSE to a directory-level overview: one node per top-level dir (with its
+  // file count) + cross-directory edges. The per-file detail lives in the ASCII
+  // tree. Small graphs stay flat with per-file nodes + kind colors.
+  if (graph.nodes.size > 40) return dirLevelMermaid(graph);
+
   const lines = ['```mermaid', 'graph TD'];
-
-  if (graph.nodes.size > 40) {
-    // Group node declarations into subgraph blocks keyed by top-level directory
-    const byDir = new Map<string, ModuleNode[]>();
-    for (const n of graph.nodes.values()) {
-      const dir = topDir(n.path);
-      if (!byDir.has(dir)) byDir.set(dir, []);
-      byDir.get(dir)!.push(n);
-    }
-    for (const [dir, nodes] of byDir) {
-      lines.push(`  subgraph ${dir}`);
-      for (const n of nodes) {
-        const net = n.callsNetwork ? ' 🌐' : '';
-        lines.push(`    ${id(n.path)}["${label(n)}${net}"]:::${n.kind}`);
-      }
-      lines.push(`  end`);
-    }
-  } else {
-    // Flat output (≤40 nodes)
-    for (const n of graph.nodes.values()) {
-      const net = n.callsNetwork ? ' 🌐' : '';
-      lines.push(`  ${id(n.path)}["${label(n)}${net}"]:::${n.kind}`);
-    }
+  for (const n of graph.nodes.values()) {
+    const net = n.callsNetwork ? ' 🌐' : '';
+    lines.push(`  ${id(n.path)}["${label(n)}${net}"]:::${n.kind}`);
   }
-
-  // Edges always come after node/subgraph declarations
   for (const n of graph.nodes.values())
     for (const dep of n.imports) if (graph.nodes.has(dep)) lines.push(`  ${id(n.path)} --> ${id(dep)}`);
-
   lines.push(
     '  classDef fetcher fill:#fde2e2,stroke:#c0392b;',
     '  classDef hook fill:#e2ecfd,stroke:#2b6cb0;',
@@ -59,6 +42,32 @@ export function toMermaid(graph: ModuleGraph): string {
     '  classDef util fill:#f0f0f0,stroke:#888;',
     '```',
   );
+  return lines.join('\n');
+}
+
+/** Directory-level overview: one node per top-level dir + cross-dir edges. */
+function dirLevelMermaid(graph: ModuleGraph): string {
+  const dirs = new Map<string, { count: number; net: boolean }>();
+  for (const n of graph.nodes.values()) {
+    const d = topDir(n.path);
+    const cur = dirs.get(d) ?? { count: 0, net: false };
+    cur.count++;
+    if (n.callsNetwork) cur.net = true;
+    dirs.set(d, cur);
+  }
+  const edges = new Set<string>();
+  for (const n of graph.nodes.values()) {
+    const from = topDir(n.path);
+    for (const dep of n.imports) {
+      if (!graph.nodes.has(dep)) continue;
+      const to = topDir(graph.nodes.get(dep)!.path);
+      if (from !== to) edges.add(`${from}|${to}`); // skip intra-dir edges
+    }
+  }
+  const lines = ['```mermaid', 'flowchart LR'];
+  for (const [d, { count, net }] of [...dirs].sort()) lines.push(`  ${id(d)}["${d}/ (${count})${net ? ' 🌐' : ''}"]`);
+  for (const e of [...edges].sort()) { const [a, b] = e.split('|'); lines.push(`  ${id(a)} --> ${id(b)}`); }
+  lines.push('```');
   return lines.join('\n');
 }
 
