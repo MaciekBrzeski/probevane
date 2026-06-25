@@ -4,6 +4,7 @@ import { stableCacheIndex } from '../src/loop/engine.js';
 import { toApiMsg, withCacheBreakpoint } from '../src/brain/anthropic-sdk.js';
 import { tokenize, similarity, pickSimilarTrace } from '../src/library/similar.js';
 import { kindFor, categoryFor, scoreFor, slugFor } from '../src/loop/runes/library_promote.js';
+import { extractTestBlock, conventionalSpecPath } from '../src/loop/extract.js';
 import { RunCtx } from '../src/loop/ctx.js';
 import type { Trace } from '../src/distill/collect.js';
 
@@ -129,6 +130,44 @@ describe('library.similar', () => {
     const traces = [trace('cartTotal discount', 'CART', 'python-pytest')];
     expect(pickSimilarTrace(traces, 'cartTotal discount', 'react-vitest-playwright')).toBeNull();
     expect(pickSimilarTrace([trace('alpha beta', 'X')], 'gamma delta', 'react-vitest-playwright')).toBeNull();
+  });
+});
+
+// ---- Text-extract fallback (non-tool-calling local models) ------------------
+describe('loop.extract', () => {
+  it('pulls a test-like fenced block out of prose', () => {
+    const text = "Here's the test:\n\n```ts\nimport { it, expect } from 'vitest';\nit('adds', () => expect(1+1).toBe(2));\n```\nDone.";
+    const ex = extractTestBlock(text)!;
+    expect(ex.code).toContain("it('adds'");
+    expect(ex.code).toContain('expect');
+  });
+  it('returns null when no fenced block or not test-like', () => {
+    expect(extractTestBlock('just some prose, no code')).toBeNull();
+    expect(extractTestBlock('```ts\nconst x = 1;\n```')).toBeNull(); // no assert/expect/it
+  });
+  it('reads a path from the fence info string', () => {
+    expect(extractTestBlock('```ts src/cart.test.ts\nexpect(1).toBe(1)\n```')!.path).toBe('src/cart.test.ts');
+  });
+  it('reads a path from a leading comment in the block', () => {
+    expect(extractTestBlock('```ts\n// src/util.test.ts\nit("x",()=>expect(1).toBe(1))\n```')!.path).toBe('src/util.test.ts');
+  });
+  it('reads a path mentioned in the prose before the fence', () => {
+    expect(extractTestBlock('File: `tests/calc_test.go`\n```go\nfunc TestX(t *testing.T){t.Errorf("x")}\n```')!.path).toBe('tests/calc_test.go');
+  });
+  it('picks the largest test-like block when several appear', () => {
+    const ex = extractTestBlock('```ts\nexpect(1).toBe(1)\n```\nand\n```ts\nit("big",()=>{expect(2).toBe(2); expect(3).toBe(3)})\n```')!;
+    expect(ex.code).toContain('big');
+  });
+});
+
+describe('conventionalSpecPath', () => {
+  it('maps each stack to its convention', () => {
+    expect(conventionalSpecPath('react-vitest-playwright', 'src/Cart.tsx')).toBe('src/Cart.test.tsx');
+    expect(conventionalSpecPath('node-vitest', 'src/util.ts')).toBe('src/util.test.ts');
+    expect(conventionalSpecPath('python-pytest', 'pkg/calc.py')).toBe('pkg/test_calc.py');
+    expect(conventionalSpecPath('go-test', 'calc.go')).toBe('calc_test.go');
+    expect(conventionalSpecPath('rust-cargo', 'src/lib.rs')).toBe('tests/lib.rs');
+    expect(conventionalSpecPath('angular', 'src/counter.service.ts')).toBe('src/counter.service.spec.ts');
   });
 });
 

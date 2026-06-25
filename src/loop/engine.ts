@@ -8,6 +8,7 @@ import { capOutput } from '../util/exec.js';
 import type { Msg, ToolResult } from './types.js';
 import { formatEvent } from './events.js';
 import { isCircular, proposal as difficultyProposal } from './difficulty.js';
+import { extractTestBlock } from './extract.js';
 import { recordRun } from '../cost/ledger.js';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -61,6 +62,10 @@ export interface RunOptions {
   takeoverBrain?: Brain;
   /** Extra guidance pulled when stuck (e.g. a library exemplar). */
   onConsult?: (ctx: RunCtx) => Promise<string | undefined>;
+  /** Accept a fenced code block in the model's prose as a write (non-tool-calling local models). */
+  textExtract?: boolean;
+  /** Fallback spec path when an extracted block names none (single-target runs). */
+  specPathHint?: string;
   /** Stable id for the live event log file (defaults to a timestamp id). */
   runId?: string;
   /** Human label for the cost ledger, e.g. "generate:fixtures/x" (path:target). */
@@ -139,6 +144,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   let accepted = false;
   let stopReason: RunOutcome['stopReason'] = 'max_steps';
   let proposalText: string | undefined;
+  let lastExtract: string | undefined; // last text-extracted spec (dedup → converge to stop gates)
 
   while (ctx.step < maxSteps) {
     ctx.step++;
@@ -202,19 +208,58 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
       messages.push({ role: 'user', toolResults: results });
       pruneOldToolResults(messages, PRUNE_TOOL_RESULTS_AFTER);
     } else {
-      // Model wants to stop → run should_stop gates.
-      const decision = await firstBlockStop(runes, ctx);
-      if (decision.kind === 'block') {
-        ctx.gateBlocks++;
-        ctx.barren++;
-        ctx.noteBlock(decision.reason);
-        log(`[engine]   stop BLOCKED: ${decision.reason}`);
-        messages.push({ role: 'user', text: decision.inject ?? decision.reason });
-      } else {
-        accepted = true;
-        stopReason = 'accepted';
-        log('[engine]   ACCEPTED (all gates green)');
-        break;
+      // Text-extract fallback: a non-tool-calling local model emits the test as a
+      // fenced code block in prose. Treat a NEW block as a write (synthesize the
+      // write_file call so it runs through the gates); a REPEATED/identical block
+      // means the model is done → fall through to the stop gates so it can accept.
+      let handledAsWrite = false;
+      if (opts.textExtract && resp.text) {
+        const ex = extractTestBlock(resp.text);
+        if (ex && ex.code !== lastExtract) {
+          const path = ex.path ?? opts.specPathHint;
+          if (path) {
+            lastExtract = ex.code;
+            if (!ctx.plan) ctx.plan = { text: 'auto (text-extract): write the extracted spec', at: ctx.step };
+            const call = { id: `extract-${ctx.step}`, name: 'write_file', input: { path, contents: ex.code } };
+            ctx.noteCall(call);
+            const decision = await firstBlockBefore(runes, call, ctx);
+            if (decision.kind === 'block') {
+              ctx.gateBlocks++; ctx.barren++; ctx.noteBlock(decision.reason);
+              messages.push({ role: 'assistant', toolCalls: [call] });
+              messages.push({ role: 'user', toolResults: [{ id: call.id, content: decision.inject ?? decision.reason, isError: true }] });
+              log(`[engine]   text-extract write BLOCKED: ${decision.reason}`);
+            } else {
+              const out = capOutput(await execTool(call, ctx));
+              for (const r of runes) await r.afterToolCall?.(call, { id: call.id, content: out, isError: false }, ctx);
+              messages.push({ role: 'assistant', toolCalls: [call] });
+              messages.push({ role: 'user', toolResults: [{ id: call.id, content: out, isError: false }] });
+              ctx.barren = 0;
+              log(`[engine]   text-extract: wrote ${path}`);
+            }
+            handledAsWrite = true;
+          } else {
+            ctx.barren++;
+            messages.push({ role: 'user', text: 'You wrote a code block but named no file. Start it with a `// <relative/path>` comment, or call the write_file tool.' });
+            handledAsWrite = true;
+          }
+        }
+      }
+
+      if (!handledAsWrite) {
+        // Model wants to stop → run should_stop gates.
+        const decision = await firstBlockStop(runes, ctx);
+        if (decision.kind === 'block') {
+          ctx.gateBlocks++;
+          ctx.barren++;
+          ctx.noteBlock(decision.reason);
+          log(`[engine]   stop BLOCKED: ${decision.reason}`);
+          messages.push({ role: 'user', text: decision.inject ?? decision.reason });
+        } else {
+          accepted = true;
+          stopReason = 'accepted';
+          log('[engine]   ACCEPTED (all gates green)');
+          break;
+        }
       }
     }
 

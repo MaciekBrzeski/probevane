@@ -5,6 +5,7 @@ import { runLoop, type RunOutcome } from './engine.js';
 import { retrieveFewShot } from '../library/retrieve.js';
 import { readTraces } from '../distill/collect.js';
 import { pickSimilarTrace } from '../library/similar.js';
+import { conventionalSpecPath } from './extract.js';
 import { mockInject } from './runes/mock_inject.js';
 import { buildChain } from '../mock/index.js';
 import { brainFor } from '../brain/select.js';
@@ -137,12 +138,22 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
   // Insert mock_inject right after context_inject (index 0) so its guidance lands early.
   if (mockRune) runes.splice(1, 0, mockRune);
 
+  // Text-extract fallback for non-tool-calling local models (openai-compat):
+  // accept a fenced test block as a write. Hint the spec path from the first
+  // probed target's stack convention (used only when the block names none).
+  const textExtract = brain.id === 'openai-compat' || takeoverBrain?.id === 'openai-compat';
+  const specPathHint = probedTargets[0]
+    ? conventionalSpecPath(adapter.id, probedTargets[0].sourcePath)
+    : undefined;
+
   return runLoop({
     workdir: dir,
     adapter,
     brain,
     takeoverBrain,
     onConsult,
+    textExtract,
+    specPathHint,
     runes,
     task,
     label: `${kind === 'e2e' ? 'generate-e2e' : 'generate'}:${dir.split('/').pop()}`,
