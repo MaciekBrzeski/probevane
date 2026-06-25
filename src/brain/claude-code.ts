@@ -44,6 +44,9 @@ export function claudeCodeBrain(model?: string): Brain {
           output: u.output_tokens ?? 0,
           cacheRead: u.cache_read_input_tokens ?? 0,
           cacheWrite: u.cache_creation_input_tokens ?? 0,
+          // The CLI reports actual cost (subscription or API); thread it so the
+          // ledger reflects real spend instead of $0 (claude-code:* isn't priced).
+          costUsd: typeof env_.total_cost_usd === 'number' ? env_.total_cost_usd : undefined,
         },
       };
     },

@@ -17,7 +17,8 @@ export interface RunRecord {
   tokensIn: number;
   tokensOut: number;
   cacheRead: number;
-  cost: number; // USD
+  cost: number; // USD — brain-reported actual (costUsd) when present, else priced from tokens
+  costUsd?: number; // actual cost reported by the brain (claude-code CLI), if any
   accepted: boolean;
   tookOver: boolean;
   stopReason: string;
@@ -26,7 +27,8 @@ export interface RunRecord {
 
 export async function recordRun(rec: Omit<RunRecord, 'cost'>): Promise<void> {
   if (process.env.PROBEVANE_LEDGER === '0') return;
-  const full: RunRecord = { ...rec, cost: costOf(rec.model, { input: rec.tokensIn, output: rec.tokensOut, cacheRead: rec.cacheRead }) };
+  const cost = rec.costUsd ?? costOf(rec.model, { input: rec.tokensIn, output: rec.tokensOut, cacheRead: rec.cacheRead });
+  const full: RunRecord = { ...rec, cost };
   try {
     await mkdir(join(homedir(), '.local/share/probevane'), { recursive: true });
     await appendFile(LEDGER_PATH, JSON.stringify(full) + '\n');
