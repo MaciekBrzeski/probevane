@@ -243,7 +243,7 @@ probevane skill --check
 Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:.
 
 ```
-probevane distill <build|stats|train> [--execute]
+probevane distill <build|stats|train|bases> [--execute] [--models a,b]
 # e.g.
 probevane distill build
 ```

@@ -12,6 +12,7 @@ import { pyAuditRules } from '../src/audit/rules-py.js';
 import { a11yRules } from '../src/a11y/rules.js';
 import { buildExamples, splitExamples, statsByStack } from '../src/distill/dataset.js';
 import type { Trace } from '../src/distill/collect.js';
+import { stripFences, baseValue } from '../src/distill/bases.js';
 import { selectBest, scoreSuite, type SuiteScore } from '../src/loop/passk.js';
 import { reactAdapter } from '../src/adapters/react-vitest-playwright/index.js';
 import { recordingBrain, replayBrain } from '../src/brain/replay.js';
@@ -114,6 +115,18 @@ describe('distillation dataset', () => {
   });
   it('counts by stack', () => {
     expect(statsByStack([mk('react', 'a'), mk('react', 'b'), mk('go', 'c')])).toEqual({ react: 2, go: 1 });
+  });
+});
+
+describe('cpu base bake-off helpers', () => {
+  it('stripFences pulls code out of a fenced block', () => {
+    expect(stripFences('blah\n```go\nfunc T(){}\n```\nend')).toBe('func T(){}');
+    expect(stripFences('no fence here')).toBe('no fence here');
+  });
+  it('baseValue gates on green, rewards coverage+tests, penalizes audit', () => {
+    expect(baseValue({ green: false, tests: 9, coverage: 100, auditErrors: 0 })).toBe(-1);
+    expect(baseValue({ green: true, tests: 4, coverage: 100, auditErrors: 0 })).toBe(120);
+    expect(baseValue({ green: true, tests: 4, coverage: 100, auditErrors: 1 })).toBe(110);
   });
 });
 

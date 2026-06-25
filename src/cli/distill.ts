@@ -1,8 +1,14 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { cpSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { readTraces } from '../distill/collect.js';
 import { buildExamples, splitExamples, statsByStack } from '../distill/dataset.js';
+import { cpuGenerate, stripFences, baseValue, type BaseResult } from '../distill/bases.js';
+import { selectAdapterOrThrow } from '../adapters/registry.js';
+import { specCandidatesFor } from '../git.js';
+import { scoreSuite } from '../loop/passk.js';
 
 // probevane distill <build|stats|train>
 //   build   traces → train.jsonl/val.jsonl (quality-filtered, deduped)
@@ -52,7 +58,49 @@ async function main() {
     process.exit(0);
   }
 
-  console.error('usage: probevane distill <build|stats|train>');
+  if (sub === 'bases') {
+    // CPU model bake-off → best base for GPU-less machines.
+    const models = (arg('--models') ?? 'qwen2.5-coder:3b,qwen2.5-coder:7b').split(',').map((s) => s.trim()).filter(Boolean);
+    const fixture = join(process.env.PROBEVANE_ROOT ?? process.cwd(), arg('--fixture') ?? 'fixtures/py-calc');
+    const adapter = await selectAdapterOrThrow(fixture);
+    const target = (await adapter.discover(fixture, 'unit'))[0];
+    if (!target) { console.error('[distill] no target source in fixture'); process.exit(1); }
+    const probe = await adapter.probe(fixture, target);
+    const src = (await import('node:fs/promises')).readFile(join(fixture, target.sourcePath), 'utf8');
+    const testFile = specCandidatesFor(target.sourcePath)[0];
+    const prompt = `${probe.digest}\n\nSource ${target.sourcePath}:\n\n${await src}\n\n${adapter.guidance('unit')}\n\nWrite the test at ${testFile}. Use the EXACT identifiers from the source (do not change casing) and import them as shown. Output ONLY the test file code.`;
+    console.error(`[distill] bake-off on ${adapter.id} (${fixture}), test → ${testFile}`);
+    const results: BaseResult[] = [];
+    for (const model of models) {
+      const work = join(tmpdir(), `pv-base-${model.replace(/[^a-z0-9]/gi, '_')}`);
+      rmSync(work, { recursive: true, force: true });
+      cpSync(fixture, work, { recursive: true });
+      for (const s of await adapter.specFiles(work)) rmSync(join(work, s), { force: true }); // drop golden tests
+      try {
+        console.error(`[distill] baking ${model} (CPU)…`);
+        const gen = await cpuGenerate(model, 'You write tests. Output ONLY the test file.', prompt);
+        writeFileSync(join(work, testFile), stripFences(gen.text));
+        const s = await scoreSuite(work, adapter);
+        const r = { model, green: s.green, tests: s.tests, coverage: s.coverage, auditErrors: s.auditErrors, ms: gen.ms, tokPerSec: gen.tokPerSec };
+        results.push({ ...r, value: baseValue(r) });
+      } catch (e) {
+        console.error(`[distill] ${model} failed: ${String(e).slice(0, 100)}`);
+        results.push({ model, green: false, tests: 0, coverage: 0, auditErrors: 0, ms: 0, tokPerSec: 0, value: -1 });
+      } finally {
+        rmSync(work, { recursive: true, force: true });
+      }
+    }
+    results.sort((a, b) => b.value - a.value || a.ms - b.ms);
+    console.log('\n### probevane distill bases — CPU model bake-off\n');
+    console.log('| rank | model | green | tests | cov% | audit err | CPU tok/s | ms | value |');
+    console.log('|---|---|---|---|---|---|---|---|---|');
+    results.forEach((r, i) => console.log(`| ${i + 1} | ${r.model} | ${r.green ? '✅' : '❌'} | ${r.tests} | ${r.coverage} | ${r.auditErrors} | ${r.tokPerSec} | ${r.ms} | ${r.value} |`));
+    const best = results.find((r) => r.value >= 0);
+    console.log(best ? `\n**Best CPU base: \`${best.model}\`** (value ${best.value}, ${best.tokPerSec} tok/s). Serve: \`probevane generate --model local:${best.model}\`.` : '\n_No candidate produced a green suite._');
+    return;
+  }
+
+  console.error('usage: probevane distill <build|stats|train|bases>');
   process.exit(2);
 }
 
