@@ -43,6 +43,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `status` | Quick dashboard: adapter, suite result, coverage. |
 | `learn` | Save a spec to the cross-project learning library. |
 | `eval` | Run probevane's fixture eval (self-test of the harness); --live regenerates. |
+| `watch` | Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop. |
 | `skill` | Generate/check the probevane control skill (this doc). --check fails on drift. |
 
 ## Reference
@@ -207,6 +208,15 @@ Run probevane's fixture eval (self-test of the harness); --live regenerates.
 probevane eval [--live] [--flake N]
 # e.g.
 probevane eval
+```
+
+### watch
+Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop.
+
+```
+probevane watch <dir> [--run] [--debounce ms]
+# e.g.
+probevane watch ./app --run
 ```
 
 ### skill

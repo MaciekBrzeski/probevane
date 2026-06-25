@@ -33,11 +33,12 @@ export const COMMANDS: Command[] = [
   { name: 'status', summary: 'Quick dashboard: adapter, suite result, coverage.', usage: 'probevane status <dir>', example: 'probevane status ./app' },
   { name: 'learn', summary: 'Save a spec to the cross-project learning library.', usage: 'probevane learn <dir> --file <spec> --category <c> [--kind] [--bad]', example: 'probevane learn ./app --file src/x.test.ts --category crud' },
   { name: 'eval', summary: "Run probevane's fixture eval (self-test of the harness); --live regenerates.", usage: 'probevane eval [--live] [--flake N]', example: 'probevane eval' },
+  { name: 'watch', summary: 'Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop.', usage: 'probevane watch <dir> [--run] [--debounce ms]', example: 'probevane watch ./app --run' },
   { name: 'skill', summary: 'Generate/check the probevane control skill (this doc). --check fails on drift.', usage: 'probevane skill [--check]', example: 'probevane skill --check' },
 ];
 
 /** Commands accepted by bin/probevane that intentionally aren't user-facing skill entries. */
-export const UNDOCUMENTED = new Set(['plan', 'watch', 'version', '-v', '--version', 'help', '-h', '--help']);
+export const UNDOCUMENTED = new Set(['plan', 'version', '-v', '--version', 'help', '-h', '--help']);
 
 /** Parse the command names the bin dispatcher accepts (the `a|b|c)` case line). */
 export async function binCommands(): Promise<string[]> {
