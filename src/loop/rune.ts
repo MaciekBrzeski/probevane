@@ -17,8 +17,8 @@ export function block(reason: string, inject?: string): RuneDecision {
 export interface Rune {
   name: string;
 
-  /** Static rule text appended to the system prompt. */
-  systemPromptAddition?(ctx: RunCtx): string | undefined;
+  /** Static rule text appended to the system prompt. `ctx` is optional — most additions are static. */
+  systemPromptAddition?(ctx?: RunCtx): string | undefined;
 
   /** Async pre-run contribution (e.g. RAG few-shot). Returns text to append. */
   prepare?(ctx: RunCtx): Promise<string | undefined>;
