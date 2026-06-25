@@ -28,6 +28,7 @@ export interface GenerateOpts {
   minCoverage?: number;
   mutation?: boolean;
   flakeGuard?: boolean;
+  a11y?: boolean;
   budget?: number;
   mock?: boolean; // synthesize + inject mocks (network/deps), enforce hermeticity
   targetGaps?: boolean; // run coverage first + steer the model at uncovered lines
@@ -119,6 +120,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     minCoverage: opts.minCoverage,
     mutation: opts.mutation,
     flakeGuard: opts.flakeGuard,
+    a11y: opts.a11y,
   });
   // Insert mock_inject right after context_inject (index 0) so its guidance lands early.
   if (mockRune) runes.splice(1, 0, mockRune);

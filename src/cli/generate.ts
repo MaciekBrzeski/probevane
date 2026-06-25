@@ -23,6 +23,7 @@ async function main() {
   const mock = args.includes('--mock') || (!args.includes('--no-mock') && (cfg.mock ?? kind === 'unit'));
   const targetGaps = args.includes('--target-gaps');
   const flakeGuard = args.includes('--flake-guard') || cfg.flakeGuard === true;
+  const a11y = args.includes('--a11y') || cfg.a11y === true;
   const budget = pick(num(flag(args, '--budget')), cfg.budget);
   const passk = parseInt(flag(args, '--passk') ?? '1', 10);
 
@@ -47,6 +48,7 @@ async function main() {
     minCoverage,
     mutation,
     flakeGuard,
+    a11y,
     budget,
     mock,
     targetGaps,

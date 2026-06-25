@@ -13,6 +13,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `repair` | After source changes, update the affected (stale) tests so the whole suite is green. |
 | `fix` | Apply described issues/findings to the code, keeping the suite green + audit-clean. |
 | `review` | Read-only quality grade (0–100) of a suite: green, coverage, audit, flake. |
+| `a11y` | Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade. |
 | `bench` | Measure a suite: coverage, audit, and mutation score (does it catch bugs?). |
 | `ci` | PR helper: report changed-untested files + coverage; --generate adds tests; --review-fix reviews the diff (gated) and auto-fixes. |
 | `mock` | Synthesize the mock boundary (MSW handlers, fixtures, contracts) from the module graph. |
@@ -41,7 +42,7 @@ probevane init <dir>
 Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).
 
 ```bash
-probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--passk N] [--budget N] [--only <substr>] [--spec]
+probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--passk N] [--budget N] [--only <substr>] [--spec]
 # e.g. probevane generate ./my-app --kind unit --mock
 ```
 
@@ -83,6 +84,14 @@ Read-only quality grade (0–100) of a suite: green, coverage, audit, flake.
 ```bash
 probevane review <dir> [--flake N]
 # e.g. probevane review ./app
+```
+
+### a11y
+Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade.
+
+```bash
+probevane a11y <dir>
+# e.g. probevane a11y ./app
 ```
 
 ### bench

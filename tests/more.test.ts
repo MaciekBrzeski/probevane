@@ -9,6 +9,7 @@ import { auditSource } from '../src/audit/core.js';
 import { jsAuditRules } from '../src/audit/rules-js.js';
 import { goAuditRules } from '../src/audit/rules-go.js';
 import { pyAuditRules } from '../src/audit/rules-py.js';
+import { a11yRules } from '../src/a11y/rules.js';
 import { selectBest, scoreSuite, type SuiteScore } from '../src/loop/passk.js';
 import { reactAdapter } from '../src/adapters/react-vitest-playwright/index.js';
 import { recordingBrain, replayBrain } from '../src/brain/replay.js';
@@ -88,6 +89,26 @@ describe('passk.scoreSuite (real fixture)', () => {
     expect(s.green).toBe(true);
     expect(s.value).toBeGreaterThan(0);
   }, 60_000);
+});
+
+describe('a11y rules', () => {
+  it('catches missing alt / name / role / positive tabindex', () => {
+    const bad = `export function B(){return(<div>\n<img src="x"/>\n<div onClick={()=>{}}>x</div>\n<input type="text"/>\n<button tabIndex={3}></button>\n</div>);}`;
+    const ids = a11yRules().flatMap((r) => auditSource('B.tsx', bad, [r])).map((v) => v.rule);
+    expect(ids).toContain('a11y-img-alt');
+    expect(ids).toContain('a11y-click-no-role');
+    expect(ids).toContain('a11y-input-label');
+    expect(ids).toContain('a11y-positive-tabindex');
+  });
+  it('passes a multiline labeled input (no false positive)', () => {
+    const ok = `<input\n  aria-label="Name"\n  value={v}\n/>`;
+    const v = auditSource('ok.tsx', ok, a11yRules());
+    expect(v.find((x) => x.rule === 'a11y-input-label')).toBeUndefined();
+  });
+  it('img with alt passes', () => {
+    const v = auditSource('ok.tsx', `<img src="x" alt="a cat" />`, a11yRules());
+    expect(v.find((x) => x.rule === 'a11y-img-alt')).toBeUndefined();
+  });
 });
 
 describe('review verification gate', () => {

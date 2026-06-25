@@ -16,12 +16,13 @@ export interface Command {
 
 export const COMMANDS: Command[] = [
   { name: 'init', summary: 'Detect the stack and install test deps + config.', usage: 'probevane init <dir>', example: 'probevane init ./my-app' },
-  { name: 'generate', summary: 'Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).', usage: 'probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--passk N] [--budget N] [--only <substr>] [--spec]', example: 'probevane generate ./my-app --kind unit --mock' },
+  { name: 'generate', summary: 'Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).', usage: 'probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--passk N] [--budget N] [--only <substr>] [--spec]', example: 'probevane generate ./my-app --kind unit --mock' },
   { name: 'refactor', summary: 'Characterization-first refactor: change source only, every test stays green (behavior_lock).', usage: 'probevane refactor <dir> --task "<what to refactor>" [--model …] [--budget N]', example: 'probevane refactor ./app --task "extract helpers into utils.ts"' },
   { name: 'feature', summary: 'TDD red-first: write a failing test, implement, go green; existing tests protected.', usage: 'probevane feature <dir> --task "<feature>" [--model …]', example: 'probevane feature ./app --task "add a discount field to cartTotal"' },
   { name: 'repair', summary: 'After source changes, update the affected (stale) tests so the whole suite is green.', usage: 'probevane repair <dir> [--since <ref>] [--model …]', example: 'probevane repair ./app --since HEAD~1' },
   { name: 'fix', summary: 'Apply described issues/findings to the code, keeping the suite green + audit-clean.', usage: 'probevane fix <dir> --task "<issues>" [--model …]', example: 'probevane fix ./app --task "handle the null case in parse()"' },
   { name: 'review', summary: 'Read-only quality grade (0–100) of a suite: green, coverage, audit, flake.', usage: 'probevane review <dir> [--flake N]', example: 'probevane review ./app' },
+  { name: 'a11y', summary: 'Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade.', usage: 'probevane a11y <dir>', example: 'probevane a11y ./app' },
   { name: 'bench', summary: 'Measure a suite: coverage, audit, and mutation score (does it catch bugs?).', usage: 'probevane bench <dir> [--mutants N]', example: 'probevane bench ./app --mutants 6' },
   { name: 'ci', summary: 'PR helper: report changed-untested files + coverage; --generate adds tests; --review-fix reviews the diff (gated) and auto-fixes.', usage: 'probevane ci <dir> [--base <ref>] [--generate] [--review-fix] [--strict]', example: 'probevane ci . --base origin/main --review-fix' },
   { name: 'mock', summary: 'Synthesize the mock boundary (MSW handlers, fixtures, contracts) from the module graph.', usage: 'probevane mock <dir>', example: 'probevane mock ./app' },
@@ -44,6 +45,6 @@ export const UNDOCUMENTED = new Set(['plan', 'version', '-v', '--version', 'help
 export async function binCommands(): Promise<string[]> {
   const bin = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'probevane');
   const src = await readFile(bin, 'utf8');
-  const m = src.match(/^\s*(init\|[a-z|]+)\)/m);
+  const m = src.match(/^\s*(init\|[a-z0-9|]+)\)/m);
   return m ? m[1].split('|') : [];
 }

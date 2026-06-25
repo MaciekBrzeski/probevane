@@ -16,6 +16,7 @@ export interface ProbevaneConfig {
   mock?: boolean;
   mutation?: boolean;
   flakeGuard?: boolean;
+  a11y?: boolean;
   takeover?: string;
   budget?: number; // hard output-token ceiling per run
 }
