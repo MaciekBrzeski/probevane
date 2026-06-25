@@ -48,6 +48,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `skill` | Generate/check the probevane control skill (this doc). --check fails on drift. |
 | `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
+| `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
 | `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
 
 ## Reference
@@ -257,6 +258,15 @@ Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/
 probevane serve [dir] [--port N]
 # e.g.
 probevane serve ./app
+```
+
+### improve
+Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop).
+
+```
+probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload <cmd>] [--max N]
+# e.g.
+probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"
 ```
 
 ### peek

@@ -218,6 +218,14 @@ describe('brain replay (record → replay identical, offline)', () => {
   });
 });
 
+describe('visual improve — extractFence', () => {
+  it('pulls the code out of a fenced reply, null when none', async () => {
+    const { extractFence } = await import('../src/visual/improve.js');
+    expect(extractFence('here:\n```html\n<h1>x</h1>\n```\ndone')).toBe('<h1>x</h1>');
+    expect(extractFence('DONE')).toBeNull();
+  });
+});
+
 describe('validation_gate tsc error counting', () => {
   it('counts error TS diagnostics (so a dirty baseline cannot mask new errors)', async () => {
     const { countTsErrors } = await import('../src/loop/runes/validation_gate.js');

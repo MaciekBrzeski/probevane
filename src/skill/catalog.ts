@@ -38,6 +38,7 @@ export const COMMANDS: Command[] = [
   { name: 'skill', summary: 'Generate/check the probevane control skill (this doc). --check fails on drift.', usage: 'probevane skill [--check]', example: 'probevane skill --check' },
   { name: 'distill', summary: "Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:.", usage: 'probevane distill <build|stats|train|bases> [--execute] [--models a,b]', example: 'probevane distill build' },
   { name: 'serve', summary: 'Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs.', usage: 'probevane serve [dir] [--port N]', example: 'probevane serve ./app' },
+  { name: 'improve', summary: 'Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop).', usage: 'probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload <cmd>] [--max N]', example: 'probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"' },
   { name: 'peek', summary: 'Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console.', usage: 'probevane peek [dir]', example: 'probevane peek ./app' },
 ];
 
