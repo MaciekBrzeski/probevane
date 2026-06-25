@@ -35,3 +35,18 @@ Each test starts from a fresh `page.goto('/')`; do not depend on another test's 
 - A label like `toggle <text>` or `delete <text>` in the ground truth is an `aria-label` → use `getByLabel`.
 - If a locator could match many elements, scope it (`page.getByRole('listitem').filter({ hasText })`).
 - Never assert on text the app does not render (check the ground-truth inventory).
+
+## PATTERN E-VIS — visual-regression checkpoint (--visual)
+```ts
+import { test } from '@playwright/test';
+import { checkpoint } from './checkpoint';
+
+test('todo flow looks right', async ({ page }) => {
+  await page.goto('/');
+  await checkpoint(page, 'empty');                 // baseline of the empty state
+  await page.getByLabel('New todo').fill('Buy milk');
+  await page.getByRole('button', { name: 'Add' }).click();
+  await checkpoint(page, 'one-item', { mask: [page.getByTestId('clock')] }); // mask dynamic bits
+});
+```
+Capture a checkpoint at each meaningful UI state. First run writes the baseline; later runs diff against it (small pixel tolerance, animations frozen). Mask timestamps/ids.

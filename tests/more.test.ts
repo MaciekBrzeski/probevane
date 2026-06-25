@@ -130,6 +130,23 @@ describe('cpu base bake-off helpers', () => {
   });
 });
 
+describe('visual_gate decision', () => {
+  it('blocks an e2e spec with no screenshot, allows one with checkpoint', async () => {
+    const { visualGate } = await import('../src/loop/runes/visual_gate.js');
+    const dir = mkdtempSync(join(tmpdir(), 'vg-'));
+    mkdirSync(join(dir, 'e2e'), { recursive: true });
+    const mk = (body: string) => {
+      writeFileSync(join(dir, 'e2e', 'a.spec.ts'), body);
+      return { workdir: dir, editedFiles: new Set(['e2e/a.spec.ts']), adapter: { id: 'react-vitest-playwright' } } as any;
+    };
+    const noShot = await visualGate.shouldStop!(mk(`test('t', async ({page}) => { await page.goto('/'); });`));
+    expect(noShot.kind).toBe('block');
+    const withShot = await visualGate.shouldStop!(mk(`import {checkpoint} from './checkpoint'; test('t', async ({page}) => { await page.goto('/'); await checkpoint(page,'x'); });`));
+    expect(withShot.kind).toBe('allow');
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe('a11y rules', () => {
   it('catches missing alt / name / role / positive tabindex', () => {
     const bad = `export function B(){return(<div>\n<img src="x"/>\n<div onClick={()=>{}}>x</div>\n<input type="text"/>\n<button tabIndex={3}></button>\n</div>);}`;

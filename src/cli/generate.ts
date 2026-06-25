@@ -24,6 +24,7 @@ async function main() {
   const targetGaps = args.includes('--target-gaps');
   const flakeGuard = args.includes('--flake-guard') || cfg.flakeGuard === true;
   const a11y = args.includes('--a11y') || cfg.a11y === true;
+  const visual = args.includes('--visual') || cfg.visual === true;
   const budget = pick(num(flag(args, '--budget')), cfg.budget);
   const passk = parseInt(flag(args, '--passk') ?? '1', 10);
 
@@ -49,6 +50,7 @@ async function main() {
     mutation,
     flakeGuard,
     a11y,
+    visual,
     budget,
     mock,
     targetGaps,

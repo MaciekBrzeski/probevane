@@ -10,6 +10,7 @@ import { acceptanceGate } from './runes/acceptance_gate.js';
 import { hermeticGate } from './runes/hermetic_gate.js';
 import { mutationGate } from './runes/mutation_gate.js';
 import { a11yGate } from './runes/a11y_gate.js';
+import { visualGate } from './runes/visual_gate.js';
 import { flakeGate } from './runes/flake_gate.js';
 import { behaviorLock } from './runes/behavior_lock.js';
 import { redFirst } from './runes/red_first.js';
@@ -30,6 +31,7 @@ export interface ProfileOpts {
   mutation?: boolean; // opt-in mutation gate (slow)
   flakeGuard?: boolean; // opt-in flake gate (runs new specs N times)
   a11y?: boolean; // opt-in a11y gate (component specs must assert accessibility)
+  visual?: boolean; // opt-in visual gate (e2e specs must capture a screenshot checkpoint)
 }
 
 export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
@@ -53,6 +55,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         ...(opts.flakeGuard ? [flakeGate()] : []),
         ...(opts.mutation ? [mutationGate({ enforce: true })] : []),
         ...(opts.a11y ? [a11yGate] : []),
+        ...(opts.visual && scope === 'e2e' ? [visualGate] : []),
         sessionDiary,
         caveatHarvest,
         distillTrace,

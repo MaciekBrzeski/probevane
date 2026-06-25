@@ -12,5 +12,5 @@
     "rootDir": "."
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["fixtures", "node_modules", "dist"]
+  "exclude": ["fixtures", "node_modules", "dist", "src/e2e/checkpoint.ts"]
 }
