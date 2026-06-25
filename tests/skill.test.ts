@@ -48,4 +48,20 @@ describe('wiki link integrity (no broken nav)', () => {
     }
     expect(broken, `broken wiki links: ${broken.join(', ')}`).toEqual([]);
   });
+
+  it('every generated project spec page is well-formed', async () => {
+    const dir = 'docs/wiki';
+    const projects = (await readdir(dir)).filter((f) => f.startsWith('project-') && f.endsWith('.md'));
+    expect(projects.length, 'no project spec pages').toBeGreaterThan(0);
+    for (const f of projects) {
+      const md = await readFile(join(dir, f), 'utf8');
+      expect(md, `${f} missing a title`).toMatch(/^#\s+\S/m);
+      expect(md, `${f} missing module graph`).toMatch(/Module graph/i);
+    }
+  });
+
+  it('probevane has its own dogfood spec page', async () => {
+    const md = await readFile('docs/wiki/project-probevane.md', 'utf8').catch(() => '');
+    expect(md, 'run `probevane spec . --wiki`').toMatch(/# probevane/);
+  });
 });
