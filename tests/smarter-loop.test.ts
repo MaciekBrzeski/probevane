@@ -36,6 +36,16 @@ describe('difficulty.isCircular', () => {
     expect(p).not.toContain('"old"');
   });
 
+  it('catches the never-edited stall: same stop-block repeating is circular', () => {
+    // A weak local model that never calls write_file keeps hitting the same stop
+    // gate; recentCalls may be empty, but the repeated block reason alone trips it.
+    const ctx = new RunCtx('/tmp', {} as any, 'task');
+    for (let i = 0; i < 8; i++) ctx.noteBlock('validation_gate: no test file was written');
+    expect(ctx.editedFiles.size).toBe(0); // never edited
+    expect(isCircular(ctx)).toBe(true);
+    expect(proposal(ctx)).toContain('no test file was written');
+  });
+
   it('RunCtx.noteBlock feeds the raw history the gate reads', () => {
     const ctx = new RunCtx('/tmp', {} as any, 'task');
     ctx.noteBlock('validation_gate');
