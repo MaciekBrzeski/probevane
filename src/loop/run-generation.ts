@@ -3,6 +3,8 @@ import type { Brain } from '../brain/brain.js';
 import { profile } from './profiles.js';
 import { runLoop, type RunOutcome } from './engine.js';
 import { retrieveFewShot } from '../library/retrieve.js';
+import { readTraces } from '../distill/collect.js';
+import { pickSimilarTrace } from '../library/similar.js';
 import { mockInject } from './runes/mock_inject.js';
 import { buildChain } from '../mock/index.js';
 import { brainFor } from '../brain/select.js';
@@ -108,8 +110,16 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     gapGround,
   ].join('\n');
 
-  // Consult: when stalled, surface the best library exemplar for this stack+kind.
+  // Consult: when stalled, surface the most-similar WORKED EXAMPLE for this
+  // module. Prefer an accepted trace closest to this task (exemplar-RAG helps
+  // novel local-solve, and only on retry — the consult ladder is that retry);
+  // fall back to the curated library few-shot if no trace matches.
   const onConsult = async (ctx: RunCtx): Promise<string | undefined> => {
+    const traces = await readTraces().catch(() => []);
+    const hit = pickSimilarTrace(traces, ctx.task, ctx.adapter.id);
+    if (hit) {
+      return `WORKED EXAMPLE from a similar module (match its shape, adapt to THIS module's symbols):\n\n${hit.spec.slice(0, 2500)}`;
+    }
     const ex = await retrieveFewShot({ stack: ctx.adapter.id, kind, topK: 1 }).catch(() => []);
     if (!ex.length) return undefined;
     return `A known-good ${kind} example for this stack (match its shape):\n\n${ex[0].body.slice(0, 2500)}`;
