@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { sseFrame, tailFrom } from '../loop/observe.js';
 
 // probevane serve [dir] [--port N]
 //
@@ -18,24 +19,20 @@ function flag(name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
-// Byte-offset tailer: return new bytes appended to each events-*.jsonl since last seen.
+// Byte-offset tailer: new lines appended to each events-*.jsonl since last seen.
+// The decision (which lines are new) is the pure `tailFrom`; this is just the I/O.
 const offsets = new Map<string, number>();
-export async function pollNew(dir: string): Promise<string[]> {
-  const lines: string[] = [];
+async function pollNew(dir: string): Promise<string[]> {
+  const out: string[] = [];
   const files = (await readdir(dir).catch(() => [])).filter((f) => /^events-.*\.jsonl$/.test(f));
   for (const f of files.sort()) {
     const p = join(dir, f);
-    const sz = (await stat(p).catch(() => null))?.size ?? 0;
-    const from = offsets.get(p) ?? 0;
-    if (sz <= from) {
-      offsets.set(p, sz);
-      continue;
-    }
-    const buf = await readFile(p, 'utf8').catch(() => '');
-    offsets.set(p, buf.length);
-    for (const ln of buf.slice(from).split('\n').filter(Boolean)) lines.push(ln);
+    if (((await stat(p).catch(() => null))?.size ?? 0) <= (offsets.get(p) ?? 0)) continue;
+    const { lines, offset } = tailFrom(await readFile(p, 'utf8').catch(() => ''), offsets.get(p) ?? 0);
+    offsets.set(p, offset);
+    out.push(...lines);
   }
-  return lines;
+  return out;
 }
 
 const server = createServer(async (req, res) => {
@@ -48,7 +45,7 @@ const server = createServer(async (req, res) => {
     offsets.clear();
     while (alive) {
       const lines = await pollNew(EVENTS);
-      for (const ln of lines) res.write(`data: ${ln}\n\n`);
+      for (const ln of lines) res.write(sseFrame(ln));
       await new Promise((r) => setTimeout(r, 500));
     }
     return;
