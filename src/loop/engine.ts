@@ -150,7 +150,12 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
         system,
         messages,
         tools: TOOL_SPECS,
-        cachePrefixIndex: stableCacheIndex(messages.length),
+        // Kill-switch (A/B + escape hatch): PROBEVANE_NO_TRANSCRIPT_CACHE=1 keeps
+        // only the system/tools cache breakpoint, re-billing the transcript.
+        cachePrefixIndex:
+          process.env.PROBEVANE_NO_TRANSCRIPT_CACHE === '1'
+            ? undefined
+            : stableCacheIndex(messages.length),
       });
     } catch (e) {
       log(`[engine] brain error: ${String(e)}`);
