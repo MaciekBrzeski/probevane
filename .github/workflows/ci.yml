@@ -1,0 +1,35 @@
+name: ci
+
+# probevane's own gate (dogfood — the test tool is itself tested). On every
+# push/PR: typecheck, run probevane's self-tests, and the fixture eval.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: pip install pytest pytest-cov
+      - run: npm ci || npm install
+      - name: typecheck
+        run: npm run typecheck
+      - name: probevane self-tests
+        run: npx vitest run
+      - name: install fixture deps
+        run: |
+          for f in fixtures/*/; do [ -f "$f/package.json" ] && (cd "$f" && npm install --no-fund --no-audit) || true; done
+      - name: fixture eval (no LLM)
+        run: ./bin/probevane eval
