@@ -147,6 +147,17 @@ describe('visual_gate decision', () => {
   });
 });
 
+describe('loop peek view-model', () => {
+  it('collapses events to the latest per run', async () => {
+    const { latestPerRun } = await import('../src/cli/peek.js');
+    const ev = (runId: string, step: number, extra = {}) => ({ ts: 't', runId, step, toolCalls: step, gateBlocks: 0, tokensIn: 0, tokensOut: 0, ...extra });
+    const m = latestPerRun([ev('a', 1), ev('a', 2), ev('b', 1), ev('a', 3, { stopReason: 'accepted', accepted: true })] as any);
+    expect(m.get('a')!.step).toBe(3);
+    expect(m.get('a')!.accepted).toBe(true);
+    expect(m.get('b')!.step).toBe(1);
+  });
+});
+
 describe('a11y rules', () => {
   it('catches missing alt / name / role / positive tabindex', () => {
     const bad = `export function B(){return(<div>\n<img src="x"/>\n<div onClick={()=>{}}>x</div>\n<input type="text"/>\n<button tabIndex={3}></button>\n</div>);}`;

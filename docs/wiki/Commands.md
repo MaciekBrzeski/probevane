@@ -28,6 +28,8 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `watch` | Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop. |
 | `skill` | Generate/check the probevane control skill (this doc). --check fails on drift. |
 | `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
+| `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
+| `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
 
 ## Reference
 
@@ -205,4 +207,20 @@ Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and p
 ```bash
 probevane distill <build|stats|train|bases> [--execute] [--models a,b]
 # e.g. probevane distill build
+```
+
+### serve
+Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs.
+
+```bash
+probevane serve [dir] [--port N]
+# e.g. probevane serve ./app
+```
+
+### peek
+Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console.
+
+```bash
+probevane peek [dir]
+# e.g. probevane peek ./app
 ```

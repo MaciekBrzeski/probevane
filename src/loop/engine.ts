@@ -6,6 +6,9 @@ import { firstBlockBefore, firstBlockStop } from './rune.js';
 import { TOOL_SPECS, execTool } from './tools.js';
 import { capOutput } from '../util/exec.js';
 import type { Msg, ToolResult } from './types.js';
+import { formatEvent } from './events.js';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 // Turns to keep full tool_result bodies; older ones are pruned to a stub so the
 // transcript (re-sent every turn) stays bounded. The files persist on disk —
@@ -43,6 +46,8 @@ export interface RunOptions {
   takeoverBrain?: Brain;
   /** Extra guidance pulled when stuck (e.g. a library exemplar). */
   onConsult?: (ctx: RunCtx) => Promise<string | undefined>;
+  /** Stable id for the live event log file (defaults to a timestamp id). */
+  runId?: string;
   log?: (line: string) => void;
 }
 
@@ -92,6 +97,26 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   let tokensIn = 0;
   let tokensOut = 0;
   let cacheRead = 0;
+
+  // Live event log — one JSON line per step to <workdir>/.probevane/events-<runId>.jsonl,
+  // tailed by `probevane serve`/`peek`. On by default; opt out with PROBEVANE_EVENTS=0.
+  const runId = opts.runId ?? `run-${Date.now().toString(36)}`;
+  const eventsOn = process.env.PROBEVANE_EVENTS !== '0';
+  const eventsPath = join(workdir, '.probevane', `events-${runId}.jsonl`);
+  if (eventsOn) mkdirSync(join(workdir, '.probevane'), { recursive: true });
+  const emit = (extra: Record<string, unknown>) => {
+    if (!eventsOn) return;
+    try {
+      appendFileSync(
+        eventsPath,
+        formatEvent({
+          ts: new Date().toISOString(), runId, step: ctx.step,
+          toolCalls: ctx.toolCalls, gateBlocks: ctx.gateBlocks, gateBlockReasons: ctx.gateBlockReasons,
+          tokensIn, tokensOut, editedFiles: [...ctx.editedFiles], ...extra,
+        }) + '\n',
+      );
+    } catch { /* observability is best-effort */ }
+  };
   let accepted = false;
   let stopReason: RunOutcome['stopReason'] = 'max_steps';
 
@@ -114,6 +139,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
       `[engine] step ${ctx.step}: ${resp.toolCalls.length} tool call(s)${resp.text ? ' + text' : ''}` +
         `${resp.usage.cacheRead ? ` [cache hit ${resp.usage.cacheRead}]` : ''}`,
     );
+    emit({ tool: resp.toolCalls[0]?.name });
 
     messages.push({ role: 'assistant', text: resp.text || undefined, toolCalls: resp.toolCalls });
 
@@ -207,6 +233,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
 
   ctx.accepted = accepted;
   ctx.stopReason = stopReason;
+  emit({ stopReason, accepted });
   for (const r of runes) await r.onStop?.(ctx);
 
   return {

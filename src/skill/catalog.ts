@@ -37,6 +37,8 @@ export const COMMANDS: Command[] = [
   { name: 'watch', summary: 'Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop.', usage: 'probevane watch <dir> [--run] [--debounce ms]', example: 'probevane watch ./app --run' },
   { name: 'skill', summary: 'Generate/check the probevane control skill (this doc). --check fails on drift.', usage: 'probevane skill [--check]', example: 'probevane skill --check' },
   { name: 'distill', summary: "Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:.", usage: 'probevane distill <build|stats|train|bases> [--execute] [--models a,b]', example: 'probevane distill build' },
+  { name: 'serve', summary: 'Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs.', usage: 'probevane serve [dir] [--port N]', example: 'probevane serve ./app' },
+  { name: 'peek', summary: 'Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console.', usage: 'probevane peek [dir]', example: 'probevane peek ./app' },
 ];
 
 /** Commands accepted by bin/probevane that intentionally aren't user-facing skill entries. */
