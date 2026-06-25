@@ -20,7 +20,8 @@ You point probevane at a project. An **adapter** detects the stack (React first)
 
 ## Start here
 
-- [Task paths](Paths.md) — write-tests · refactor · feature · repair
+- [Task paths](Paths.md) — write-tests · refactor · feature · repair · fix
+- [Commands](Commands.md) — full CLI reference (generated, gated)
 - [Architecture](Architecture.md) — the pieces and how they connect
 - [The Loop](The-Loop.md) — turn-by-turn control flow
 - [Runes & Gates](Runes-and-Gates.md) — what blocks the model and why

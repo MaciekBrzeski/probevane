@@ -28,6 +28,8 @@ jobs:
         run: npm run typecheck
       - name: probevane self-tests
         run: npx vitest run
+      - name: skill + wiki in sync (drift gate)
+        run: ./bin/probevane skill --check
       - name: install fixture deps
         run: |
           for f in fixtures/*/; do [ -f "$f/package.json" ] && (cd "$f" && npm install --no-fund --no-audit) || true; done
