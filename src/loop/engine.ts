@@ -121,6 +121,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   let tokensIn = 0;
   let tokensOut = 0;
   let cacheRead = 0;
+  let costUsd = 0; // brain-reported actual cost (claude-code), when available
 
   // Live event log — one JSON line per step to <workdir>/.probevane/events-<runId>.jsonl,
   // tailed by `probevane serve`/`peek`. On by default; opt out with PROBEVANE_EVENTS=0.
@@ -171,6 +172,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     tokensIn += resp.usage.input;
     tokensOut += resp.usage.output;
     cacheRead += resp.usage.cacheRead ?? 0;
+    costUsd += resp.usage.costUsd ?? 0;
     log(
       `[engine] step ${ctx.step}: ${resp.toolCalls.length} tool call(s)${resp.text ? ' + text' : ''}` +
         `${resp.usage.cacheRead ? ` [cache hit ${resp.usage.cacheRead}]` : ''}`,
@@ -331,6 +333,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
           tokensIn += r.usage.input;
           tokensOut += r.usage.output;
           cacheRead += r.usage.cacheRead ?? 0;
+          costUsd += r.usage.costUsd ?? 0;
           if (r.text.trim()) proposalText += `\n\nModel: ${r.text.trim()}`;
         } catch { /* deterministic proposal still stands */ }
       }
@@ -360,6 +363,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   await recordRun({
     ts: new Date().toISOString(), runId, label: opts.label ?? 'run', model: brain.model,
     tokensIn, tokensOut, cacheRead, accepted, tookOver, stopReason, steps: ctx.step,
+    costUsd: costUsd || undefined,
   });
   for (const r of runes) await r.onStop?.(ctx);
 

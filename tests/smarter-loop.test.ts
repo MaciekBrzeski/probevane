@@ -6,6 +6,7 @@ import { tokenize, similarity, pickSimilarTrace } from '../src/library/similar.j
 import { kindFor, categoryFor, scoreFor, slugFor } from '../src/loop/runes/library_promote.js';
 import { extractTestBlock, conventionalSpecPath } from '../src/loop/extract.js';
 import { parseDecision, extractJson } from '../src/brain/claude-code.js';
+import { summarize, type RunRecord } from '../src/cost/ledger.js';
 import { RunCtx } from '../src/loop/ctx.js';
 import type { Trace } from '../src/distill/collect.js';
 
@@ -194,6 +195,21 @@ describe('brain.claude-code parseDecision', () => {
   it('extractJson handles nested braces + strings with braces', () => {
     const o = extractJson('noise {"a":{"b":"}{"},"c":1} trailing');
     expect(o).toEqual({ a: { b: '}{' }, c: 1 });
+  });
+});
+
+// ---- Ledger: honest cost (claude-code reports actual spend) ------------------
+describe('ledger honest cost', () => {
+  const rec = (over: Partial<RunRecord>): RunRecord => ({
+    ts: 't', runId: 'r', label: 'delegate:x', model: 'claude-code:haiku',
+    tokensIn: 0, tokensOut: 0, cacheRead: 0, cost: 0, accepted: false, tookOver: false,
+    stopReason: 'max_steps', steps: 1, ...over,
+  });
+  it('summarize totals the brain-reported cost (claude-code:* unpriced otherwise)', () => {
+    // cost field is what recordRun computed: costUsd when present, else token-priced.
+    const s = summarize([rec({ cost: 0.3363, costUsd: 0.3363 }), rec({ cost: 0.1769, costUsd: 0.1769 })]);
+    expect(s.totalCost).toBeCloseTo(0.5132, 4);
+    expect(s.byModel['claude-code:haiku'].cost).toBeCloseTo(0.5132, 4);
   });
 });
 

@@ -35,6 +35,21 @@ async function main() {
   const model = flag(args, '--model') ?? cfg.model ?? 'auto';
   console.error(`[probevane] generate kind=${kind} adapter=${adapter.id} model=${model} dir=${dir}`);
 
+  // Shape B: --delegate hands the WHOLE task to an external harness (claude -p),
+  // then runs probevane's gates on the diff. `--model cc:<m>`/`claude-code` picks
+  // the claude model; default sonnet.
+  if (args.includes('--delegate')) {
+    const { runDelegated } = await import('../loop/delegate.js');
+    const ccModel = model.startsWith('cc:') ? model.slice(3) : model === 'claude-code' ? undefined : 'sonnet';
+    const out = await runDelegated({ dir, kind, adapter, model: ccModel, only: flag(args, '--only'), maxRounds: num(flag(args, '--rounds')) ?? 3, log: (l) => console.error(l) });
+    console.log(
+      `[probevane] DELEGATE ${out.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} rounds=${out.rounds} ` +
+        `specs=${out.changedFiles.length} green=${out.green} auditErr=${out.auditErrors} cost=$${out.costUsd.toFixed(4)}`,
+    );
+    if (!out.accepted) process.exit(1);
+    return;
+  }
+
   const takeoverOverride = flag(args, '--takeover');
   const genOpts = (d: string) => ({
     dir: d,
