@@ -131,7 +131,8 @@ describe('brain replay (record → replay identical, offline)', () => {
 });
 
 describe('audit rules (js/go/py)', () => {
-  it('js: conditional-expect + unused-import + waitForTimeout', () => {
+  it('js: conditional-expect + unused-import + brittle-wait', () => {
+    // probevane-allow: no-wait-for-timeout probevane-allow: conditional-expect (intentional bad-code fixture)
     const src = `import { a, b } from './x';\nit('t', async () => { if (a) expect(1).toBe(1); await page.waitForTimeout(5); });`;
     const v = auditSource('a.test.ts', src, jsAuditRules()).map((x) => x.rule);
     expect(v).toContain('conditional-expect');

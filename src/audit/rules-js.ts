@@ -98,7 +98,10 @@ export function jsAuditRules(): AuditRule[] {
       check: (line, _lineNo, _file, full) => {
         const m = line.match(/^\s*import\s+\{([^}]+)\}\s+from/);
         if (!m) return null;
-        const names = m[1].split(',').map((s) => s.trim().split(/\s+as\s+/).pop()!.trim()).filter(Boolean);
+        const names = m[1]
+          .split(',')
+          .map((s) => s.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()!.trim())
+          .filter(Boolean);
         const rest = full.replace(line, '');
         const unused = names.filter((n) => !new RegExp(`\\b${escapeRe(n)}\\b`).test(rest));
         return unused.length ? `unused import(s): ${unused.join(', ')} — remove or use them` : null;
