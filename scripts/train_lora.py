@@ -30,6 +30,22 @@ def load_chat_jsonl(path):
         return [json.loads(line) for line in f if line.strip()]
 
 
+def vram_free_gb():
+    """(free, total) GB on the active AMD GPU via sysfs; (None, None) if unknown."""
+    import glob
+    best = None
+    for used in glob.glob("/sys/class/drm/card*/device/mem_info_vram_used"):
+        total = used.replace("_used", "_total")
+        try:
+            t = int(open(total).read()) / 2**30
+            u = int(open(used).read()) / 2**30
+        except OSError:
+            continue
+        if best is None or t > best[1]:  # the dGPU is the biggest-VRAM card
+            best = (t - u, t)
+    return best if best else (None, None)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="Qwen/Qwen2.5-Coder-7B-Instruct")
@@ -42,6 +58,14 @@ def main():
     ap.add_argument("--grad-accum", type=int, default=16)
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--max-len", type=int, default=4096)
+    ap.add_argument("--load-4bit", action="store_true",
+                    help="QLoRA: load the base in 4-bit (smallest VRAM — use when sharing the GPU)")
+    ap.add_argument("--max-vram-frac", type=float, default=0.0,
+                    help="cap this process to a fraction of total VRAM (e.g. 0.55 when another job runs)")
+    ap.add_argument("--min-free-gb", type=float, default=8.0,
+                    help="refuse to start if less than this much VRAM is free (co-run guard)")
+    ap.add_argument("--allow-shared-gpu", action="store_true",
+                    help="proceed even if the GPU is busy / low on free VRAM (you accept the freeze risk)")
     ap.add_argument("--validate-only", action="store_true",
                     help="parse the dataset + print the plan, then exit (no GPU)")
     args = ap.parse_args()
@@ -57,11 +81,21 @@ def main():
               f"batch={args.batch}x{args.grad_accum} lr={args.lr} max_len={args.max_len}")
         return
 
-    # --- GPU path (runs only when explicitly invoked on an idle RDNA4) ---
+    # --- GPU path (runs only when explicitly invoked) ---
     if "HSA_OVERRIDE_GFX_VERSION" in os.environ:
         sys.exit("[train] refuse: HSA_OVERRIDE_GFX_VERSION set — breaks RDNA4. unset it.")
     os.environ.setdefault("HIP_VISIBLE_DEVICES", "0")
     os.environ.setdefault("PYTORCH_HIP_ALLOC_CONF", "expandable_segments:True")
+
+    # Co-run guard — the GPU is single-tenant on this box; heavy co-load has
+    # frozen it before. Refuse to start if VRAM is tight unless told otherwise.
+    free_gb, total_gb = vram_free_gb()
+    if free_gb is not None:
+        print(f"[train] VRAM: {free_gb:.1f}GB free / {total_gb:.1f}GB total")
+        if free_gb < args.min_free_gb and not args.allow_shared_gpu:
+            sys.exit(f"[train] refuse: only {free_gb:.1f}GB free (< --min-free-gb {args.min_free_gb}). "
+                     f"Another job is likely training. Wait, or re-run with --load-4bit --max-vram-frac 0.5 --allow-shared-gpu "
+                     f"(accepts slower + freeze risk). 7B bf16 needs ~14GB; prefer the 3B base + --load-4bit when sharing.")
 
     import torch  # noqa: E402  (deferred — avoids import cost on validate-only)
     from datasets import Dataset  # noqa: E402
@@ -79,7 +113,25 @@ def main():
         return enc
 
     ds = Dataset.from_list(data).map(fmt, remove_columns=["messages"])
-    model = AutoModelForCausalLM.from_pretrained(args.base, torch_dtype=torch.bfloat16, device_map="auto")
+
+    # Per-process VRAM cap — keep this job inside its lane when sharing the GPU.
+    if args.max_vram_frac > 0 and torch.cuda.is_available():
+        torch.cuda.set_per_process_memory_fraction(args.max_vram_frac, 0)
+        print(f"[train] capped to {args.max_vram_frac:.0%} of VRAM")
+
+    load_kw = dict(device_map="auto")
+    if args.load_4bit:
+        from transformers import BitsAndBytesConfig  # noqa: E402
+        load_kw["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_quant_type="nf4")
+        print("[train] QLoRA: base in 4-bit")
+    else:
+        load_kw["torch_dtype"] = torch.bfloat16
+    model = AutoModelForCausalLM.from_pretrained(args.base, **load_kw)
+    if args.load_4bit:
+        from peft import prepare_model_for_kbit_training  # noqa: E402
+        model = prepare_model_for_kbit_training(model)
+    model.gradient_checkpointing_enable()
     model = get_peft_model(model, LoraConfig(
         r=args.rank, lora_alpha=args.rank * 2, lora_dropout=0.05,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj"], task_type="CAUSAL_LM"))

@@ -42,12 +42,16 @@ async function main() {
 
   if (sub === 'train') {
     const execute = process.argv.includes('--execute');
-    const base = arg('--base') ?? 'Qwen/Qwen2.5-Coder-7B-Instruct';
-    const cmd = `python scripts/train_lora.py --base ${base} --data ${OUT}/train.jsonl --val ${OUT}/val.jsonl --out ${OUT}/adapter`;
+    // Default to the 3B base — the CPU bake-off winner; lighter to train + serve.
+    const base = arg('--base') ?? 'Qwen/Qwen2.5-Coder-3B-Instruct';
+    const shared = process.argv.includes('--shared-gpu'); // another job on the GPU
+    const flags = shared ? ' --load-4bit --max-vram-frac 0.5 --allow-shared-gpu' : '';
+    const cmd = `python scripts/train_lora.py --base ${base} --data ${OUT}/train.jsonl --val ${OUT}/val.jsonl --out ${OUT}/adapter${flags}`;
     console.log('[distill] LoRA training plan (RDNA4 ROCm):');
     console.log(`  base:     ${base}`);
     console.log(`  data:     ${OUT}/train.jsonl`);
     console.log(`  adapter:  ${OUT}/adapter`);
+    console.log(`  gpu:      ${shared ? '4-bit QLoRA, capped to 50% VRAM (co-run with another job)' : 'bf16, expects a free GPU (refuses if <8GB free)'}`);
     console.log(`  serve:    vLLM/llama.cpp OpenAI server → probevane generate --model local:<name>`);
     console.log(`  command:  ${cmd}`);
     if (!execute) {
