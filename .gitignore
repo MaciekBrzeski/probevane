@@ -23,3 +23,5 @@ fixtures/**/cover.out
 .probevane/
 SPEC.md
 .probevane-live/
+test-results/
+playwright-report/

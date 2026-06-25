@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { sseFrame, tailFrom } from '../loop/observe.js';
 
 // probevane serve [dir] [--port N]
@@ -56,36 +58,4 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => console.log(`probevane loop dashboard → http://127.0.0.1:${PORT}  (watching ${EVENTS})`));
 
-const DASHBOARD = `<!doctype html><meta charset=utf-8><title>probevane loop</title>
-<style>
- body{margin:0;font:14px/1.5 ui-monospace,Menlo,monospace;background:#0d1117;color:#e6edf3}
- header{padding:12px 18px;background:#161b22;border-bottom:1px solid #30363d;font-weight:700}
- .runs{display:flex;flex-wrap:wrap;gap:10px;padding:14px 18px}
- .run{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 14px;min-width:240px}
- .run.done{opacity:.6}.run h3{margin:0 0 6px;font-size:13px;color:#58a6ff}
- .k{color:#8b949e}.b{color:#f85149}.g{color:#3fb950}
- .bar{height:5px;background:#30363d;border-radius:3px;margin-top:6px;overflow:hidden}
- .bar>i{display:block;height:100%;background:#58a6ff}
- #log{padding:8px 18px;white-space:pre-wrap;color:#8b949e;font-size:12px;max-height:38vh;overflow:auto;border-top:1px solid #30363d}
-</style>
-<header>🧪 probevane — live loop</header><div class=runs id=runs></div><div id=log></div>
-<script>
- const runs={}, R=document.getElementById('runs'), L=document.getElementById('log');
- function render(){
-   R.innerHTML='';
-   for(const id of Object.keys(runs).sort()){
-     const e=runs[id], done=e.stopReason!=null;
-     const d=document.createElement('div'); d.className='run'+(done?' done':'');
-     d.innerHTML='<h3>'+id+(done?' · '+(e.accepted?'<span class=g>ACCEPTED</span>':'<span class=b>'+e.stopReason+'</span>'):'')+'</h3>'
-       +'<div><span class=k>step</span> '+(e.step??0)+' · <span class=k>tools</span> '+(e.toolCalls??0)
-       +' · <span class=k>blocks</span> <span class='+((e.gateBlocks)?'b':'')+'>'+(e.gateBlocks??0)+'</span></div>'
-       +'<div><span class=k>tok</span> '+(e.tokensIn??0)+'/'+(e.tokensOut??0)+(e.tool?' · <span class=k>tool</span> '+e.tool:'')+'</div>'
-       +(e.gateBlockReasons&&e.gateBlockReasons.length?'<div class=b>'+e.gateBlockReasons.slice(-1)[0]+'</div>':'')
-       +'<div class=bar><i style="width:'+Math.min(100,(e.step??0)/30*100)+'%"></i></div>';
-     R.appendChild(d);
-   }
- }
- const es=new EventSource('/stream');
- es.onmessage=m=>{ try{ const e=JSON.parse(m.data); runs[e.runId]={...runs[e.runId],...e}; render();
-   L.textContent+=(e.step!=null?'['+e.runId+' step '+e.step+'] ':'')+(e.tool||e.stopReason||'')+'\\n'; L.scrollTop=L.scrollHeight; }catch{} };
-</script>`;
+const DASHBOARD = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'ui', 'loop.html'), 'utf8');

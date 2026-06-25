@@ -11,9 +11,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "eval": "tsx src/cli/eval.ts",
-    "wiki": "node scripts/wiki.mjs"
+    "wiki": "node scripts/wiki.mjs",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^2.1.9",
     "tsx": "^4.19.0",

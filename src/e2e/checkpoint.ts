@@ -15,7 +15,9 @@ export interface CheckpointOpts {
 }
 
 export async function checkpoint(page: Page, name: string, opts: CheckpointOpts = {}): Promise<void> {
-  await page.waitForLoadState('networkidle').catch(() => {});
+  // Best-effort settle — a short bounded wait, so a page holding an open
+  // connection (SSE/websocket) never reaches "networkidle" and doesn't hang.
+  await page.waitForLoadState('networkidle', { timeout: 2500 }).catch(() => {});
   await expect(page).toHaveScreenshot(`${name}.png`, {
     maxDiffPixelRatio: opts.tolerance ?? 0.01,
     mask: opts.mask,
