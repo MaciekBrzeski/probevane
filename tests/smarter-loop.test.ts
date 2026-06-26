@@ -18,6 +18,7 @@ import { simulateCost, savings, MEASURED } from '../src/cost/simulate.js';
 import { factDigest } from '../src/loop/fact-digest.js';
 import { propertyGuidance, looksPropertyTestable } from '../src/loop/property.js';
 import { runPool } from '../src/util/concurrent.js';
+import { lineOf, mutantDigest } from '../src/loop/mutation.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -90,6 +91,24 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- mutation-driven targeting ----------------------------------------------
+describe('mutation targeting', () => {
+  it('lineOf returns the 1-based line of an index', () => {
+    const src = 'a\nbb\nccc';
+    expect(lineOf(src, 0)).toBe(1); // 'a'
+    expect(lineOf(src, 2)).toBe(2); // first char of 'bb'
+    expect(lineOf(src, 5)).toBe(3); // 'ccc'
+  });
+  it('mutantDigest lists survivors with location + mutation; empty on none', () => {
+    expect(mutantDigest([])).toBe('');
+    const d = mutantDigest([{ sourcePath: 'src/x.ts', line: 12, mutation: '=== → !==', snippet: 'if (a === b) return 1;' }]);
+    expect(d).toContain('SURVIVING MUTANTS');
+    expect(d).toContain('src/x.ts:12');
+    expect(d).toContain('=== → !==');
+    expect(d).toMatch(/FAIL/);
   });
 });
 
