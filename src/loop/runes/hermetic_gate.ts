@@ -8,6 +8,8 @@ import type { RunCtx } from '../ctx.js';
 // Non-hermetic tests are flaky and let a model "pass" by hitting a live backend
 // instead of asserting behavior. This also enforces that synthesized mocks are
 // actually used (see the mock maker). Scans the spec files written this run.
+// Test/spec files across stacks — the gate scopes to the ones THIS run edited.
+const TEST_RE = /(\.(test|spec)\.[tj]sx?$)|(test_\w+\.py$)|(_test\.py$)|(_test\.go$)|(tests\/.*\.rs$)/;
 const EXTERNAL_URL = /["'`]https?:\/\/(?!localhost|127\.0\.0\.1|\[::1\])/;
 const RAW_NET = /\b(fetch|axios|XMLHttpRequest|got|superagent)\s*[(.]/;
 const MOCK_SETUP = /\b(setupServer|server\.use|http\.(get|post|put|patch|delete)|graphql\.|vi\.mock|page\.route|mockFetch|msw)\b/;
@@ -22,7 +24,11 @@ export const hermeticGate: Rune = {
   },
 
   async shouldStop(ctx: RunCtx): Promise<RuneDecision> {
-    const specs = await ctx.adapter.specFiles(ctx.workdir);
+    // Scope to the spec files THIS run wrote — not the whole suite. A pre-existing
+    // unrelated test holding a URL/clock literal must not block a run (and
+    // no_regression forbids "fixing" it, which would deadlock). Mirrors audit/
+    // no_regression scoping.
+    const specs = [...ctx.editedFiles].filter((rel) => TEST_RE.test(rel));
     for (const rel of specs) {
       const src = await readFile(join(ctx.workdir, rel), 'utf8').catch(() => '');
       if (!src) continue;
