@@ -1,12 +1,19 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { stateRoot } from '../util/state.js';
 import { readRuns, type RunRecord } from '../cost/ledger.js';
 import { appendJsonl } from '../util/jsonl.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
 import { computeAlerts, DEFAULT_ALERT_OPTS } from '../observe/alerts.js';
 import { readAudit } from '../observe/audit.js';
+import { validateLaunch } from '../observe/launch.js';
+import { scanProject } from '../quality/scan.js';
+import { tailFrom, sseFrame } from '../loop/observe.js';
 
 // probevane daemon [--port N] [--root <stateDir>] [--interval SEC]
 //
@@ -82,9 +89,134 @@ function sendJson(res: ServerResponse, code: number, body: unknown) {
   res.end(s);
 }
 
-async function handle(req: IncomingMessage, res: ServerResponse) {
-  const url = (req.url ?? '/').split('?')[0];
+// --- Control center: launch + track loop runs -----------------------------
+const BIN = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'bin', 'probevane');
+const UI_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'ui');
+const DASHBOARD = readFileSync(join(UI_DIR, 'control.html'), 'utf8');
+
+interface Job {
+  id: string;
+  op: string;
+  dir: string;
+  flags: string[];
+  pid?: number;
+  status: 'running' | 'done' | 'error';
+  startedAt: string;
+  endedAt?: string;
+  exitCode?: number;
+  tail: string[]; // last N output lines (for the dashboard)
+}
+const jobs = new Map<string, Job>();
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((res) => {
+    let data = '';
+    req.on('data', (c) => {
+      data += c;
+      if (data.length > 1_000_000) req.destroy(); // cap
+    });
+    req.on('end', () => res(data));
+    req.on('error', () => res(data));
+  });
+}
+
+async function launch(req: IncomingMessage, res: ServerResponse) {
+  let body: unknown;
   try {
+    body = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    return sendJson(res, 400, { error: 'invalid JSON body' });
+  }
+  const v = validateLaunch(body);
+  if (!v.ok) return sendJson(res, 400, { error: v.error });
+  const dir = resolve(v.plan.dir);
+  if (!(await stat(dir).then((s) => s.isDirectory()).catch(() => false)))
+    return sendJson(res, 400, { error: `dir not found: ${dir}` });
+
+  const id = randomUUID().slice(0, 8);
+  const job: Job = {
+    id,
+    op: v.plan.op,
+    dir,
+    flags: v.plan.flags,
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    tail: [],
+  };
+  jobs.set(id, job);
+  // No shell — arg array. Child writes its own event log under <dir>/.probevane.
+  const child = spawn(BIN, [v.plan.op, dir, ...v.plan.flags], { stdio: ['ignore', 'pipe', 'pipe'] });
+  job.pid = child.pid;
+  const onOut = (buf: Buffer) =>
+    String(buf)
+      .split('\n')
+      .filter(Boolean)
+      .forEach((l) => {
+        job.tail.push(l);
+        if (job.tail.length > 200) job.tail.shift();
+      });
+  child.stdout.on('data', onOut);
+  child.stderr.on('data', onOut);
+  child.on('close', (code) => {
+    job.status = code === 0 ? 'done' : 'error';
+    job.exitCode = code ?? 1;
+    job.endedAt = new Date().toISOString();
+    void log('info', 'job_done', { id, op: job.op, status: job.status, exitCode: job.exitCode });
+  });
+  await log('info', 'job_start', { id, op: job.op, dir, flags: job.flags });
+  return sendJson(res, 200, { id, status: job.status });
+}
+
+// SSE tail of a launched run's event log (<dir>/.probevane/events-*.jsonl).
+async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
+  res.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive',
+  });
+  res.write('retry: 1000\n\n');
+  const evDir = join(resolve(dir), '.probevane');
+  const offsets = new Map<string, number>();
+  let alive = true;
+  req.on('close', () => (alive = false));
+  while (alive) {
+    const files = (await readdir(evDir).catch(() => [])).filter((f) => /^events-.*\.jsonl$/.test(f));
+    for (const f of files.sort()) {
+      const p = join(evDir, f);
+      const content = await readFile(p, 'utf8').catch(() => '');
+      const { lines, offset } = tailFrom(content, offsets.get(p) ?? 0);
+      offsets.set(p, offset);
+      for (const ln of lines) res.write(sseFrame(ln));
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+async function handle(req: IncomingMessage, res: ServerResponse) {
+  const full = req.url ?? '/';
+  const url = full.split('?')[0];
+  const query = new URLSearchParams(full.split('?')[1] ?? '');
+  try {
+    if (req.method === 'POST' && url === '/run') return launch(req, res);
+    if (url === '/jobs') {
+      return sendJson(res, 200, {
+        jobs: [...jobs.values()].map((j) => ({ ...j, tail: j.tail.slice(-40) })),
+      });
+    }
+    if (url === '/stream') {
+      const dir = query.get('dir');
+      if (!dir) return sendJson(res, 400, { error: 'dir query param required' });
+      return streamEvents(dir, res, req);
+    }
+    if (url === '/quality') {
+      const dir = query.get('dir');
+      if (!dir) return sendJson(res, 400, { error: 'dir query param required' });
+      return sendJson(res, 200, await scanProject(resolve(dir)));
+    }
+    if (url === '/ops') {
+      const { LAUNCH_OPS } = await import('../observe/launch.js');
+      return sendJson(res, 200, { ops: LAUNCH_OPS });
+    }
     if (url === '/health') {
       const { ledgers } = await scanRuns();
       return sendJson(res, 200, {
@@ -110,11 +242,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       return sendJson(res, 200, { count: entries.length, entries: entries.slice(-200) });
     }
     if (url === '/' || url === '/index') {
-      return sendJson(res, 200, {
-        service: 'probevane daemon',
-        version: VERSION,
-        endpoints: ['/health', '/aggregate', '/alerts', '/audit'],
-      });
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(DASHBOARD);
     }
     return sendJson(res, 404, { error: `no route ${url}` });
   } catch (e: any) {
