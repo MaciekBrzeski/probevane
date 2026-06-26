@@ -20,6 +20,7 @@ import { propertyGuidance, looksPropertyTestable } from '../src/loop/property.js
 import { runPool } from '../src/util/concurrent.js';
 import { lineOf, mutantDigest } from '../src/loop/mutation.js';
 import { scoreAssertions, aggregateScore } from '../src/audit/assertion-score.js';
+import { impactedSpecs, reachesAny } from '../src/loop/impact.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -92,6 +93,37 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- test-impact analysis ---------------------------------------------------
+describe('impact analysis', () => {
+  // a → b → c chain
+  const graph: any = { nodes: new Map([
+    ['src/a.ts', { imports: ['src/b.ts'] }],
+    ['src/b.ts', { imports: ['src/c.ts'] }],
+    ['src/c.ts', { imports: [] }],
+    ['src/z.ts', { imports: [] }],
+  ]) };
+  const specDeps = new Map([
+    ['src/a.test.ts', ['src/a.ts']],
+    ['src/z.test.ts', ['src/z.ts']],
+  ]);
+  it('reachesAny follows the transitive import chain', () => {
+    expect(reachesAny(graph, ['src/a.ts'], new Set(['src/c.ts']))).toBe(true);
+    expect(reachesAny(graph, ['src/z.ts'], new Set(['src/c.ts']))).toBe(false);
+  });
+  it('a transitive source change impacts the dependent spec only', () => {
+    expect(impactedSpecs(graph, specDeps, ['src/c.ts'])).toEqual(['src/a.test.ts']);
+  });
+  it('a direct source change impacts its spec', () => {
+    expect(impactedSpecs(graph, specDeps, ['src/z.ts'])).toEqual(['src/z.test.ts']);
+  });
+  it('the spec itself changing impacts it', () => {
+    expect(impactedSpecs(graph, specDeps, ['src/a.test.ts'])).toContain('src/a.test.ts');
+  });
+  it('an unrelated change impacts nothing (CI skip)', () => {
+    expect(impactedSpecs(graph, specDeps, ['src/other.ts'])).toEqual([]);
   });
 });
 
