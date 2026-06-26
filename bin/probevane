@@ -11,7 +11,7 @@ cmd="${1:-help}"
 shift 2>/dev/null || true
 
 case "$cmd" in
-  init|plan|generate|run|audit|coverage|learn|eval|status|mock|graph|spec|refactor|feature|repair|fix|ci|review|bench|watch|skill|a11y|distill|serve|peek|improve|history|ado|simcost|assert-score|impact|revert|factory)
+  init|plan|generate|run|audit|coverage|learn|eval|status|mock|graph|spec|refactor|feature|repair|fix|ci|review|bench|watch|skill|a11y|distill|serve|peek|improve|history|ado|simcost|assert-score|impact|revert|factory|daemon)
     # Prefer the compiled dist (published installs ship it, no tsx needed);
     # fall back to tsx on the source for dev-from-checkout.
     if [ -f "$PROBEVANE_ROOT/dist/cli/$cmd.js" ]; then
