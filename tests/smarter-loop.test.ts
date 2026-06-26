@@ -10,6 +10,8 @@ import { summarize, type RunRecord } from '../src/cost/ledger.js';
 import { toResponse } from '../src/brain/bridge.js';
 import { RunCtx } from '../src/loop/ctx.js';
 import { hermeticGate } from '../src/loop/runes/hermetic_gate.js';
+import { auditGate } from '../src/loop/runes/audit_gate.js';
+import { jsAuditRules } from '../src/audit/rules-js.js';
 import { firstFailure } from '../src/loop/runes/validation_gate.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -111,6 +113,35 @@ describe('hermetic_gate scopes to run-edited specs', () => {
     const ctx = ctxWith({ 'tests/a.test.ts': DIRTY, 'src/b.test.ts': CLEAN }, ['src/b.test.ts']);
     const d = await hermeticGate.shouldStop!(ctx);
     expect(d.kind).toBe('allow');
+  });
+});
+
+// ---- audit_gate scoping (consistency with hermetic fix) ---------------------
+describe('audit_gate scopes to run-edited specs', () => {
+  function auditCtx(files: Record<string, string>, edited: string[]): RunCtx {
+    const dir = mkdtempSync(join(tmpdir(), 'pv-audit-'));
+    for (const [rel, body] of Object.entries(files)) {
+      mkdirSync(join(dir, dirname(rel)), { recursive: true });
+      writeFileSync(join(dir, rel), body);
+    }
+    const adapter: any = {
+      auditRules: () => jsAuditRules(),
+      specFiles: async () => Object.keys(files),
+    };
+    const ctx = new RunCtx(dir, adapter, 'task');
+    edited.forEach((e) => ctx.editedFiles.add(e));
+    return ctx;
+  }
+  const DIRTY = `import { it, expect } from 'vitest';\nit.only('x', () => { expect(1).toBe(1); });`; // .only → audit error
+  const CLEAN = `import { it, expect } from 'vitest';\nit('x', () => { expect(1).toBe(1); });`;
+
+  it('blocks on an audit error in a spec THIS run edited', async () => {
+    const ctx = auditCtx({ 'src/a.test.ts': DIRTY }, ['src/a.test.ts']);
+    expect((await auditGate.shouldStop!(ctx)).kind).toBe('block');
+  });
+  it('ignores a pre-existing dirty spec not edited this run', async () => {
+    const ctx = auditCtx({ 'src/old.test.ts': DIRTY, 'src/new.test.ts': CLEAN }, ['src/new.test.ts']);
+    expect((await auditGate.shouldStop!(ctx)).kind).toBe('allow');
   });
 });
 

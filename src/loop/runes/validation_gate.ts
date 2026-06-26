@@ -22,7 +22,7 @@ export function validationGate(scope: RunScope = 'unit', full = false): Rune {
     name: 'validation_gate',
 
     systemPromptAddition(): string {
-      return 'FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix it and continue.';
+      return 'FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix the FIRST reported failure (shown under "FIX THIS FIRST"), re-run, then the next — one at a time. Do not rewrite the whole file each turn.';
     },
 
     async prepare(ctx: RunCtx): Promise<string | undefined> {
