@@ -55,6 +55,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `impact` | Test-impact analysis — which specs are affected by the diff since <base> (transitive import graph); --run executes only those to speed CI. |
 | `assert-score` | Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation). |
 | `simcost` | Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger. |
+| `factory` | Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted — into one cost/coverage/quality rollup (report.json). Unrecognized flags forward to generate per-repo. |
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
 
 ## Reference
@@ -327,6 +328,15 @@ Simulated cost benchmark — triage a dir into easy/hard modules and compare all
 probevane simcost [dir] [--easy N --hard M] [--local-hit R] [--json]
 # e.g.
 probevane simcost ./app --local-hit 0.6
+```
+
+### factory
+Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted — into one cost/coverage/quality rollup (report.json). Unrecognized flags forward to generate per-repo.
+
+```
+probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--state-root <dir>] [--no-checkpoint] [...generate flags]
+# e.g.
+probevane factory repos.txt --concurrency 4 --model auto
 ```
 
 ### ado

@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
 
 // Minimal git helpers for the run safety net: capture HEAD before a run edits the
 // workdir (checkpoint), and restore the run's touched files afterward (revert).
@@ -30,4 +32,27 @@ export async function fileExistedAt(dir: string, sha: string, file: string): Pro
 /** Restore `file` to its content at `sha`. */
 export async function restoreFile(dir: string, sha: string, file: string): Promise<boolean> {
   return (await git(dir, ['checkout', sha, '--', file])).ok;
+}
+
+/**
+ * Undo a run's edits: restore each file to its content at `sha` if it existed
+ * then, else remove it (the run created it). The shared core of `revert` and the
+ * factory's revert-on-error. Returns how many were restored vs removed.
+ */
+export async function revertEdits(
+  dir: string,
+  sha: string,
+  files: string[],
+): Promise<{ restored: number; removed: number }> {
+  let restored = 0,
+    removed = 0;
+  for (const f of files) {
+    if (sha && (await fileExistedAt(dir, sha, f))) {
+      if (await restoreFile(dir, sha, f)) restored++;
+    } else {
+      await rm(join(dir, f), { force: true });
+      removed++;
+    }
+  }
+  return { restored, removed };
 }
