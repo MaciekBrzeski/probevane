@@ -19,6 +19,9 @@ export function openaiCompatBrain(model: string): Brain {
       const body = {
         model,
         max_tokens: 4096,
+        // Greedy (temperature 0) — deterministic output so gate-feedback repair is
+        // reproducible (fourier-nca lesson: do_sample=False for the repair loop).
+        temperature: 0,
         messages: toApiMessages(req),
         tools: req.tools.map((t) => ({
           type: 'function',
