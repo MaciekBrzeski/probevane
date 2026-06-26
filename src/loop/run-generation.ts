@@ -154,7 +154,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
   // tools" framing steers them into tool-prose, which extracts to nothing. Tell
   // them to emit the spec as ONE fenced block (with a path comment) instead.
   const finalTask = textExtract
-    ? `${task}${sourceBlock}\n\nOUTPUT FORMAT: You CANNOT call tools here. Write the COMPLETE test file as ONE fenced \`\`\`${specPathHint?.endsWith('.py') ? 'python' : 'ts'} code block, starting with a \`// ${specPathHint ?? 'spec'}\` comment line, and output NOTHING else — no prose. It is saved automatically; fix it next turn if a gate reports a failure.`
+    ? `${task}\n\nOUTPUT FORMAT: You CANNOT call tools here. Write the COMPLETE test file as ONE fenced \`\`\`${specPathHint?.endsWith('.py') ? 'python' : 'ts'} code block, starting with a \`// ${specPathHint ?? 'spec'}\` comment line, and output NOTHING else — no prose. It is saved automatically; fix it next turn if a gate reports a failure.`
     : task;
 
   return runLoop({
