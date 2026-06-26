@@ -50,5 +50,10 @@ export function routeModels(choice: string, complex: boolean): { primary?: strin
   if (choice === 'haiku') return { primary: HAIKU, takeover: SONNET };
   if (choice === 'sonnet') return { primary: SONNET, takeover: SONNET };
   if (choice === 'opus') return { primary: OPUS, takeover: OPUS };
+  // Host-serviced / CLI brains stay on themselves — never silently fall back to a
+  // paid API takeover (would break the $0 guarantee of a bridge run).
+  if (choice === 'bridge') return { primary: 'bridge', takeover: 'bridge' };
+  if (choice === 'claude-code') return { primary: 'claude-code', takeover: 'claude-code' };
+  if (choice.startsWith('cc:')) return { primary: choice, takeover: choice };
   return { primary: choice, takeover: SONNET }; // explicit model id
 }
