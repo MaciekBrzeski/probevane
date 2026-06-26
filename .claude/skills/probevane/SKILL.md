@@ -51,6 +51,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
 | `history` | Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown. |
 | `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
+| `revert` | Undo a run — restore the files a run edited to its pre-run checkpoint (or remove ones it created), from the diary record. Safety net for a crashed/bad run. |
 | `impact` | Test-impact analysis — which specs are affected by the diff since <base> (transitive import graph); --run executes only those to speed CI. |
 | `assert-score` | Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation). |
 | `simcost` | Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger. |
@@ -290,6 +291,15 @@ Terminal live view of the loop — same event stream as serve, compact table (st
 probevane peek [dir]
 # e.g.
 probevane peek ./app
+```
+
+### revert
+Undo a run — restore the files a run edited to its pre-run checkpoint (or remove ones it created), from the diary record. Safety net for a crashed/bad run.
+
+```
+probevane revert <runId> [dir]
+# e.g.
+probevane revert run-abc123 ./app
 ```
 
 ### impact

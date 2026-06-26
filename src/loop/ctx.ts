@@ -14,6 +14,7 @@ export class RunCtx {
   task: string;
 
   runId = ''; // unique per run (set by the engine); diary/events key on it
+  checkpointSha = ''; // HEAD before this run edited the workdir — revert restores to it
   step = 0;
   toolCalls = 0;
   gateBlocks = 0;

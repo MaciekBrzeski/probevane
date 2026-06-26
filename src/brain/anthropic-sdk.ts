@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Brain, BrainRequest } from './brain.js';
 import type { BrainResponse, Msg, StopReason, ToolCall } from '../loop/types.js';
+import { apiLimiter } from './limiter.js';
 
 // Default brain: native Anthropic Messages API with tool use. Bills API credits
 // (Max plan can't do reliable per-turn tool calls — see runestone notes).
@@ -46,20 +47,23 @@ export function anthropicBrain(model = DEFAULT_MODEL): Brain {
         messages,
       };
 
-      let lastErr: unknown;
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          const resp = await client.messages.create(body as any);
-          return fromApi(resp);
-        } catch (e: any) {
-          lastErr = e;
-          const status = e?.status ?? e?.response?.status;
-          if (![429, 529, 500, 502, 503, 504].includes(status) || attempt === MAX_RETRIES) throw e;
-          const wait = Math.min(60_000, 1000 * 2 ** attempt);
-          await new Promise((r) => setTimeout(r, wait));
+      // Bound in-flight API calls so concurrent targets/repos don't blow the TPM.
+      return apiLimiter.run(async () => {
+        let lastErr: unknown;
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const resp = await client.messages.create(body as any);
+            return fromApi(resp);
+          } catch (e: any) {
+            lastErr = e;
+            const status = e?.status ?? e?.response?.status;
+            if (![429, 529, 500, 502, 503, 504].includes(status) || attempt === MAX_RETRIES) throw e;
+            const wait = Math.min(60_000, 1000 * 2 ** attempt);
+            await new Promise((r) => setTimeout(r, wait));
+          }
         }
-      }
-      throw lastErr;
+        throw lastErr;
+      });
     },
   };
 }

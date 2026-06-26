@@ -9,6 +9,7 @@ import type { Msg, ToolResult } from './types.js';
 import { formatEvent } from './events.js';
 import { isCircular, proposal as difficultyProposal } from './difficulty.js';
 import { extractTestBlock } from './extract.js';
+import { headSha } from '../util/git.js';
 import { recordRun } from '../cost/ledger.js';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -144,6 +145,9 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   // tailed by `probevane serve`/`peek`. On by default; opt out with PROBEVANE_EVENTS=0.
   const runId = opts.runId ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   ctx.runId = runId; // unique per run — diary/events key on it (no cross-run collision)
+  // Safety net: record HEAD before we edit, so `probevane revert <runId>` can roll
+  // the run's touched files back (no-op outside a git repo).
+  ctx.checkpointSha = await headSha(workdir).catch(() => '');
   const eventsOn = process.env.PROBEVANE_EVENTS !== '0';
   const eventsPath = join(workdir, '.probevane', `events-${runId}.jsonl`);
   if (eventsOn) mkdirSync(join(workdir, '.probevane'), { recursive: true });

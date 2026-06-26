@@ -13,6 +13,8 @@ export const sessionDiary: Rune = {
     const dir = join(ctx.workdir, '.probevane', 'diary');
     await mkdir(dir, { recursive: true }).catch(() => {});
     const record = {
+      runId: ctx.runId,
+      checkpointSha: ctx.checkpointSha, // for `probevane revert <runId>`
       task: ctx.task.slice(0, 200),
       accepted: ctx.accepted,
       stopReason: ctx.stopReason,
