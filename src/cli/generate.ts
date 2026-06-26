@@ -2,6 +2,8 @@ import { resolve, join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { isEasyTarget } from '../loop/triage.js';
+import { draftLocal } from '../loop/draft-local.js';
+import { brainFor } from '../brain/select.js';
 import { anthropicBrain } from '../brain/anthropic-sdk.js';
 import { generateTests } from '../loop/run-generation.js';
 import { loadConfig, pick } from '../config.js';
@@ -37,42 +39,6 @@ async function main() {
   const model = flag(args, '--model') ?? cfg.model ?? 'auto';
   console.error(`[probevane] generate kind=${kind} adapter=${adapter.id} model=${model} dir=${dir}`);
 
-  // Easy-band triage (dry run): classify discovered targets into local-draftable
-  // (pure, low-fact, $0) vs bridge-needed (IO/component/fact-heavy). Routing hint
-  // for a hybrid run — local clears the easy band free, bridge handles the rest.
-  if (args.includes('--triage')) {
-    let targets = await adapter.discover(dir, kind);
-    const only = flag(args, '--only');
-    if (only) targets = targets.filter((t) => t.sourcePath.includes(only));
-    const rows = await Promise.all(targets.map(async (t) => {
-      const src = await readFile(join(dir, t.sourcePath), 'utf8').catch(() => '');
-      return { t, tri: isEasyTarget(t, src) };
-    }));
-    const easy = rows.filter((r) => r.tri.easy);
-    const hard = rows.filter((r) => !r.tri.easy);
-    console.log(`[triage] ${easy.length} local-draftable ($0), ${hard.length} bridge-needed, of ${rows.length} target(s)\n`);
-    console.log('LOCAL ($0 easy band):');
-    easy.forEach((r) => console.log(`  + ${r.t.sourcePath}`));
-    console.log('\nBRIDGE (fact-heavy / IO / component):');
-    hard.slice(0, 40).forEach((r) => console.log(`  - ${r.t.sourcePath}  [${r.tri.reasons.join(', ')}]`));
-    return;
-  }
-
-  // Shape B: --delegate hands the WHOLE task to an external harness (claude -p),
-  // then runs probevane's gates on the diff. `--model cc:<m>`/`claude-code` picks
-  // the claude model; default sonnet.
-  if (args.includes('--delegate')) {
-    const { runDelegated } = await import('../loop/delegate.js');
-    const ccModel = model.startsWith('cc:') ? model.slice(3) : model === 'claude-code' ? undefined : 'sonnet';
-    const out = await runDelegated({ dir, kind, adapter, model: ccModel, only: flag(args, '--only'), maxRounds: num(flag(args, '--rounds')) ?? 3, log: (l) => console.error(l) });
-    console.log(
-      `[probevane] DELEGATE ${out.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} rounds=${out.rounds} ` +
-        `specs=${out.changedFiles.length} green=${out.green} auditErr=${out.auditErrors} cost=$${out.costUsd.toFixed(4)}`,
-    );
-    if (!out.accepted) process.exit(1);
-    return;
-  }
-
   const takeoverOverride = flag(args, '--takeover');
   const genOpts = (d: string) => ({
     dir: d,
@@ -94,6 +60,69 @@ async function main() {
     targetGaps,
     log: (l: string) => console.error(l),
   });
+
+  // Easy-band triage (dry run): classify discovered targets into local-draftable
+  // (pure, low-fact, $0) vs bridge-needed (IO/component/fact-heavy). Routing hint
+  // for a hybrid run — local clears the easy band free, bridge handles the rest.
+  if (args.includes('--triage')) {
+    let targets = await adapter.discover(dir, kind);
+    const only = flag(args, '--only');
+    if (only) targets = targets.filter((t) => t.sourcePath.includes(only));
+    const rows = await Promise.all(targets.map(async (t) => {
+      const src = await readFile(join(dir, t.sourcePath), 'utf8').catch(() => '');
+      return { t, tri: isEasyTarget(t, src) };
+    }));
+    const easy = rows.filter((r) => r.tri.easy);
+    const hard = rows.filter((r) => !r.tri.easy);
+    console.log(`[triage] ${easy.length} local-draftable ($0), ${hard.length} bridge-needed, of ${rows.length} target(s)\n`);
+    console.log('LOCAL ($0 easy band):');
+    easy.forEach((r) => console.log(`  + ${r.t.sourcePath}`));
+    console.log('\nBRIDGE (fact-heavy / IO / component):');
+    hard.slice(0, 40).forEach((r) => console.log(`  - ${r.t.sourcePath}  [${r.tri.reasons.join(', ')}]`));
+    return;
+  }
+
+  // Hybrid: local model drafts the easy/pure band ($0), bridge/paid handles the
+  // rest. Triage → for each easy target run the focused local drafter (write +
+  // verify with gates); then the normal loop covers what's left (now the hard,
+  // fact-heavy modules). --local-model picks the local brain (default ollama
+  // qwen2.5-coder:7b; point PROBEVANE_BASE_URL at a shim to use a trained adapter).
+  if (args.includes('--hybrid')) {
+    const localBrain = brainFor(flag(args, '--local-model') ?? 'local:qwen2.5-coder:7b');
+    let targets = await adapter.discover(dir, kind);
+    const only = flag(args, '--only');
+    if (only) targets = targets.filter((t) => t.sourcePath.includes(only));
+    const routed = await Promise.all(targets.map(async (t) => {
+      const src = await readFile(join(dir, t.sourcePath), 'utf8').catch(() => '');
+      return { t, easy: isEasyTarget(t, src).easy };
+    }));
+    const easy = routed.filter((r) => r.easy).map((r) => r.t);
+    console.error(`[hybrid] ${easy.length} easy → local (${localBrain.model}), rest → bridge (${model})`);
+    let localOk = 0;
+    for (const t of easy) {
+      const r = await draftLocal({ dir, target: t, kind, adapter, brain: localBrain, log: (l) => console.error(l) });
+      if (r.accepted) localOk++;
+    }
+    console.error(`[hybrid] local landed ${localOk}/${easy.length} easy targets ($0). Bridge handles the rest…`);
+    const out = await generateTests(genOpts(dir));
+    console.log(`[hybrid] DONE: local ${localOk}/${easy.length} easy ($0) + bridge ${out.accepted ? 'ACCEPTED' : out.stopReason} on the rest. Cost: probevane history`);
+    return;
+  }
+
+  // Shape B: --delegate hands the WHOLE task to an external harness (claude -p),
+  // then runs probevane's gates on the diff. `--model cc:<m>`/`claude-code` picks
+  // the claude model; default sonnet.
+  if (args.includes('--delegate')) {
+    const { runDelegated } = await import('../loop/delegate.js');
+    const ccModel = model.startsWith('cc:') ? model.slice(3) : model === 'claude-code' ? undefined : 'sonnet';
+    const out = await runDelegated({ dir, kind, adapter, model: ccModel, only: flag(args, '--only'), maxRounds: num(flag(args, '--rounds')) ?? 3, log: (l) => console.error(l) });
+    console.log(
+      `[probevane] DELEGATE ${out.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} rounds=${out.rounds} ` +
+        `specs=${out.changedFiles.length} green=${out.green} auditErr=${out.auditErrors} cost=$${out.costUsd.toFixed(4)}`,
+    );
+    if (!out.accepted) process.exit(1);
+    return;
+  }
 
   if (passk > 1) {
     // pass@k: sample K candidate suites, keep the best-scoring one.
