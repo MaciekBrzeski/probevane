@@ -16,6 +16,7 @@ import { firstFailure } from '../src/loop/runes/validation_gate.js';
 import { isEasyTarget, factDensity, routeTargets } from '../src/loop/triage.js';
 import { simulateCost, savings, MEASURED } from '../src/cost/simulate.js';
 import { factDigest } from '../src/loop/fact-digest.js';
+import { propertyGuidance, looksPropertyTestable } from '../src/loop/property.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -88,6 +89,23 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- property / invariant testing -------------------------------------------
+describe('property guidance', () => {
+  it('teaches the core invariant patterns', () => {
+    const g = propertyGuidance();
+    expect(g).toMatch(/round-trip|inverse/);
+    expect(g).toContain('idempotence');
+    expect(g).toMatch(/it\.each/);
+    expect(g).toMatch(/no exact expected value|do NOT guess/i);
+  });
+  it('looksPropertyTestable: pure fn yes, IO no', () => {
+    expect(looksPropertyTestable('export function add(a:number,b:number){return a+b}')).toBe(true);
+    expect(looksPropertyTestable('export const f = (x:number) => x*2')).toBe(true);
+    expect(looksPropertyTestable('export async function load(id){return fetch("/x"+id)}')).toBe(false);
+    expect(looksPropertyTestable('export function now(){return Date.now()}')).toBe(false);
   });
 });
 
