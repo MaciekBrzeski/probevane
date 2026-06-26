@@ -26,8 +26,10 @@ jobs:
       - run: npm ci || npm install
       - name: typecheck
         run: npm run typecheck
-      - name: probevane self-tests
-        run: npx vitest run
+      - name: probevane self-tests + coverage floor
+        run: npm run coverage
+      - name: dist build (packaging gate — must compile + copy ui)
+        run: npm run build
       - name: skill + wiki in sync (drift gate)
         run: ./bin/probevane skill --check
       - name: regenerate probevane's own wiki spec (dogfood, keeps it fresh)

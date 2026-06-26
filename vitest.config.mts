@@ -8,6 +8,15 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: ['src/cli/**', 'src/brain/anthropic-sdk.ts', 'src/brain/openai-compat.ts'],
+      // Floors set just below current (stmts/lines 46.6, branch 81.8, funcs 64.2)
+      // so the gate catches a real regression but doesn't flake on noise. Raise
+      // as coverage climbs — never lower to make a red run pass.
+      thresholds: {
+        statements: 40,
+        lines: 40,
+        functions: 55,
+        branches: 75,
+      },
     },
   },
 });

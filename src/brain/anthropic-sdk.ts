@@ -16,6 +16,14 @@ export function anthropicBrain(model = DEFAULT_MODEL): Brain {
     id: 'anthropic-sdk',
     model,
     async complete(req: BrainRequest): Promise<BrainResponse> {
+      // Validate the secret WHEN the API brain is actually used (not at construction —
+      // a local/$0 run still constructs a default Sonnet takeover it never invokes).
+      if (!process.env.ANTHROPIC_API_KEY) {
+        throw new Error(
+          'ANTHROPIC_API_KEY is not set — required for the API brain. Set it (see .env.example) ' +
+            'or use a local model (--model local:<id>) / the bridge (--model bridge).',
+        );
+      }
       // Prompt caching: the system block + tools are large and STABLE across the
       // whole run (base prompt + rune additions + RAG few-shot + tool specs).
       // Marking the end of that prefix with cache_control makes every turn after

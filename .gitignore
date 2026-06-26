@@ -5,6 +5,9 @@ fixtures/**/package-lock.json
 
 # build / coverage / test artifacts
 dist/
+# stray in-place compiled JS (src/eval are .ts only — guards a mis-built tsc)
+src/**/*.js
+eval/**/*.js
 coverage/
 fixtures/**/coverage/
 fixtures/**/test-fixtures/
