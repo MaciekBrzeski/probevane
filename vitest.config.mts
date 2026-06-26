@@ -13,6 +13,7 @@ export default defineConfig({
         'src/brain/openai-compat.ts',
         'src/factory/run.ts', // process/fs orchestration (spawn child + revert); pure core in report.ts is tested
         'src/quality/scan.ts', // fs walk/read glue; pure analyzer in analyze.ts is tested
+        'src/mfe/scan.ts', // fs walk/read glue; pure parser+rules in federation.ts/standards.ts are tested
       ],
       // Floors set just below current (stmts/lines 46.6, branch 81.8, funcs 64.2)
       // so the gate catches a real regression but doesn't flake on noise. Raise
