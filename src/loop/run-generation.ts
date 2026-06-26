@@ -145,11 +145,16 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
   const specPathHint = probedTargets[0]
     ? conventionalSpecPath(adapter.id, probedTargets[0].sourcePath)
     : undefined;
+  // NOTE: tried injecting the target SOURCE here (tighter ground-truth so small
+  // models bind real facts instead of inventing them) — it BACKFIRED: +3k chars
+  // overwhelmed the 3B (capacity wall) → it wrote nothing at all. Facts were
+  // already available; the small model can't bind them, and more context makes it
+  // worse. Reverted. (A capable model reads the source via read_file anyway.)
   // Non-tool-calling local models (text-extract mode): the base "work by calling
   // tools" framing steers them into tool-prose, which extracts to nothing. Tell
   // them to emit the spec as ONE fenced block (with a path comment) instead.
   const finalTask = textExtract
-    ? `${task}\n\nOUTPUT FORMAT: You CANNOT call tools here. Write the COMPLETE test file as ONE fenced \`\`\`${specPathHint?.endsWith('.py') ? 'python' : 'ts'} code block, starting with a \`// ${specPathHint ?? 'spec'}\` comment line, and output NOTHING else — no prose. It is saved automatically; fix it next turn if a gate reports a failure.`
+    ? `${task}${sourceBlock}\n\nOUTPUT FORMAT: You CANNOT call tools here. Write the COMPLETE test file as ONE fenced \`\`\`${specPathHint?.endsWith('.py') ? 'python' : 'ts'} code block, starting with a \`// ${specPathHint ?? 'spec'}\` comment line, and output NOTHING else — no prose. It is saved automatically; fix it next turn if a gate reports a failure.`
     : task;
 
   return runLoop({
