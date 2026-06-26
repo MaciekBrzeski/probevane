@@ -35,6 +35,11 @@ export class RunCtx {
 
   plan: PlanRecord | null = null;
   editedFiles = new Set<string>();
+  // Last measured suite signals (set by acceptance_gate when it runs) — surfaced
+  // on the outcome so `generate --report` can record them without a second run.
+  lastRunPassed?: number;
+  lastCoverage?: number; // statement coverage %
+
   lastEditPath: string | null = null;
   validatedSinceEdit = false;
 

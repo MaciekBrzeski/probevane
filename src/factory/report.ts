@@ -12,6 +12,7 @@ export interface FactoryRepoResult {
   tokensIn: number;
   tokensOut: number;
   reverted: boolean;
+  cached?: boolean; // skipped via --resume (carried from a prior report)
   error?: string;
 }
 
@@ -22,7 +23,13 @@ export interface FactoryReport {
   acceptRate: number;
   totalCost: number;
   totalTests: number;
+  byStopReason: Record<string, number>; // error-mode breakdown across repos
   results: FactoryRepoResult[];
+}
+
+/** Repos that ACCEPTED in a prior report — used by --resume to skip re-running them. */
+export function acceptedRepos(prior: FactoryReport | null | undefined): Set<string> {
+  return new Set((prior?.results ?? []).filter((r) => r.accepted).map((r) => r.repo));
 }
 
 /** Parse a repo-list file: one path per line, blank lines + `#` comments skipped. */
@@ -41,6 +48,8 @@ export function slug(repo: string): string {
 /** Roll per-repo results into the headline report (pure — the testable core). */
 export function aggregate(results: FactoryRepoResult[], ts: string): FactoryReport {
   const accepted = results.filter((r) => r.accepted).length;
+  const byStopReason: Record<string, number> = {};
+  for (const r of results) byStopReason[r.stopReason] = (byStopReason[r.stopReason] ?? 0) + 1;
   return {
     ts,
     repos: results.length,
@@ -48,6 +57,7 @@ export function aggregate(results: FactoryRepoResult[], ts: string): FactoryRepo
     acceptRate: results.length ? +(accepted / results.length).toFixed(3) : 0,
     totalCost: Math.round(results.reduce((a, r) => a + r.cost, 0) * 1e6) / 1e6,
     totalTests: results.reduce((a, r) => a + r.tests, 0),
+    byStopReason,
     results,
   };
 }

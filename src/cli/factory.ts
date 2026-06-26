@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { statePath } from '../util/state.js';
 import { loadConfig } from '../config.js';
 import { runFactory } from '../factory/run.js';
-import { parseRepoList, type FactoryRepoResult } from '../factory/report.js';
+import { parseRepoList, acceptedRepos, type FactoryReport, type FactoryRepoResult } from '../factory/report.js';
 import type { TestKind } from '../adapters/adapter.js';
 
 // probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e]
@@ -23,6 +23,8 @@ const OWN: Record<string, 0 | 1> = {
   '--state-root': 1,
   '--repos': 1,
   '--no-checkpoint': 0,
+  '--resume': 0,
+  '--no-retry': 0,
 };
 
 async function main() {
@@ -70,8 +72,18 @@ async function main() {
     (own['--state-root'] as string) ?? statePath('factory', `run-${Date.now().toString(36)}`),
   );
   const checkpoint = own['--no-checkpoint'] !== true;
+  const retry = own['--no-retry'] !== true;
   const reportPath = resolve((own['--report'] as string) ?? join(stateRoot, 'report.json'));
   const binPath = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'bin', 'probevane');
+
+  // --resume: load the prior report (at reportPath) and skip its accepted repos.
+  let prior: FactoryReport | null = null;
+  let skip = new Set<string>();
+  if (own['--resume'] === true) {
+    prior = await readFile(reportPath, 'utf8').then((s) => JSON.parse(s) as FactoryReport).catch(() => null);
+    skip = acceptedRepos(prior);
+    if (skip.size) console.error(`[factory] resume: skipping ${skip.size} already-accepted repo(s)`);
+  }
 
   // Surface any per-repo generate config defaults the user wouldn't otherwise see
   // (factory forwards flags but each child also reads its own probevane.config).
@@ -91,6 +103,9 @@ async function main() {
     passThrough,
     binPath,
     checkpoint,
+    retry,
+    skip,
+    prior,
     log: (l) => console.error(l),
   });
 
@@ -99,9 +114,15 @@ async function main() {
   // Rollup.
   console.log('');
   for (const r of report.results) console.log('  ' + rowLine(r));
+  const modes = Object.entries(report.byStopReason)
+    .filter(([k]) => k !== 'accepted')
+    .map(([k, n]) => `${k}:${n}`)
+    .join(' ');
   console.log(
     `\n[factory] ${report.accepted}/${report.repos} accepted (${(report.acceptRate * 100).toFixed(0)}%), ` +
-      `${report.totalTests} tests, $${report.totalCost.toFixed(4)} → ${reportPath}`,
+      `${report.totalTests} tests, $${report.totalCost.toFixed(4)}` +
+      (modes ? ` · failures: ${modes}` : '') +
+      ` → ${reportPath}`,
   );
 
   if (report.accepted < report.repos) process.exit(1);
@@ -111,7 +132,7 @@ function rowLine(r: FactoryRepoResult): string {
   const name = r.repo.replace(/\/+$/, '').split('/').pop() || r.repo;
   if (r.accepted) {
     const cov = r.coverage != null ? `cov ${r.coverage}%` : 'cov n/a';
-    return `${name}  ✓ ${r.tests} tests  ${cov}  $${r.cost.toFixed(4)}`;
+    return `${name}  ✓ ${r.tests} tests  ${cov}  $${r.cost.toFixed(4)}${r.cached ? '  (cached)' : ''}`;
   }
   const tail = r.reverted ? 'reverted' : r.error ? r.error : r.stopReason;
   return `${name}  ✗ ${r.stopReason}${tail !== r.stopReason ? ` (${tail})` : ''}`;

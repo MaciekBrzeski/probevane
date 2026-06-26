@@ -88,6 +88,9 @@ export interface RunOutcome {
   tookOver: boolean;
   /** Set when stopReason is "difficulty": what blocked + suggested next steps. */
   proposal?: string;
+  /** Suite signals captured by the gates (no extra run) — for `generate --report`. */
+  tests?: number;
+  coverage?: number;
 }
 
 const BASE_SYSTEM = `You are probevane, an agent that edits a codebase to satisfy a task.
@@ -437,5 +440,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     cacheRead,
     tookOver,
     proposal: proposalText,
+    tests: ctx.lastRunPassed,
+    coverage: ctx.lastCoverage,
   };
 }
