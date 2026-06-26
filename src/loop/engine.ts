@@ -146,6 +146,7 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   let stopReason: RunOutcome['stopReason'] = 'max_steps';
   let proposalText: string | undefined;
   let lastExtract: string | undefined; // last text-extracted spec (dedup → converge to stop gates)
+  let exemplarShown = false; // selective retrieval: inject a similar exemplar once, on first stop-block
 
   while (ctx.step < maxSteps) {
     ctx.step++;
@@ -255,7 +256,16 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
           ctx.barren++;
           ctx.noteBlock(decision.reason);
           log(`[engine]   stop BLOCKED: ${decision.reason}`);
-          messages.push({ role: 'user', text: decision.inject ?? decision.reason });
+          let inject = decision.inject ?? decision.reason;
+          // Selective retrieval (fourier-nca: failures-only +5.5%, blanket = 0):
+          // on the FIRST stop-block after an edit, surface the most-similar accepted
+          // exemplar alongside the gate feedback. Once per run, only if one matches.
+          if (!exemplarShown && ctx.editedFiles.size > 0 && opts.onConsult) {
+            exemplarShown = true;
+            const ex = await opts.onConsult(ctx).catch(() => undefined);
+            if (ex) { inject += `\n\nA passing test for a SIMILAR module (adapt its approach):\n${ex}`; log('[engine]   + similar exemplar injected'); }
+          }
+          messages.push({ role: 'user', text: inject });
         } else {
           accepted = true;
           stopReason = 'accepted';
@@ -297,8 +307,12 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
         `You have made ${consultAfter} turns with no productive change. Re-read the latest gate ` +
         `feedback above. If you believe the tests are complete, STOP CALLING TOOLS so the gates can ` +
         `run. If a test file is empty or a leftover, delete_file it. Do not keep reading.`;
-      const extra = await opts.onConsult?.(ctx).catch(() => undefined);
-      if (extra) msg += `\n\nHELP:\n${extra}`;
+      // Skip the exemplar here if already surfaced on the first block (no blanket
+      // re-injection — fourier: blanket retrieval is noise).
+      if (!exemplarShown) {
+        const extra = await opts.onConsult?.(ctx).catch(() => undefined);
+        if (extra) { msg += `\n\nHELP:\n${extra}`; exemplarShown = true; }
+      }
       if (opts.takeoverBrain) {
         brain = opts.takeoverBrain;
         tookOver = true;
