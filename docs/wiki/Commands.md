@@ -63,7 +63,7 @@ probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local
 Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress).
 
 ```bash
-probevane refactor <dir> --task "<what to refactor>" [--model …] [--budget N] [--quality]
+probevane refactor <dir> --task "<what to refactor>" [--model …] [--budget N] [--force-stop-after N] [--quality]
 # e.g. probevane refactor ./app --task "extract helpers into utils.ts" --quality
 ```
 
@@ -71,7 +71,7 @@ probevane refactor <dir> --task "<what to refactor>" [--model …] [--budget N] 
 TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.
 
 ```bash
-probevane feature <dir> --task "<feature>" [--model …] [--quality]
+probevane feature <dir> --task "<feature>" [--model …] [--force-stop-after N] [--quality]
 # e.g. probevane feature ./app --task "add a discount field to cartTotal"
 ```
 
@@ -79,7 +79,7 @@ probevane feature <dir> --task "<feature>" [--model …] [--quality]
 After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality.
 
 ```bash
-probevane repair <dir> [--since <ref>] [--model …] [--quality]
+probevane repair <dir> [--since <ref>] [--model …] [--force-stop-after N] [--quality]
 # e.g. probevane repair ./app --since HEAD~1
 ```
 
@@ -87,7 +87,7 @@ probevane repair <dir> [--since <ref>] [--model …] [--quality]
 Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality.
 
 ```bash
-probevane fix <dir> --task "<issues>" [--model …] [--quality]
+probevane fix <dir> --task "<issues>" [--model …] [--force-stop-after N] [--quality]
 # e.g. probevane fix ./app --task "handle the null case in parse()"
 ```
 

@@ -16,6 +16,7 @@ export interface RunPathOpts {
   maxSteps?: number;
   budget?: number;
   quality?: ProfileOpts['quality']; // opt-in source-quality gate
+  forceStopAfter?: number; // barren-turn ceiling (raise for big-repo refactors that read/plan a lot before editing)
   log?: (l: string) => void;
 }
 
@@ -39,7 +40,7 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
     task: opts.task,
     label: `${opts.profileName}:${opts.dir.split('/').pop()}`,
     maxSteps: opts.maxSteps ?? 30,
-    forceStopAfter: 8,
+    forceStopAfter: opts.forceStopAfter ?? 8,
     budget: opts.budget,
     log,
   });
