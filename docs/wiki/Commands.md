@@ -38,6 +38,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `simcost` | Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger. |
 | `factory` | Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted + retried once — into one cost/coverage/quality rollup (report.json, with an error-mode breakdown). --resume skips repos already accepted in a prior report. Unrecognized flags forward to generate per-repo. |
 | `quality` | Project source-quality gate — file size, function length/cyclomatic+cognitive complexity/nesting/params, long lines, debt markers (TODO/FIXME, comment-scoped), import fan-out, and (maximal-block) duplication → a 0–100 health grade. --strict exits 1 on error-severity violations (CI). Complements audit (test specs), assert-score (assertions), bench (mutation). |
+| `mfe-audit` | Micro-frontend (Module Federation) standards gate — per repo: boundaries (no deep cross-remote imports), shared singletons, runtime resilience (Suspense + error boundary), typed contracts; across repos: shared version alignment. Pure analysis ($0, no LLM) → grade + violations; --strict exits 1 (CI). The fitness function the refactor loop enforces. |
 | `daemon` | Long-running OPERATE/OBSERVE + control-center service — an HTML dashboard (/) plus /health, /aggregate (cost+acceptance over time), /alerts (cost spike / acceptance drop / error burst), /audit (library-mutation trail), /jobs, and POST /run (launch an op) + /cancel?id= (kill it). Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval. Binds 127.0.0.1; read-only over ledgers. |
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
 
@@ -297,6 +298,14 @@ Project source-quality gate — file size, function length/cyclomatic+cognitive 
 ```bash
 probevane quality <dir> [--strict] [--json] [--max-file N] [--max-fn N] [--max-complexity N] [--max-cognitive N] [--max-nesting N] [--max-params N] [--max-width N] [--max-imports N] [--no-debt]
 # e.g. probevane quality ./app --strict
+```
+
+### mfe-audit
+Micro-frontend (Module Federation) standards gate — per repo: boundaries (no deep cross-remote imports), shared singletons, runtime resilience (Suspense + error boundary), typed contracts; across repos: shared version alignment. Pure analysis ($0, no LLM) → grade + violations; --strict exits 1 (CI). The fitness function the refactor loop enforces.
+
+```bash
+probevane mfe-audit <dir | repos.txt> [--repos <file>] [--json] [--strict] [--design-system <pkg>]
+# e.g. probevane mfe-audit ./host --strict
 ```
 
 ### daemon
