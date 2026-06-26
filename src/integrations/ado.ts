@@ -76,10 +76,14 @@ export function parseDirective(title: string, description = ''): AdoDirective | 
   return { command, dir, kind, only, task: taskMatch?.[1] };
 }
 
-/** One-line outcome summary from a probevane run's stdout (the ACCEPTED/steps line). */
+/** One-line outcome summary from a probevane run's stdout — prefer the final
+ *  `[probevane] … (accepted) steps=/tokens=` line, then any ACCEPTED/steps line. */
 export function summarize(out: string): string {
-  const line = out.split('\n').reverse().find((l) => /ACCEPTED|stopReason|steps=/.test(l));
-  return line?.trim() ?? out.trim().split('\n').slice(-1)[0] ?? '(no output)';
+  const lines = out.split('\n');
+  const best =
+    lines.reverse().find((l) => /\[probevane\].*(ACCEPTED|steps=)/.test(l)) ??
+    lines.find((l) => /ACCEPTED|stopReason|steps=/.test(l));
+  return best?.trim() ?? out.trim().split('\n').slice(-1)[0] ?? '(no output)';
 }
 
 // ---- fetch client -----------------------------------------------------------
