@@ -10,6 +10,7 @@ import { summarize, type RunRecord } from '../src/cost/ledger.js';
 import { toResponse } from '../src/brain/bridge.js';
 import { RunCtx } from '../src/loop/ctx.js';
 import { hermeticGate } from '../src/loop/runes/hermetic_gate.js';
+import { firstFailure } from '../src/loop/runes/validation_gate.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -62,6 +63,26 @@ describe('difficulty.isCircular', () => {
     expect(ctx.gateBlockHistory).toHaveLength(3); // raw — repeats kept
     expect(ctx.gateBlockReasons).toHaveLength(1); // deduped
     expect(isCircular(ctx)).toBe(true);
+  });
+});
+
+// ---- validation_gate sharper repair signal (loop investment) ----------------
+describe('validation_gate.firstFailure', () => {
+  it('extracts the first vitest failure + assertion', () => {
+    const raw = ' ✓ cart.test.ts > sums\n ✗ cart.test.ts > applies discount\n   AssertionError: expected 90 to be 80\n    ❯ cart.test.ts:12:24\n ✓ cart.test.ts > rounds';
+    const f = firstFailure(raw)!;
+    expect(f).toContain('applies discount');
+    expect(f).toContain('expected 90 to be 80');
+    expect(f).not.toContain('rounds'); // stops near the first failure
+  });
+  it('extracts the first pytest failure', () => {
+    const raw = 'test_calc.py::test_add PASSED\ntest_calc.py::test_sub FAILED\nE   assert 3 == 4\n';
+    const f = firstFailure(raw)!;
+    expect(f).toMatch(/FAILED|assert 3 == 4/);
+  });
+  it('returns undefined on green/empty output', () => {
+    expect(firstFailure('')).toBeUndefined();
+    expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
   });
 });
 
