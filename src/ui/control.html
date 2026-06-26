@@ -37,6 +37,7 @@
   .tag.running { background:#0d2d4d; color:var(--acc); }
   .tag.done { background:#0a2912; color:var(--ok); }
   .tag.error { background:#2a0a0a; color:var(--err); }
+  .tag.cancelled { background:#221a0a; color:var(--warn); }
   .badge { font-size:11px; padding:1px 6px; border-radius:4px; background:var(--bg); border:1px solid var(--line); }
 </style>
 </head>
@@ -102,6 +103,9 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const j = async (u, o) => (await fetch(u, o)).json();
+// Escape any value interpolated into innerHTML — run output / dirs are attacker-
+// influenced (e.g. a repo path with <img onerror=…>). textContent paths are safe.
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function loadOps() {
   try {
@@ -121,7 +125,7 @@ async function poll() {
     const a = await j('/aggregate');
     const max = Math.max(1, ...a.daily.map((d) => d.cost));
     $('bars').innerHTML = a.daily.map((d) =>
-      `<div class="bar" title="${d.date}: $${d.cost} · ${d.accepted}/${d.runs} accepted · ${d.errors} err" style="height:${Math.round((d.cost/max)*100)}%"></div>`).join('');
+      `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} · ${esc(d.accepted)}/${esc(d.runs)} accepted · ${esc(d.errors)} err" style="height:${Math.round((d.cost/max)*100)}%"></div>`).join('');
     $('aggMeta').textContent = `${a.totals.runs} runs · $${a.totals.totalCost} · accept ${(a.totals.acceptRate*100).toFixed(0)}%`;
     $('cost').textContent = '$' + a.totals.totalCost;
     $('accept').textContent = (a.totals.acceptRate*100).toFixed(0) + '%';
@@ -131,7 +135,7 @@ async function poll() {
     const { alerts } = await j('/alerts');
     $('alertN').textContent = alerts.length;
     $('alerts').innerHTML = alerts.length
-      ? alerts.map((a) => `<div class="alert ${a.severity}"><b>${a.kind}</b> — ${a.message}</div>`).join('')
+      ? alerts.map((a) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> — ${esc(a.message)}</div>`).join('')
       : '<span class="muted">none</span>';
   } catch {}
 
@@ -145,7 +149,7 @@ async function poll() {
     const { jobs } = await j('/jobs');
     $('jobs').innerHTML = '<tbody>' + (jobs.length
       ? jobs.slice().reverse().map((jb) =>
-          `<tr><td><span class="tag ${jb.status}">${jb.status}</span></td><td>${jb.op}</td><td class="muted">${jb.dir.split('/').pop()}</td><td class="muted">${jb.exitCode??''}</td></tr>`).join('')
+          `<tr><td><span class="tag ${esc(jb.status)}">${esc(jb.status)}</span></td><td>${esc(jb.op)}</td><td class="muted">${esc(String(jb.dir).split('/').pop())}</td><td class="muted">${esc(jb.exitCode??'')}</td></tr>`).join('')
       : '<tr><td class="muted">none yet</td></tr>') + '</tbody>';
   } catch {}
 }

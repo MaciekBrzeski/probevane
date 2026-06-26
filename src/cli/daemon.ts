@@ -1,17 +1,18 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, rename } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { stateRoot } from '../util/state.js';
 import { readRuns, type RunRecord } from '../cost/ledger.js';
-import { appendJsonl } from '../util/jsonl.js';
+import { appendJsonl, readJsonl } from '../util/jsonl.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
 import { computeAlerts, DEFAULT_ALERT_OPTS } from '../observe/alerts.js';
 import { readAudit } from '../observe/audit.js';
 import { validateLaunch } from '../observe/launch.js';
+import { reduceJobs, jobsToEvict, type PersistedJob } from '../observe/jobs.js';
 import { scanProject } from '../quality/scan.js';
 import { tailFrom, sseFrame } from '../loop/observe.js';
 
@@ -35,8 +36,17 @@ const PORT = Number(flag('--port') ?? process.env.PROBEVANE_DAEMON_PORT ?? 7766)
 const ROOT = resolve(flag('--root') ?? stateRoot());
 const INTERVAL = Number(flag('--interval') ?? 60) * 1000;
 const LOG_PATH = join(ROOT, 'daemon.log.jsonl'); // self-contained under the scanned root
+const JOBS_PATH = join(ROOT, 'jobs.jsonl'); // persisted launched-job history (restart-safe)
 const STARTED = Date.now();
 const VERSION = await pkgVersion();
+
+// Configurable limits (defaults preserve prior behaviour).
+const MAX_BODY = Number(process.env.PROBEVANE_DAEMON_MAX_BODY ?? 1_000_000);
+const JOB_TAIL = Number(process.env.PROBEVANE_DAEMON_JOB_TAIL ?? 200); // lines kept per job
+const JOBS_RETURN = Number(process.env.PROBEVANE_DAEMON_JOBS_RETURN ?? 40); // tail lines in /jobs
+const AUDIT_RETURN = Number(process.env.PROBEVANE_DAEMON_AUDIT ?? 200); // entries in /audit
+const MAX_JOBS = Number(process.env.PROBEVANE_DAEMON_MAX_JOBS ?? 200); // in-memory job cap
+const LOG_MAX_BYTES = Number(process.env.PROBEVANE_DAEMON_LOG_MAX ?? 5_000_000); // rotate threshold
 
 const alertOpts = {
   ...DEFAULT_ALERT_OPTS,
@@ -52,10 +62,17 @@ async function pkgVersion(): Promise<string> {
     .catch(() => '0.0.0');
 }
 
-/** Structured log line — to the daemon log (atomic) and stderr. */
+/** Rotate the daemon log to `.1` once it grows past LOG_MAX_BYTES (keeps one gen). */
+async function rotateLogIfBig() {
+  const sz = (await stat(LOG_PATH).catch(() => null))?.size ?? 0;
+  if (sz > LOG_MAX_BYTES) await rename(LOG_PATH, LOG_PATH + '.1').catch(() => {});
+}
+
+/** Structured log line — to the daemon log (atomic, rotated) and stderr. */
 async function log(level: string, event: string, data: Record<string, unknown> = {}) {
   const line = { ts: new Date().toISOString(), level, event, ...data };
   console.error(`[daemon] ${event} ${JSON.stringify(data)}`);
+  await rotateLogIfBig();
   await appendJsonl(LOG_PATH, line).catch(() => {});
 }
 
@@ -100,20 +117,44 @@ interface Job {
   dir: string;
   flags: string[];
   pid?: number;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'cancelled';
   startedAt: string;
   endedAt?: string;
   exitCode?: number;
   tail: string[]; // last N output lines (for the dashboard)
+  proc?: ChildProcess; // runtime handle (not persisted) — for /cancel
 }
 const jobs = new Map<string, Job>();
+
+/** Persisted snapshot of a job (no runtime handle / capped tail). */
+function snapshot(j: Job): Omit<Job, 'proc'> {
+  const { proc, ...rest } = j;
+  return { ...rest, tail: j.tail.slice(-JOB_TAIL) };
+}
+
+/** Append the job's current state; jobs.jsonl is reduced last-wins on load. */
+async function persistJob(j: Job) {
+  await appendJsonl(JOBS_PATH, snapshot(j)).catch(() => {});
+}
+
+/** Rebuild the jobs map from disk on startup (last-wins; orphaned 'running' →
+ *  'error') via the pure reducer. */
+async function loadJobs() {
+  const rows = await readJsonl<PersistedJob>(JOBS_PATH).catch(() => [] as PersistedJob[]);
+  for (const j of reduceJobs(rows)) jobs.set(j.id, { ...j, tail: j.tail ?? [] });
+}
+
+/** Keep the in-memory map bounded: evict the oldest finished jobs past MAX_JOBS. */
+function evictOldJobs() {
+  for (const id of jobsToEvict([...jobs.values()], MAX_JOBS)) jobs.delete(id);
+}
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((res) => {
     let data = '';
     req.on('data', (c) => {
       data += c;
-      if (data.length > 1_000_000) req.destroy(); // cap
+      if (data.length > MAX_BODY) req.destroy(); // cap
     });
     req.on('end', () => res(data));
     req.on('error', () => res(data));
@@ -144,27 +185,43 @@ async function launch(req: IncomingMessage, res: ServerResponse) {
     tail: [],
   };
   jobs.set(id, job);
+  evictOldJobs();
   // No shell — arg array. Child writes its own event log under <dir>/.probevane.
   const child = spawn(BIN, [v.plan.op, dir, ...v.plan.flags], { stdio: ['ignore', 'pipe', 'pipe'] });
   job.pid = child.pid;
+  job.proc = child;
   const onOut = (buf: Buffer) =>
     String(buf)
       .split('\n')
       .filter(Boolean)
       .forEach((l) => {
         job.tail.push(l);
-        if (job.tail.length > 200) job.tail.shift();
+        if (job.tail.length > JOB_TAIL) job.tail.shift();
       });
   child.stdout.on('data', onOut);
   child.stderr.on('data', onOut);
   child.on('close', (code) => {
-    job.status = code === 0 ? 'done' : 'error';
+    if (job.status !== 'cancelled') job.status = code === 0 ? 'done' : 'error';
     job.exitCode = code ?? 1;
     job.endedAt = new Date().toISOString();
+    job.proc = undefined;
     void log('info', 'job_done', { id, op: job.op, status: job.status, exitCode: job.exitCode });
+    void persistJob(job);
   });
   await log('info', 'job_start', { id, op: job.op, dir, flags: job.flags });
+  await persistJob(job);
   return sendJson(res, 200, { id, status: job.status });
+}
+
+/** Cancel a running job by killing its child process. */
+function cancelJob(id: string, res: ServerResponse) {
+  const job = jobs.get(id);
+  if (!job) return sendJson(res, 404, { error: `no job ${id}` });
+  if (job.status !== 'running' || !job.proc) return sendJson(res, 409, { error: `job ${id} not running` });
+  job.status = 'cancelled';
+  job.proc.kill('SIGTERM');
+  void log('info', 'job_cancel', { id, op: job.op });
+  return sendJson(res, 200, { id, status: 'cancelled' });
 }
 
 // SSE tail of a launched run's event log (<dir>/.probevane/events-*.jsonl).
@@ -198,9 +255,15 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   const query = new URLSearchParams(full.split('?')[1] ?? '');
   try {
     if (req.method === 'POST' && url === '/run') return launch(req, res);
+    if (req.method === 'POST' && url === '/cancel') {
+      const id = query.get('id');
+      if (!id) return sendJson(res, 400, { error: 'id query param required' });
+      return cancelJob(id, res);
+    }
     if (url === '/jobs') {
+      // snapshot() drops the ChildProcess handle (not serializable) + caps the tail.
       return sendJson(res, 200, {
-        jobs: [...jobs.values()].map((j) => ({ ...j, tail: j.tail.slice(-40) })),
+        jobs: [...jobs.values()].map((j) => ({ ...snapshot(j), tail: j.tail.slice(-JOBS_RETURN) })),
       });
     }
     if (url === '/stream') {
@@ -239,7 +302,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     }
     if (url === '/audit') {
       const entries = await readAudit();
-      return sendJson(res, 200, { count: entries.length, entries: entries.slice(-200) });
+      return sendJson(res, 200, { count: entries.length, entries: entries.slice(-AUDIT_RETURN) });
     }
     if (url === '/' || url === '/index') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -289,9 +352,10 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
 server.listen(PORT, '127.0.0.1', async () => {
-  await log('info', 'listen', { port: PORT, root: ROOT, intervalSec: INTERVAL / 1000, version: VERSION });
+  await loadJobs(); // restore launched-job history (orphaned 'running' → 'error')
+  await log('info', 'listen', { port: PORT, root: ROOT, intervalSec: INTERVAL / 1000, version: VERSION, jobs: jobs.size });
   console.log(`probevane daemon → http://127.0.0.1:${PORT}  (state: ${ROOT})`);
-  console.log(`  /health  /aggregate  /alerts  /audit`);
+  console.log(`  /health  /aggregate  /alerts  /audit  /jobs  (POST /run, /cancel?id=)`);
   await evalAlerts();
   timer = setInterval(() => void evalAlerts(), INTERVAL);
 });
