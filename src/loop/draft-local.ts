@@ -5,6 +5,7 @@ import type { StackAdapter, TestKind, RunScope } from '../adapters/adapter.js';
 import { extractTestBlock, conventionalSpecPath } from './extract.js';
 import { auditFiles } from '../audit/core.js';
 import { firstFailure } from './runes/validation_gate.js';
+import { factDigest } from './fact-digest.js';
 import { sh } from '../util/exec.js';
 
 // Per-target LOCAL drafter ($0) for the easy band. NOT the full gated loop (small
@@ -44,12 +45,17 @@ export async function draftLocal(opts: {
   if (!source) return { accepted: false, specPath, reason: 'unreadable source' };
 
   const placement = adapter.guidance(kind);
+  // Surgical fact-RAG: lead with the literal facts (const values, type shapes) the
+  // test must bind — a small model invents these from signatures alone. Compact, so
+  // it doesn't re-trigger the whole-source length choke.
+  const facts = factDigest(source);
+  const factBlock = facts ? `=== EXACT FACTS (use these literal names + values + shapes; do NOT invent any) ===\n${facts}\n\n` : '';
   let feedback = '';
   const maxRepairs = opts.maxRepairs ?? 2;
 
   for (let attempt = 0; attempt <= maxRepairs; attempt++) {
     const user =
-      `Write a ${kind} test ${placement}\nTarget: ${target.sourcePath}\n\n=== SOURCE ===\n${source.slice(0, 4000)}` +
+      `Write a ${kind} test ${placement}\nTarget: ${target.sourcePath}\n\n${factBlock}=== SOURCE ===\n${source.slice(0, 3000)}` +
       (feedback ? `\n\n=== YOUR PREVIOUS ATTEMPT FAILED ===\n${feedback}\nFix it and output the full file again.` : '');
     const resp = await brain.complete({ system: DRAFT_SYSTEM, messages: [{ role: 'user', text: user }], tools: [] });
     const ex = extractTestBlock(resp.text);
@@ -74,6 +80,6 @@ export async function draftLocal(opts: {
     log(`[draft-local] ✗ ${specPath} attempt ${attempt + 1}: ${!run.green ? 'red' : tcErrs.length ? 'type' : 'audit'}`);
   }
 
-  await rm(abs, { force: true }); // local couldn't land it — leave nothing for the bridge to trip on
+  if (process.env.PROBEVANE_KEEP_DRAFT !== '1') await rm(abs, { force: true }); // leave nothing for the bridge to trip on (unless inspecting)
   return { accepted: false, specPath, reason: 'local could not produce a green+clean test' };
 }
