@@ -50,8 +50,8 @@ describe('ado parseDirective', () => {
 });
 
 describe('ado summarize', () => {
-  it('picks the outcome line from run output', () => {
-    const out = 'noise\n[probevane] ACCEPTED (accepted) steps=4 tokens=0/0\nmore noise';
-    expect(summarize(out)).toContain('ACCEPTED (accepted) steps=4');
+  it('prefers the final [probevane] outcome line over inner engine logs', () => {
+    const out = '[engine]   ACCEPTED (all gates green)\n[probevane] ACCEPTED (accepted) steps=4 tokens=10/20\ntrailing';
+    expect(summarize(out)).toContain('[probevane] ACCEPTED (accepted) steps=4');
   });
 });
