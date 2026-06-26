@@ -9,6 +9,10 @@ import { parseDecision, extractJson } from '../src/brain/claude-code.js';
 import { summarize, type RunRecord } from '../src/cost/ledger.js';
 import { toResponse } from '../src/brain/bridge.js';
 import { RunCtx } from '../src/loop/ctx.js';
+import { hermeticGate } from '../src/loop/runes/hermetic_gate.js';
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
 import type { Trace } from '../src/distill/collect.js';
 
 // ---- Difficulty gate --------------------------------------------------------
@@ -58,6 +62,34 @@ describe('difficulty.isCircular', () => {
     expect(ctx.gateBlockHistory).toHaveLength(3); // raw — repeats kept
     expect(ctx.gateBlockReasons).toHaveLength(1); // deduped
     expect(isCircular(ctx)).toBe(true);
+  });
+});
+
+// ---- hermetic_gate scoping (dogfood fix) ------------------------------------
+describe('hermetic_gate scopes to run-edited specs', () => {
+  function ctxWith(files: Record<string, string>, edited: string[]): RunCtx {
+    const dir = mkdtempSync(join(tmpdir(), 'pv-herm-'));
+    for (const [rel, body] of Object.entries(files)) {
+      mkdirSync(join(dir, dirname(rel)), { recursive: true });
+      writeFileSync(join(dir, rel), body);
+    }
+    const ctx = new RunCtx(dir, {} as any, 'task');
+    edited.forEach((e) => ctx.editedFiles.add(e));
+    return ctx;
+  }
+  const DIRTY = `it('x', async () => { await fetch('https://api.example.com/v1'); });`;
+  const CLEAN = `import { it, expect } from 'vitest';\nit('x', () => expect(1).toBe(1));`;
+
+  it('blocks when a spec THIS run edited has an external URL', async () => {
+    const ctx = ctxWith({ 'src/a.test.ts': DIRTY }, ['src/a.test.ts']);
+    const d = await hermeticGate.shouldStop!(ctx);
+    expect(d.kind).toBe('block');
+  });
+  it('ignores a pre-existing dirty spec the run did NOT edit', async () => {
+    // a.test.ts is dirty but untouched; only the clean b.test.ts was edited → ALLOW
+    const ctx = ctxWith({ 'tests/a.test.ts': DIRTY, 'src/b.test.ts': CLEAN }, ['src/b.test.ts']);
+    const d = await hermeticGate.shouldStop!(ctx);
+    expect(d.kind).toBe('allow');
   });
 });
 
