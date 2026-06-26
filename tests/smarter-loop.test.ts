@@ -285,6 +285,11 @@ describe('loop.extract', () => {
   it('reads a path mentioned in the prose before the fence', () => {
     expect(extractTestBlock('File: `tests/calc_test.go`\n```go\nfunc TestX(t *testing.T){t.Errorf("x")}\n```')!.path).toBe('tests/calc_test.go');
   });
+  it('handles a truncated (unclosed) fence — output-budget cutoff', () => {
+    const ex = extractTestBlock('```ts\nimport { it, expect } from "vitest";\nit("x", () => expect(1).toBe(1));\n// cut off mid-file, no closing fence');
+    expect(ex).not.toBeNull();
+    expect(ex!.code).toContain('expect');
+  });
   it('picks the largest test-like block when several appear', () => {
     const ex = extractTestBlock('```ts\nexpect(1).toBe(1)\n```\nand\n```ts\nit("big",()=>{expect(2).toBe(2); expect(3).toBe(3)})\n```')!;
     expect(ex.code).toContain('big');

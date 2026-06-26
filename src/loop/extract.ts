@@ -39,6 +39,13 @@ export function extractTestBlock(text: string): Extracted | null {
     if (!TESTY.test(code)) continue;
     if (!best || code.length > best.code.length) best = { info: m[1].trim(), code, start: m.index };
   }
+  // Truncation-robust: a small model whose output budget ran out leaves an OPEN
+  // fence (no closing ```). If no closed fence is test-like, take the last opening
+  // fence to end-of-text.
+  if (!best) {
+    const open = text.match(/```([^\n`]*)\n([\s\S]*)$/);
+    if (open && TESTY.test(open[2])) best = { info: open[1].trim(), code: open[2], start: open.index ?? 0 };
+  }
   if (!best) return null;
   const pre = text.slice(Math.max(0, best.start - 200), best.start);
   const path = findPath(best.info, best.code, pre);

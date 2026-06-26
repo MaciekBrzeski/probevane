@@ -54,6 +54,9 @@ export function isEasyTarget(
   if (facts > maxFacts) { score += 2; reasons.push(`fact-heavy (${facts} literals)`); }
   if (imports > maxImports) { score += 1; reasons.push(`${imports} imports`); }
   if (Number((target.meta as any)?.cost ?? 0) >= 5) { score += 3; reasons.push('provider-heavy'); }
+  // Interface/type-only modules have no runtime code to assert — not a useful (or
+  // landable) test target.
+  if (!/export\s+(async\s+)?(function|const|class|default)\b/.test(source)) { score += 5; reasons.push('types-only (no runtime exports)'); }
 
   return { easy: score === 0, score, reasons: reasons.length ? reasons : ['pure, low-fact, self-contained'] };
 }

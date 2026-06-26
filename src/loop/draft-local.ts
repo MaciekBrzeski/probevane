@@ -5,6 +5,7 @@ import type { StackAdapter, TestKind, RunScope } from '../adapters/adapter.js';
 import { extractTestBlock, conventionalSpecPath } from './extract.js';
 import { auditFiles } from '../audit/core.js';
 import { firstFailure } from './runes/validation_gate.js';
+import { sh } from '../util/exec.js';
 
 // Per-target LOCAL drafter ($0) for the easy band. NOT the full gated loop (small
 // models choke on it) — a FOCUSED single-target flow: minimal prompt + the target
@@ -53,14 +54,20 @@ export async function draftLocal(opts: {
     await writeFile(abs, ex.code);
     const run = await adapter.run(dir, scope, [specPath]).catch(() => ({ green: false, passed: 0, failed: 1, raw: '' } as any));
     const report = await auditFiles([abs], adapter.auditRules()).catch(() => ({ errors: 0 } as any));
-    if (run.green && report.errors === 0) {
+    // Typecheck too — match the full validation_gate (suite-green alone lets a
+    // type-dirty test through, e.g. a used-but-unimported type).
+    const tc = await sh(adapter.commands().typecheck, dir).catch(() => ({ stdout: '', stderr: '' } as any));
+    const tcErrs = (tc.stdout + tc.stderr).split('\n').filter((l: string) => l.includes(specPath) && /error TS/.test(l));
+    if (run.green && report.errors === 0 && tcErrs.length === 0) {
       log(`[draft-local] ✓ ${specPath} (attempt ${attempt + 1})`);
-      return { accepted: true, specPath, reason: 'green + audit-clean' };
+      return { accepted: true, specPath, reason: 'green + audit + typecheck-clean' };
     }
-    feedback = run.green
-      ? `audit: ${report.errors} violation(s).`
-      : `FIX THIS FIRST:\n${firstFailure(run.raw) ?? `${run.failed} failing test(s)`}`;
-    log(`[draft-local] ✗ ${specPath} attempt ${attempt + 1}: ${run.green ? 'audit' : 'red'}`);
+    feedback = !run.green
+      ? `FIX THIS FIRST:\n${firstFailure(run.raw) ?? `${run.failed} failing test(s)`}`
+      : tcErrs.length
+        ? `Type errors — fix the imports/types:\n${tcErrs.slice(0, 4).join('\n')}`
+        : `audit: ${report.errors} violation(s).`;
+    log(`[draft-local] ✗ ${specPath} attempt ${attempt + 1}: ${!run.green ? 'red' : tcErrs.length ? 'type' : 'audit'}`);
   }
 
   await rm(abs, { force: true }); // local couldn't land it — leave nothing for the bridge to trip on
