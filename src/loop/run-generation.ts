@@ -159,6 +159,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     takeoverBrain,
     onConsult,
     textExtract,
+    minimalSystem: textExtract, // small local models: focused prompt, gates still verify
     specPathHint,
     runes,
     task: finalTask,
