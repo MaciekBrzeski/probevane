@@ -92,3 +92,17 @@ Tested on a real 44-module production app (RealWorld: CRA + axios + redux + reac
   1. **No `path_guard`** — a model stuck on a typecheck failure started editing `node_modules/.bin/tsc` (writes to deps live *inside* the project, so the `..`/absolute guards didn't catch it). Added the `path_guard` rune (deny node_modules / build / lockfiles). See ADR-008.
   2. **Premature takeover** — `barren` counted the initial read/plan turns, so takeover fired on every run. Fixed: escalation only counts after the first productive edit (runestone's force_stop lesson).
 - **Status: all phases complete.** Probevane adds unit + e2e tests to React and Python projects through one gated, self-correcting, self-evaluating loop.
+
+## Post-P6 — Cost observability + the local-agent arc ✅
+
+A follow-on push to make runs **measurable** and to chase a **$0** path. (Brains/economics detail in [Brains](Brains.md).)
+
+- **Cost ledger + `history`** — every run logged to `~/.local/share/probevane/runs.jsonl` (tokens, real $ with cache-read at 0.1×, accepted/takeover, per-model/per-path). Made the hard-module cost problem measurable; revealed Opus-takeover as a sink → routing now keeps takeover on **Sonnet** (auto), Opus opt-in.
+- **Smarter + cheaper loop** — **transcript prompt caching** (2nd `cache_control` on the stable pruned prefix; ~11%/15-step run); **difficulty gate** (stops a circling run + proposes, deterministic + optional LLM turn); **exemplar-RAG on stall** (selective retrieval, failures-only — a fourier-nca lesson); **flywheel** (`library_promote` auto-promotes accepted specs so few-shot starts hitting); **trace gate-feedback enrichment**.
+- **Four brain backends** — added **`claude-code`** (drives the loop via headless `claude -p`) and **`bridge`** (a subagent in the host Claude Code session services each turn over a filesystem queue; the `probevane-brain` skill packages it). Bridge = the working **$0 path** (90 runs, $0; harvested 97 traces / 8 stacks).
+- **LoRA distillation, end-to-end** — harvest accepted traces → `distill build` → QLoRA 4-bit Qwen2.5-Coder-3B (RDNA4) → serve → eval. Result, honest: convention learned, **facts not bound** (3B & 14B both invent IDs/rates) — RAG-beats-distillation, again. The **gated repair loop is the lever**, not the adapter.
+- **Hybrid + cost benchmark** — `triage.isEasyTarget` (fact-density signal) routes pure/low-fact modules → local ($0), the rest → bridge; `draft-local.ts` is the focused per-target local drafter (verify with the same gates, never clobber an existing spec); **`simcost`** compares all-api vs hybrid vs bridge over measured per-module $. Hybrid pays only on **easy/pure-heavy** codebases (CRUD −31%; glue-heavy ~0%).
+- **Loop hardening (dogfood)** — scoped `hermetic_gate` + `audit_gate` to **run-edited specs only** (a whole-suite scan + `no_regression` was a deadlock); `validation_gate` leads feedback with the **first failure** (focus-one); never-edited difficulty stop for non-writing models.
+- **Azure DevOps** — `ado run` polls a board for tagged work items, runs the loop, reports back as state moves + comments (live-proven); `ado create` files a task.
+
+**Takeaway:** local's $ value is real but **narrow** — convention-emit the easy band, bridge/API the rest; for glue-heavy codebases just use the API. The scaffold (gates + repair) carries the run; the model tier sets the ceiling.
