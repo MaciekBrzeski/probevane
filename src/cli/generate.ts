@@ -4,6 +4,7 @@ import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { isEasyTarget } from '../loop/triage.js';
 import { draftLocal } from '../loop/draft-local.js';
 import { brainFor } from '../brain/select.js';
+import { runPool } from '../util/concurrent.js';
 import { anthropicBrain } from '../brain/anthropic-sdk.js';
 import { generateTests } from '../loop/run-generation.js';
 import { loadConfig, pick } from '../config.js';
@@ -98,12 +99,14 @@ async function main() {
       return { t, easy: isEasyTarget(t, src).easy };
     }));
     const easy = routed.filter((r) => r.easy).map((r) => r.t);
-    console.error(`[hybrid] ${easy.length} easy → local (${localBrain.model}), rest → bridge (${model})`);
-    let localOk = 0;
-    for (const t of easy) {
-      const r = await draftLocal({ dir, target: t, kind, adapter, brain: localBrain, log: (l) => console.error(l) });
-      if (r.accepted) localOk++;
-    }
+    const conc = num(flag(args, '--concurrency')) ?? 3;
+    console.error(`[hybrid] ${easy.length} easy → local (${localBrain.model}, ${conc}-way), rest → bridge (${model})`);
+    const drafts = await runPool(
+      easy,
+      (t) => draftLocal({ dir, target: t, kind, adapter, brain: localBrain, log: (l) => console.error(l) }).catch(() => ({ accepted: false } as any)),
+      conc,
+    );
+    const localOk = drafts.filter((r) => r.accepted).length;
     console.error(`[hybrid] local landed ${localOk}/${easy.length} easy targets ($0). Bridge handles the rest…`);
     const out = await generateTests(genOpts(dir));
     console.log(`[hybrid] DONE: local ${localOk}/${easy.length} easy ($0) + bridge ${out.accepted ? 'ACCEPTED' : out.stopReason} on the rest. Cost: probevane history`);

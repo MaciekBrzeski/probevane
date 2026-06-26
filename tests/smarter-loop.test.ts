@@ -17,6 +17,7 @@ import { isEasyTarget, factDensity, routeTargets } from '../src/loop/triage.js';
 import { simulateCost, savings, MEASURED } from '../src/cost/simulate.js';
 import { factDigest } from '../src/loop/fact-digest.js';
 import { propertyGuidance, looksPropertyTestable } from '../src/loop/property.js';
+import { runPool } from '../src/util/concurrent.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -89,6 +90,28 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- bounded-concurrency pool -----------------------------------------------
+describe('util.runPool', () => {
+  it('preserves order + runs everything', async () => {
+    const r = await runPool([1, 2, 3, 4, 5], async (n) => n * 2, 2);
+    expect(r).toEqual([2, 4, 6, 8, 10]);
+  });
+  it('never exceeds the concurrency limit', async () => {
+    let inFlight = 0, peak = 0;
+    await runPool(Array.from({ length: 10 }, (_, i) => i), async () => {
+      inFlight++; peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+    }, 3);
+    expect(peak).toBeLessThanOrEqual(3);
+    expect(peak).toBeGreaterThan(1); // actually parallel
+  });
+  it('handles empty + limit>items', async () => {
+    expect(await runPool([], async (x) => x, 4)).toEqual([]);
+    expect(await runPool([1], async (x) => x + 1, 8)).toEqual([2]);
   });
 });
 
