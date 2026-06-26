@@ -32,6 +32,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
 | `history` | Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown. |
 | `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
+| `impact` | Test-impact analysis — which specs are affected by the diff since <base> (transitive import graph); --run executes only those to speed CI. |
 | `assert-score` | Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation). |
 | `simcost` | Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger. |
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
@@ -244,6 +245,14 @@ Terminal live view of the loop — same event stream as serve, compact table (st
 ```bash
 probevane peek [dir]
 # e.g. probevane peek ./app
+```
+
+### impact
+Test-impact analysis — which specs are affected by the diff since <base> (transitive import graph); --run executes only those to speed CI.
+
+```bash
+probevane impact <dir> [--base <ref>] [--run] [--json]
+# e.g. probevane impact . --base origin/main --run
 ```
 
 ### assert-score

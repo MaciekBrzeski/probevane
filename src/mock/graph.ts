@@ -48,7 +48,7 @@ function classify(rel: string, src: string): NodeKind {
   return 'util';
 }
 
-function resolveLocalImports(src: string, fromAbs: string, dir: string, files: string[]): string[] {
+export function resolveLocalImports(src: string, fromAbs: string, dir: string, files: string[]): string[] {
   const out = new Set<string>();
   // Match whole import statements; skip type-only imports (`import type ...`)
   // and pure type member imports — they carry no runtime dependency to mock.
