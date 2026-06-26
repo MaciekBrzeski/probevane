@@ -41,6 +41,7 @@ export const COMMANDS: Command[] = [
   { name: 'improve', summary: 'Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop).', usage: 'probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload <cmd>] [--max N]', example: 'probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"' },
   { name: 'history', summary: 'Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown.', usage: 'probevane history [--limit N] [--json]', example: 'probevane history' },
   { name: 'peek', summary: 'Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console.', usage: 'probevane peek [dir]', example: 'probevane peek ./app' },
+  { name: 'ado', summary: 'Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT.', usage: 'probevane ado <run|create> [--project P] [--org O] [--tag probevane] [--title "<t>"] [--type Issue]', example: 'probevane ado run --project probevane' },
 ];
 
 /** Commands accepted by bin/probevane that intentionally aren't user-facing skill entries. */
