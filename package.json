@@ -3,13 +3,25 @@
   "version": "0.1.0",
   "description": "Unified agentic harness that adds unit + e2e tests to a project. Gated loop (Runestone-style) + test-gen craft (qaforge) + measured eval (fourier-nca). React-first, adapter-modular.",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "probevane": "./bin/probevane"
   },
+  "files": [
+    "bin/",
+    "dist/",
+    "scripts/train_lora.py",
+    "action.yml",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "eval": "tsx src/cli/eval.ts",
     "wiki": "node scripts/wiki.mjs",
     "test:e2e": "playwright test"

@@ -12,7 +12,13 @@ shift 2>/dev/null || true
 
 case "$cmd" in
   init|plan|generate|run|audit|coverage|learn|eval|status|mock|graph|spec|refactor|feature|repair|fix|ci|review|bench|watch|skill|a11y|distill|serve|peek|improve|history|ado|simcost|assert-score|impact|revert)
-    exec npx tsx "$PROBEVANE_ROOT/src/cli/$cmd.ts" "$@"
+    # Prefer the compiled dist (published installs ship it, no tsx needed);
+    # fall back to tsx on the source for dev-from-checkout.
+    if [ -f "$PROBEVANE_ROOT/dist/cli/$cmd.js" ]; then
+      exec node "$PROBEVANE_ROOT/dist/cli/$cmd.js" "$@"
+    else
+      exec npx tsx "$PROBEVANE_ROOT/src/cli/$cmd.ts" "$@"
+    fi
     ;;
   version|-v|--version)
     node -e "console.log(require('$PROBEVANE_ROOT/package.json').version)"
