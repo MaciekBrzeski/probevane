@@ -41,6 +41,7 @@ export const COMMANDS: Command[] = [
   { name: 'improve', summary: 'Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop).', usage: 'probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload <cmd>] [--max N]', example: 'probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"' },
   { name: 'history', summary: 'Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown.', usage: 'probevane history [--limit N] [--json]', example: 'probevane history' },
   { name: 'peek', summary: 'Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console.', usage: 'probevane peek [dir]', example: 'probevane peek ./app' },
+  { name: 'assert-score', summary: 'Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation).', usage: 'probevane assert-score <dir> [--json]', example: 'probevane assert-score ./app' },
   { name: 'simcost', summary: 'Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger.', usage: 'probevane simcost [dir] [--easy N --hard M] [--local-hit R] [--json]', example: 'probevane simcost ./app --local-hit 0.6' },
   { name: 'ado', summary: 'Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT.', usage: 'probevane ado <run|create> [--project P] [--org O] [--tag probevane] [--title "<t>"] [--type Issue]', example: 'probevane ado run --project probevane' },
 ];
@@ -52,6 +53,6 @@ export const UNDOCUMENTED = new Set(['plan', 'version', '-v', '--version', 'help
 export async function binCommands(): Promise<string[]> {
   const bin = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'probevane');
   const src = await readFile(bin, 'utf8');
-  const m = src.match(/^\s*(init\|[a-z0-9|]+)\)/m);
+  const m = src.match(/^\s*(init\|[a-z0-9|-]+)\)/m);
   return m ? m[1].split('|') : [];
 }

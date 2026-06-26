@@ -19,6 +19,7 @@ import { factDigest } from '../src/loop/fact-digest.js';
 import { propertyGuidance, looksPropertyTestable } from '../src/loop/property.js';
 import { runPool } from '../src/util/concurrent.js';
 import { lineOf, mutantDigest } from '../src/loop/mutation.js';
+import { scoreAssertions, aggregateScore } from '../src/audit/assertion-score.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -91,6 +92,40 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- assertion-quality scorer -----------------------------------------------
+describe('assertion-score', () => {
+  it('strong value assertions score 100', () => {
+    const s = scoreAssertions(`it('x', () => { expect(add(1,2)).toBe(3); expect(list).toEqual([1,2]); });`);
+    expect(s.score).toBe(100);
+    expect(s.weak).toHaveLength(0);
+  });
+  it('flags existence-only, tautology, snapshot, bare not.toThrow', () => {
+    const src = [
+      `expect(x).toBeDefined();`,
+      `expect(true).toBe(true);`,
+      `expect(y).toMatchSnapshot();`,
+      `expect(() => f()).not.toThrow();`,
+    ].join('\n');
+    const s = scoreAssertions(src);
+    expect(s.weak.map((w) => w.kind).sort()).toEqual(['bare not.toThrow', 'existence/type-only', 'snapshot-only', 'tautology']);
+    expect(s.score).toBe(0);
+  });
+  it('mixed file: 3 strong + 1 weak → 75', () => {
+    const src = `expect(a).toBe(1)\nexpect(b).toEqual(2)\nexpect(c).toContain('x')\nexpect(d).toBeTruthy()`;
+    expect(scoreAssertions(src).score).toBe(75);
+  });
+  it('a toBeDefined paired with a value check on the same line is not weak', () => {
+    expect(scoreAssertions(`expect(x).toBeDefined(); expect(x.id).toBe(7)`).weak).toHaveLength(0);
+  });
+  it('aggregateScore rolls files up', () => {
+    const a = aggregateScore([
+      { file: 'a', s: scoreAssertions('expect(x).toBe(1)') },
+      { file: 'b', s: scoreAssertions('expect(y).toBeDefined()') },
+    ]);
+    expect(a).toEqual({ score: 50, total: 2, weak: 1 });
   });
 });
 
