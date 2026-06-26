@@ -151,6 +151,27 @@ async function main() {
       `tokens=${outcome.tokensIn}/${outcome.tokensOut} cacheRead=${outcome.cacheRead}${outcome.tookOver ? ' (took over)' : ''}`,
   );
 
+  // Machine-readable result (for `probevane factory` — lets the parent skip a
+  // redundant suite re-run). Prefer the signals the gates already captured; only
+  // measure what's missing, once.
+  const reportPath = flag(args, '--report');
+  if (reportPath) {
+    const { writeFile } = await import('node:fs/promises');
+    let tests = outcome.tests;
+    let coverage = outcome.coverage;
+    if (outcome.accepted) {
+      if (tests === undefined) {
+        const specs = await adapter.specFiles(dir).catch(() => [] as string[]);
+        if (specs.length) tests = (await adapter.run(dir, kind, specs).catch(() => null))?.passed;
+      }
+      if (coverage === undefined) coverage = (await adapter.coverage(dir).catch(() => null))?.lines ?? undefined;
+    }
+    await writeFile(
+      reportPath,
+      JSON.stringify({ accepted: outcome.accepted, stopReason: outcome.stopReason, tests: tests ?? 0, coverage: coverage ?? null }, null, 2),
+    );
+  }
+
   // Produce/refresh the project spec as part of the run (reflects the new tests' coverage).
   if (args.includes('--spec')) {
     const { buildSpec } = await import('../spec/build.js');

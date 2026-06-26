@@ -33,6 +33,7 @@ export function acceptanceGate(opts: AcceptanceOpts): Rune {
       if (opts.minTests !== undefined) {
         const ours = newSpecs(ctx);
         const run = await ctx.adapter.run(ctx.workdir, opts.scope, ours.length ? ours : undefined);
+        ctx.lastRunPassed = run.passed; // captured so the factory needn't re-run the suite
         if (run.passed < opts.minTests) {
           return block(
             `acceptance_gate: only ${run.passed} passing tests (need ${opts.minTests})`,
@@ -43,6 +44,7 @@ export function acceptanceGate(opts: AcceptanceOpts): Rune {
 
       if (opts.minCoverage !== undefined) {
         const cov = await ctx.adapter.coverage(ctx.workdir);
+        ctx.lastCoverage = cov.statements;
         if (!cov.ok) {
           return block('acceptance_gate: coverage unavailable', 'Coverage could not be measured; ensure the suite runs under coverage.');
         }

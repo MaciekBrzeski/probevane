@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRepoList, slug, aggregate, type FactoryRepoResult } from '../src/factory/report.js';
+import { parseRepoList, slug, aggregate, acceptedRepos, type FactoryRepoResult } from '../src/factory/report.js';
 
 const ok = (repo: string, over: Partial<FactoryRepoResult> = {}): FactoryRepoResult => ({
   repo,
@@ -86,5 +86,25 @@ describe('aggregate', () => {
 
   it('all-accepted gives rate 1', () => {
     expect(aggregate([ok('a'), ok('b')], 't').acceptRate).toBe(1);
+  });
+
+  it('breaks failures down by stop reason', () => {
+    const r = aggregate(
+      [ok('a'), fail('b', { stopReason: 'error' }), fail('c', { stopReason: 'difficulty' }), fail('d', { stopReason: 'error' })],
+      't',
+    );
+    expect(r.byStopReason).toEqual({ accepted: 1, error: 2, difficulty: 1 });
+  });
+});
+
+describe('acceptedRepos (resume)', () => {
+  it('returns the set of repos that accepted in a prior report', () => {
+    const prior = aggregate([ok('a'), fail('b'), ok('c')], 't');
+    const set = acceptedRepos(prior);
+    expect([...set].sort()).toEqual(['a', 'c']);
+  });
+  it('handles null/empty', () => {
+    expect(acceptedRepos(null).size).toBe(0);
+    expect(acceptedRepos(aggregate([], 't')).size).toBe(0);
   });
 });

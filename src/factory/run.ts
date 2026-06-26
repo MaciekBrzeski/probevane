@@ -25,14 +25,17 @@ export interface FactoryOpts {
   passThrough: string[]; // extra flags forwarded verbatim to `generate`
   binPath: string; // path to bin/probevane
   checkpoint: boolean; // revert a repo's edits if its run errors
+  retry: boolean; // retry once on a transient (error) child failure
+  skip: Set<string>; // repos to skip (carried from a prior report via --resume)
+  prior: FactoryReport | null; // prior report whose accepted repos we carry on resume
   log: (l: string) => void;
 }
 
-function runChild(opts: FactoryOpts, repo: string, stateDir: string): Promise<number> {
+function runChild(opts: FactoryOpts, repo: string, stateDir: string, reportPath: string): Promise<number> {
   return new Promise((res) => {
     const child = spawn(
       opts.binPath,
-      ['generate', repo, '--kind', opts.kind, ...opts.passThrough],
+      ['generate', repo, '--kind', opts.kind, '--report', reportPath, ...opts.passThrough],
       { env: { ...process.env, PROBEVANE_STATE: stateDir }, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     const tag = `[${basename(repo)}]`;
@@ -67,24 +70,35 @@ async function latestDiary(
   return newest ? readFile(join(dd, newest), 'utf8').then(JSON.parse).catch(() => null) : null;
 }
 
+/** Newest stopReason in a ledger (the just-finished child's outcome). */
+async function lastStop(stateDir: string): Promise<{ runs: RunRecord[]; stop: string }> {
+  const runs = await readRuns(join(stateDir, 'runs.jsonl')).catch(() => [] as RunRecord[]);
+  return { runs, stop: runs.at(-1)?.stopReason ?? 'error' };
+}
+
 async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepoResult> {
   const dir = resolve(repo);
   const stateDir = join(opts.stateRoot, slug(repo));
   await mkdir(stateDir, { recursive: true });
   const before = opts.checkpoint ? await headSha(dir) : '';
+  const reportPath = join(stateDir, 'result.json');
 
-  const code = await runChild(opts, dir, stateDir);
+  let code = await runChild(opts, dir, stateDir, reportPath);
+  let { runs, stop } = await lastStop(stateDir);
+  // Retry once on a transient failure (a crashed/errored child — not a clean
+  // max_steps/difficulty/stuck, which won't change on a re-run).
+  if (code !== 0 && opts.retry && stop === 'error') {
+    opts.log(`[${basename(repo)}] transient failure (${stop}) — retrying once`);
+    code = await runChild(opts, dir, stateDir, reportPath);
+    ({ runs, stop } = await lastStop(stateDir));
+  }
 
-  // Cost/tokens from the repo's ISOLATED ledger (exit code is the truth on accept).
-  const runs = await readRuns(join(stateDir, 'runs.jsonl')).catch(() => [] as RunRecord[]);
   const sum = summarize(runs);
   const accepted = code === 0;
-  const stopReason = runs.at(-1)?.stopReason ?? (accepted ? 'accepted' : 'error');
-
   const base: FactoryRepoResult = {
     repo,
     accepted,
-    stopReason,
+    stopReason: accepted ? 'accepted' : stop,
     tests: 0,
     coverage: null,
     cost: sum.totalCost,
@@ -94,18 +108,21 @@ async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepo
   };
 
   if (accepted) {
-    // Measure the landed suite: test count (passed) + line coverage.
-    try {
-      const adapter = await selectAdapterOrThrow(dir);
-      const specs = await adapter.specFiles(dir).catch(() => [] as string[]);
-      if (specs.length) {
-        const r = await adapter.run(dir, opts.kind as RunScope, specs).catch(() => null);
-        if (r) base.tests = r.passed;
+    // Prefer the child's --report (tests/coverage the gates already measured — no
+    // second suite run in the parent). Fall back to measuring only if it's absent.
+    const rep = await readFile(reportPath, 'utf8').then(JSON.parse).catch(() => null);
+    if (rep && typeof rep.tests === 'number') {
+      base.tests = rep.tests;
+      base.coverage = typeof rep.coverage === 'number' ? rep.coverage : null;
+    } else {
+      try {
+        const adapter = await selectAdapterOrThrow(dir);
+        const specs = await adapter.specFiles(dir).catch(() => [] as string[]);
+        if (specs.length) base.tests = (await adapter.run(dir, opts.kind as RunScope, specs).catch(() => null))?.passed ?? 0;
+        base.coverage = (await adapter.coverage(dir).catch(() => null))?.lines ?? null;
+      } catch (e: any) {
+        base.error = `measure: ${e?.message ?? e}`;
       }
-      const cov = await adapter.coverage(dir).catch(() => null);
-      base.coverage = cov ? cov.lines : null;
-    } catch (e: any) {
-      base.error = `measure: ${e?.message ?? e}`;
     }
   } else if (opts.checkpoint && (await isGitRepo(dir))) {
     // Errored run — undo whatever it half-wrote so the repo is left clean.
@@ -119,10 +136,21 @@ async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepo
 }
 
 export async function runFactory(opts: FactoryOpts): Promise<FactoryReport> {
+  const priorByRepo = new Map((opts.prior?.results ?? []).map((r) => [r.repo, r] as const));
   const results = await runPool(
     opts.repos,
-    (r) =>
-      processRepo(r, opts).catch(
+    (r) => {
+      // --resume: carry an accepted repo's prior result instead of re-running it.
+      if (opts.skip.has(r)) {
+        opts.log(`[${basename(r)}] cached (resume) — skipping`);
+        const prev = priorByRepo.get(r);
+        return Promise.resolve<FactoryRepoResult>(
+          prev
+            ? { ...prev, cached: true }
+            : { repo: r, accepted: true, stopReason: 'accepted', tests: 0, coverage: null, cost: 0, tokensIn: 0, tokensOut: 0, reverted: false, cached: true },
+        );
+      }
+      return processRepo(r, opts).catch(
         (e): FactoryRepoResult => ({
           repo: r,
           accepted: false,
@@ -135,7 +163,8 @@ export async function runFactory(opts: FactoryOpts): Promise<FactoryReport> {
           reverted: false,
           error: String(e?.message ?? e),
         }),
-      ),
+      );
+    },
     opts.concurrency,
   );
   return aggregate(results, new Date().toISOString());
