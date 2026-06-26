@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 import type { Brain, BrainRequest } from './brain.js';
 import type { BrainResponse, ToolCall } from '../loop/types.js';
+import { statePath } from '../util/state.js';
 
 // bridge brain — delegates each turn to a subagent running in the HOST harness
 // (a Claude Code session), via a filesystem request/response queue. probevane
@@ -13,18 +13,19 @@ import type { BrainResponse, ToolCall } from '../loop/types.js';
 //
 // Response contract (host writes): {"text"?: string, "tool_calls": [{"name","input"}], "costUsd"?: number}
 
-const DIR = process.env.PROBEVANE_BRIDGE_DIR ?? join(homedir(), '.local/share/probevane/bridge');
+const DIR = process.env.PROBEVANE_BRIDGE_DIR ?? statePath('bridge');
 const POLL_MS = Number(process.env.PROBEVANE_BRIDGE_POLL_MS ?? 1000);
 const TIMEOUT_MS = Number(process.env.PROBEVANE_BRIDGE_TIMEOUT_MS ?? 900_000);
 
 export function bridgeBrain(): Brain {
   let seq = 0;
+  const pid = process.pid; // unique per process → no req/res collision when runs are concurrent
   mkdirSync(DIR, { recursive: true });
   return {
     id: 'bridge',
     model: 'bridge',
     async complete(req: BrainRequest): Promise<BrainResponse> {
-      const n = ++seq;
+      const n = `${pid}-${++seq}`; // e.g. req-12345-1.json; servicer matches any req-*/res-*
       const reqPath = join(DIR, `req-${n}.json`);
       const resPath = join(DIR, `res-${n}.json`);
       // Send the same shape we'd send the API: system, transcript, tool schemas.

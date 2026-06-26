@@ -12,8 +12,8 @@ probevane's loop talks to a `Brain` (`complete(req) → {text, toolCalls}`). The
 ## Protocol
 
 Queue dir: `~/.local/share/probevane/bridge/` (override `PROBEVANE_BRIDGE_DIR`).
-- probevane writes `req-<n>.json` = `{ system, messages, tools:[{name,description,input_schema}] }` — the same shape it would POST to `/v1/messages`.
-- You write `res-<n>.json` = `{ "text"?: string, "tool_calls": [{"name","input"}], "costUsd"?: number }`. Empty `tool_calls` = stop (let the gates run).
+- probevane writes `req-<id>.json` = `{ system, messages, tools:[{name,description,input_schema}] }` — the same shape it would POST to `/v1/messages`. The `<id>` is `<pid>-<seq>` (e.g. `req-12345-1.json`) so concurrent runs never collide.
+- You write `res-<id>.json` (the SAME id) = `{ "text"?: string, "tool_calls": [{"name","input"}], "costUsd"?: number }`. Empty `tool_calls` = stop (let the gates run).
 
 ## Steps
 
@@ -31,10 +31,10 @@ Queue dir: `~/.local/share/probevane/bridge/` (override `PROBEVANE_BRIDGE_DIR`).
 > You are the MODEL ("brain") for probevane, running in the background. Service its bridge queue at `~/.local/share/probevane/bridge/`.
 >
 > Loop until done:
-> 1. Poll for the lowest `req-N.json` with no matching `res-N.json` (`sleep 2` between checks).
+> 1. Poll for any `req-*.json` with no matching `res-*.json` (same id) (`sleep 2` between checks).
 > 2. Read it: `{system (probevane instructions + GROUND TRUTH + task), messages (transcript: task, prior assistant tool_calls, prior tool results / gate feedback), tools (schemas)}`.
 > 3. Act as the API model with tool use — decide the SINGLE next step. Typical arc: `read_file` source → `plan` (record test plan) → `write_file` the spec → on gate feedback, `edit_file` to fix → when gates should pass, stop (empty tool_calls). You MAY read the real source under `<project>` to make the `write_file` `contents` correct + type-clean. Tests are <stack> (e.g. vitest: `import { describe, it, expect } from 'vitest'`), placed per the system's placement guidance. Import real exports, assert concrete values, cover edge+error. Do NOT modify source. ONE tool call per turn.
-> 4. Write `res-N.json` = `{ "text": "<brief>", "tool_calls": [{"name","input"}] }` (one Write call, atomic). To finish: `{ "tool_calls": [] }`.
+> 4. Write `res-<id>.json` (the matching id) = `{ "text": "<brief>", "tool_calls": [{"name","input"}] }` (one Write call, atomic). To finish: `{ "tool_calls": [] }`.
 > 5. Stop servicing when: you emitted a stop AND no new req for ~20s, OR no new req for 40s (bg exited), OR you serviced 10 requests.
 >
 > Report: turns serviced, tool calls issued, whether a real test file was written.
