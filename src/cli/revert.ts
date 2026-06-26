@@ -1,6 +1,6 @@
-import { readFile, rm } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import { fileExistedAt, restoreFile, isGitRepo } from '../util/git.js';
+import { isGitRepo, revertEdits } from '../util/git.js';
 
 // probevane revert <runId> [dir] — undo a run's edits. Reads the run's diary
 // record (<dir>/.probevane/diary/<runId>.json) for its checkpoint sha + edited
@@ -32,15 +32,7 @@ async function main() {
     process.exit(1);
   }
   const sha = rec.checkpointSha || '';
-  let restored = 0, removed = 0;
-  for (const f of files) {
-    if (sha && (await fileExistedAt(dir, sha, f))) {
-      if (await restoreFile(dir, sha, f)) restored++;
-    } else {
-      await rm(join(dir, f), { force: true });
-      removed++;
-    }
-  }
+  const { restored, removed } = await revertEdits(dir, sha, files);
   console.log(`[revert] ${runId}: restored ${restored}, removed ${removed} (checkpoint ${sha.slice(0, 8) || 'n/a'}).`);
 }
 
