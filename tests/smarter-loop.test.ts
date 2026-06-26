@@ -15,6 +15,7 @@ import { jsAuditRules } from '../src/audit/rules-js.js';
 import { firstFailure } from '../src/loop/runes/validation_gate.js';
 import { isEasyTarget, factDensity, routeTargets } from '../src/loop/triage.js';
 import { simulateCost, savings, MEASURED } from '../src/cost/simulate.js';
+import { factDigest } from '../src/loop/fact-digest.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -87,6 +88,30 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- surgical fact-RAG ------------------------------------------------------
+describe('fact-digest', () => {
+  const SRC = `import { x } from './y';\nexport const RATES = { 'opus': { in: 5, out: 25 }, 'haiku': { in: 1, out: 5 } };\nexport interface Product { id: string; priceCents: number; inStock: boolean; }\nexport function rateFor(m: string) { return RATES[m]; }\nexport const MAX = 100;`;
+  it('captures an exported const data table with nested braces', () => {
+    const d = factDigest(SRC);
+    expect(d).toContain('RATES');
+    expect(d).toContain("'opus'");
+    expect(d).toContain('out: 25'); // nested value kept (balanced)
+  });
+  it('captures a type/interface shape', () => {
+    const d = factDigest(SRC);
+    expect(d).toContain('interface Product');
+    expect(d).toContain('priceCents');
+  });
+  it('captures a primitive const', () => {
+    expect(factDigest(SRC)).toContain('MAX = 100');
+  });
+  it('omits function bodies (facts only) and stays capped', () => {
+    const d = factDigest(SRC, { cap: 400 });
+    expect(d.length).toBeLessThanOrEqual(400);
+    expect(d).not.toContain('return RATES[m]'); // implementation excluded
   });
 });
 
