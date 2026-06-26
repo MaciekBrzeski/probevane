@@ -42,6 +42,10 @@ export interface Trace {
   task: string;
   specPath: string;
   spec: string;
+  /** Distinct gate-block reasons this run hit before the accepted spec — the
+   *  failed→fixed signal. The completion (spec) is the version that satisfies
+   *  them, so the dataset teaches the model to pre-empt these gates. */
+  gateBlocks?: string[];
 }
 
 /** Append one trace per accepted spec file. `now` is injected for testability. */
@@ -52,7 +56,10 @@ export async function recordTrace(ctx: RunCtx, now: string): Promise<number> {
     if (!TEST_RE.test(rel)) continue;
     const spec = await readFile(join(ctx.workdir, rel), 'utf8').catch(() => '');
     if (!spec.trim()) continue;
-    const trace: Trace = { ts: now, stack: ctx.adapter.id, task: redact(ctx.task), specPath: rel, spec };
+    const trace: Trace = {
+      ts: now, stack: ctx.adapter.id, task: redact(ctx.task), specPath: rel, spec,
+      gateBlocks: ctx.gateBlockReasons.length ? ctx.gateBlockReasons.map(redact) : undefined,
+    };
     await appendFile(TRACES_PATH, JSON.stringify(trace) + '\n');
     n++;
   }
