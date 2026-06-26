@@ -56,6 +56,7 @@ async function main() {
     flakeGuard,
     a11y,
     visual,
+    quality: args.includes('--quality') || cfg.quality === true,
     budget,
     mock,
     targetGaps,

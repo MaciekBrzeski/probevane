@@ -1,7 +1,7 @@
 import type { StackAdapter } from '../adapters/adapter.js';
 import { brainFor } from '../brain/select.js';
 import { assessComplexity, routeModels } from './complexity.js';
-import { profile, type ProfileName } from './profiles.js';
+import { profile, type ProfileName, type ProfileOpts } from './profiles.js';
 import { runLoop, type RunOutcome } from './engine.js';
 
 // Generic single-task path runner — shared by refactor / feature / repair. (The
@@ -15,6 +15,7 @@ export interface RunPathOpts {
   model?: string; // auto | haiku | sonnet | opus | <id>
   maxSteps?: number;
   budget?: number;
+  quality?: ProfileOpts['quality']; // opt-in source-quality gate
   log?: (l: string) => void;
 }
 
@@ -34,7 +35,7 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
     adapter: opts.adapter,
     brain,
     takeoverBrain,
-    runes: profile(opts.profileName, { kind: 'unit' }),
+    runes: profile(opts.profileName, { kind: 'unit', quality: opts.quality }),
     task: opts.task,
     label: `${opts.profileName}:${opts.dir.split('/').pop()}`,
     maxSteps: opts.maxSteps ?? 30,

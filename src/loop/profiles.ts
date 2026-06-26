@@ -14,6 +14,8 @@ import { visualGate } from './runes/visual_gate.js';
 import { flakeGate } from './runes/flake_gate.js';
 import { behaviorLock } from './runes/behavior_lock.js';
 import { redFirst } from './runes/red_first.js';
+import { qualityGate } from './runes/quality_gate.js';
+import type { QualityConfig } from '../quality/analyze.js';
 import { sessionDiary } from './runes/session_diary.js';
 import { caveatHarvest } from './runes/caveat_harvest.js';
 import { distillTrace } from './runes/distill_trace.js';
@@ -33,6 +35,13 @@ export interface ProfileOpts {
   flakeGuard?: boolean; // opt-in flake gate (runs new specs N times)
   a11y?: boolean; // opt-in a11y gate (component specs must assert accessibility)
   visual?: boolean; // opt-in visual gate (e2e specs must capture a screenshot checkpoint)
+  quality?: boolean | Partial<QualityConfig>; // opt-in source-quality gate (edited files mustn't regress)
+}
+
+/** Build the opt-in quality gate (or [] when off). */
+function maybeQuality(q: ProfileOpts['quality']) {
+  if (!q) return [];
+  return [qualityGate(typeof q === 'object' ? q : undefined)];
 }
 
 export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
@@ -57,6 +66,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         ...(opts.mutation ? [mutationGate({ enforce: true })] : []),
         ...(opts.a11y ? [a11yGate] : []),
         ...(opts.visual && scope === 'e2e' ? [visualGate] : []),
+        ...maybeQuality(opts.quality),
         sessionDiary,
         caveatHarvest,
         distillTrace,
@@ -64,7 +74,15 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
       ];
     case 'refactor':
       // Characterization-first: tests are the contract, source is what changes.
-      return [contextInject('unit'), pathGuard, planFirst, behaviorLock(), sessionDiary, caveatHarvest];
+      return [
+        contextInject('unit'),
+        pathGuard,
+        planFirst,
+        behaviorLock(),
+        ...maybeQuality(opts.quality),
+        sessionDiary,
+        caveatHarvest,
+      ];
     case 'feature':
       // TDD red-first: failing spec → implement → green, existing tests protected.
       return [
@@ -77,6 +95,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         auditGate,
         hermeticGate,
         acceptanceGate({ scope: 'unit', minTests: opts.minTests ?? 1 }),
+        ...maybeQuality(opts.quality),
         sessionDiary,
         caveatHarvest,
         distillTrace,
@@ -91,6 +110,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         validationGate('unit', true), // full suite must be green
         auditGate,
         hermeticGate,
+        ...maybeQuality(opts.quality),
         sessionDiary,
         caveatHarvest,
         distillTrace,
@@ -105,6 +125,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         validationGate('unit', true), // full suite must stay green
         auditGate,
         hermeticGate,
+        ...maybeQuality(opts.quality),
         sessionDiary,
         caveatHarvest,
         distillTrace,

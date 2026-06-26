@@ -34,6 +34,13 @@ export async function restoreFile(dir: string, sha: string, file: string): Promi
   return (await git(dir, ['checkout', sha, '--', file])).ok;
 }
 
+/** Content of `file` at commit `sha`, or '' if it didn't exist / not a repo. */
+export async function showFile(dir: string, sha: string, file: string): Promise<string> {
+  if (!sha) return '';
+  const r = await git(dir, ['show', `${sha}:${file}`]);
+  return r.ok ? r.out : '';
+}
+
 /**
  * Undo a run's edits: restore each file to its content at `sha` if it existed
  * then, else remove it (the run created it). The shared core of `revert` and the

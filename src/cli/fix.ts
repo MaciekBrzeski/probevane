@@ -31,7 +31,8 @@ async function main() {
     task,
   ].join('\n');
 
-  const outcome = await runPath({ dir, adapter, profileName: 'fix', task: fullTask, model, maxSteps, budget, log: (l) => console.error(l) });
+  const quality = args.includes('--quality') || cfg.quality === true;
+  const outcome = await runPath({ dir, adapter, profileName: 'fix', task: fullTask, model, maxSteps, budget, quality, log: (l) => console.error(l) });
   console.log(
     `[probevane] ${outcome.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} (${outcome.stopReason}) steps=${outcome.steps} ` +
       `tokens=${outcome.tokensIn}/${outcome.tokensOut}${outcome.tookOver ? ' (took over)' : ''}`,
