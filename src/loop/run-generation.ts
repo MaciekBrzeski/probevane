@@ -6,6 +6,7 @@ import { retrieveFewShot } from '../library/retrieve.js';
 import { readTraces } from '../distill/collect.js';
 import { pickSimilarTrace } from '../library/similar.js';
 import { conventionalSpecPath } from './extract.js';
+import { propertyGuidance } from './property.js';
 import { mockInject } from './runes/mock_inject.js';
 import { buildChain } from '../mock/index.js';
 import { brainFor } from '../brain/select.js';
@@ -36,6 +37,7 @@ export interface GenerateOpts {
   budget?: number;
   mock?: boolean; // synthesize + inject mocks (network/deps), enforce hermeticity
   targetGaps?: boolean; // run coverage first + steer the model at uncovered lines
+  property?: boolean; // teach property/invariant testing (prefer for pure functions)
   log?: (l: string) => void;
 }
 
@@ -104,6 +106,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     `RULES: Write ONE spec file. Never create empty or placeholder test files — every file you write`,
     `must contain real, runnable tests. When the tests are complete, STOP CALLING TOOLS so the`,
     `validation + audit + acceptance gates can run; fix only what they report.`,
+    opts.property ? `\n${propertyGuidance()}` : '',
     ``,
     `=== GROUND TRUTH ===`,
     ground,

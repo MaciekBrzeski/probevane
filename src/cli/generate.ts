@@ -58,6 +58,7 @@ async function main() {
     budget,
     mock,
     targetGaps,
+    property: args.includes('--property'),
     log: (l: string) => console.error(l),
   });
 
