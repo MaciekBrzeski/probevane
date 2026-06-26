@@ -13,6 +13,7 @@ import { hermeticGate } from '../src/loop/runes/hermetic_gate.js';
 import { auditGate } from '../src/loop/runes/audit_gate.js';
 import { jsAuditRules } from '../src/audit/rules-js.js';
 import { firstFailure } from '../src/loop/runes/validation_gate.js';
+import { isEasyTarget, factDensity, routeTargets } from '../src/loop/triage.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -85,6 +86,49 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- easy-band triage (local-drafter prototype) -----------------------------
+describe('triage.isEasyTarget', () => {
+  const tgt = (sourcePath: string, meta: any = {}): any => ({ sourcePath, name: 'x', kind: 'unit', meta });
+  const PURE = `export function add(a: number, b: number): number { return a + b; }\nexport function clamp(n: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, n)); }`;
+  const NETWORK = `import { x } from './y';\nexport async function load(id: string) { const r = await fetch('/api/' + id); return r.json(); }`;
+  const FACTS = `export const RATES = { 'claude-opus-4-8': { in: 5, out: 25 }, 'claude-sonnet-4-6': { in: 3, out: 15 }, 'claude-haiku-4-5': { in: 1, out: 5 }, 'gpt-4': { in: 30, out: 60 } };\nexport function rateFor(m: string) { return RATES[m]; }`;
+
+  it('pure low-fact helper → easy (score 0)', () => {
+    const t = isEasyTarget(tgt('src/math.ts'), PURE);
+    expect(t.easy).toBe(true);
+    expect(t.score).toBe(0);
+  });
+  it('networked module → hard', () => {
+    const t = isEasyTarget(tgt('src/api.ts'), NETWORK);
+    expect(t.easy).toBe(false);
+    expect(t.reasons).toContain('network/IO');
+  });
+  it('fact-heavy table → hard (local would invent the facts)', () => {
+    const t = isEasyTarget(tgt('src/pricing.ts'), FACTS);
+    expect(t.easy).toBe(false);
+    expect(t.reasons.some((r) => r.includes('fact-heavy'))).toBe(true);
+  });
+  it('component (.tsx) → hard', () => {
+    expect(isEasyTarget(tgt('src/Cart.tsx'), 'export const Cart = () => <div/>;').easy).toBe(false);
+  });
+  it('provider-heavy meta → hard', () => {
+    expect(isEasyTarget(tgt('src/x.ts', { cost: 6 }), 'export function f(){return 1}').easy).toBe(false);
+  });
+
+  it('factDensity: pure ~0, rate-table high', () => {
+    expect(factDensity(PURE)).toBeLessThan(5);
+    expect(factDensity(FACTS)).toBeGreaterThan(10);
+  });
+  it('routeTargets splits easy vs hard', () => {
+    const r = routeTargets([
+      { target: tgt('src/math.ts'), source: PURE },
+      { target: tgt('src/api.ts'), source: NETWORK },
+    ]);
+    expect(r.easy.map((t) => t.sourcePath)).toEqual(['src/math.ts']);
+    expect(r.hard.map((t) => t.sourcePath)).toEqual(['src/api.ts']);
   });
 });
 
