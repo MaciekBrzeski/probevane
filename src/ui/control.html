@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>probevane control center</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --fg:#c9d1d9; --dim:#8b949e;
+          --ok:#3fb950; --warn:#d29922; --err:#f85149; --acc:#58a6ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { display:flex; align-items:center; gap:16px; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:2; }
+  header h1 { font-size:14px; margin:0; font-weight:600; }
+  header .stat { color:var(--dim); }
+  header .stat b { color:var(--fg); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px; }
+  .panel.wide { grid-column:1 / -1; }
+  .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin:0 0 10px; }
+  label { color:var(--dim); margin-right:4px; }
+  input, select { background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:5px 7px; font:inherit; }
+  input[type=text] { width:230px; }
+  button { background:var(--acc); color:#02050a; border:0; border-radius:4px; padding:6px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+  pre { background:#010409; border:1px solid var(--line); border-radius:4px; padding:8px; margin:0; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+  .bars { display:flex; align-items:flex-end; gap:3px; height:60px; }
+  .bars .bar { flex:1; background:var(--acc); min-height:2px; border-radius:2px 2px 0 0; opacity:.85; }
+  .muted { color:var(--dim); }
+  .alert { padding:6px 8px; border-radius:4px; margin-bottom:6px; border-left:3px solid var(--warn); background:#1c1407; }
+  .alert.error { border-left-color:var(--err); background:#1c0a0a; }
+  table { width:100%; border-collapse:collapse; }
+  td, th { text-align:left; padding:3px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:500; }
+  .tag { padding:1px 6px; border-radius:10px; font-size:11px; }
+  .tag.running { background:#0d2d4d; color:var(--acc); }
+  .tag.done { background:#0a2912; color:var(--ok); }
+  .tag.error { background:#2a0a0a; color:var(--err); }
+  .badge { font-size:11px; padding:1px 6px; border-radius:4px; background:var(--bg); border:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <h1>probevane <span class="muted">control center</span></h1>
+  <span class="stat"><span id="healthDot" class="dot" style="background:var(--dim)"></span><span id="health">connecting…</span></span>
+  <span class="stat">cost <b id="cost">–</b> · accept <b id="accept">–</b> · alerts <b id="alertN">–</b></span>
+</header>
+
+<div class="grid">
+  <!-- Launch -->
+  <section class="panel wide">
+    <h2>run — write tests · refactor · feature · fix · quality</h2>
+    <div class="row">
+      <label>dir</label><input type="text" id="dir" placeholder="/path/to/project" />
+      <label>op</label><select id="op"></select>
+      <label>flags</label><input type="text" id="flags" placeholder="--kind unit --model auto" style="width:280px" />
+      <button id="run">RUN ▶</button>
+      <button class="ghost" id="qbtn">quality scan</button>
+      <span id="runMsg" class="muted"></span>
+    </div>
+  </section>
+
+  <!-- Live -->
+  <section class="panel">
+    <h2>live</h2>
+    <pre id="live" class="muted">no run streaming. launch one above ↑</pre>
+  </section>
+
+  <!-- Jobs -->
+  <section class="panel">
+    <h2>jobs</h2>
+    <table id="jobs"><tbody><tr><td class="muted">none yet</td></tr></tbody></table>
+  </section>
+
+  <!-- Aggregate -->
+  <section class="panel">
+    <h2>cost / day</h2>
+    <div class="bars" id="bars"></div>
+    <div class="muted" id="aggMeta" style="margin-top:8px"></div>
+  </section>
+
+  <!-- Alerts -->
+  <section class="panel">
+    <h2>alerts</h2>
+    <div id="alerts" class="muted">none</div>
+  </section>
+
+  <!-- Quality -->
+  <section class="panel wide">
+    <h2>quality <span id="qmeta" class="muted"></span></h2>
+    <pre id="quality" class="muted">run a quality scan above to see file-size / complexity / duplication findings.</pre>
+  </section>
+
+  <!-- Audit -->
+  <section class="panel wide">
+    <h2>library audit trail</h2>
+    <pre id="audit" class="muted">–</pre>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const j = async (u, o) => (await fetch(u, o)).json();
+
+async function loadOps() {
+  try {
+    const { ops } = await j('/ops');
+    $('op').innerHTML = ops.map((o) => `<option>${o}</option>`).join('');
+  } catch {}
+}
+
+async function poll() {
+  try {
+    const h = await j('/health');
+    $('health').innerHTML = `v${h.version} · ${h.ledgers} ledger(s) · up ${h.uptimeSec}s`;
+    $('healthDot').style.background = 'var(--ok)';
+  } catch { $('health').textContent = 'daemon down'; $('healthDot').style.background = 'var(--err)'; }
+
+  try {
+    const a = await j('/aggregate');
+    const max = Math.max(1, ...a.daily.map((d) => d.cost));
+    $('bars').innerHTML = a.daily.map((d) =>
+      `<div class="bar" title="${d.date}: $${d.cost} · ${d.accepted}/${d.runs} accepted · ${d.errors} err" style="height:${Math.round((d.cost/max)*100)}%"></div>`).join('');
+    $('aggMeta').textContent = `${a.totals.runs} runs · $${a.totals.totalCost} · accept ${(a.totals.acceptRate*100).toFixed(0)}%`;
+    $('cost').textContent = '$' + a.totals.totalCost;
+    $('accept').textContent = (a.totals.acceptRate*100).toFixed(0) + '%';
+  } catch {}
+
+  try {
+    const { alerts } = await j('/alerts');
+    $('alertN').textContent = alerts.length;
+    $('alerts').innerHTML = alerts.length
+      ? alerts.map((a) => `<div class="alert ${a.severity}"><b>${a.kind}</b> — ${a.message}</div>`).join('')
+      : '<span class="muted">none</span>';
+  } catch {}
+
+  try {
+    const { entries } = await j('/audit');
+    $('audit').textContent = entries.slice(-30).reverse()
+      .map((e) => `${e.ts.slice(0,19)}  ${e.action}  ${e.target}`).join('\n') || 'no library mutations yet';
+  } catch {}
+
+  try {
+    const { jobs } = await j('/jobs');
+    $('jobs').innerHTML = '<tbody>' + (jobs.length
+      ? jobs.slice().reverse().map((jb) =>
+          `<tr><td><span class="tag ${jb.status}">${jb.status}</span></td><td>${jb.op}</td><td class="muted">${jb.dir.split('/').pop()}</td><td class="muted">${jb.exitCode??''}</td></tr>`).join('')
+      : '<tr><td class="muted">none yet</td></tr>') + '</tbody>';
+  } catch {}
+}
+
+let es;
+function stream(dir) {
+  if (es) es.close();
+  $('live').textContent = '';
+  es = new EventSource('/stream?dir=' + encodeURIComponent(dir));
+  es.onmessage = (ev) => {
+    const el = $('live'); el.classList.remove('muted');
+    el.textContent += ev.data + '\n'; el.scrollTop = el.scrollHeight;
+  };
+}
+
+$('run').onclick = async () => {
+  const dir = $('dir').value.trim();
+  const op = $('op').value;
+  const flags = $('flags').value.trim().split(/\s+/).filter(Boolean);
+  if (!dir) { $('runMsg').textContent = 'enter a dir'; return; }
+  $('runMsg').textContent = 'launching…';
+  try {
+    const r = await j('/run', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ op, dir, flags }) });
+    if (r.error) { $('runMsg').textContent = '✗ ' + r.error; return; }
+    $('runMsg').textContent = `▶ job ${r.id} (${op})`;
+    stream(dir);
+    poll();
+  } catch (e) { $('runMsg').textContent = '✗ ' + e; }
+};
+
+$('qbtn').onclick = async () => {
+  const dir = $('dir').value.trim();
+  if (!dir) { $('runMsg').textContent = 'enter a dir'; return; }
+  $('quality').textContent = 'scanning…'; $('quality').classList.remove('muted');
+  try {
+    const q = await j('/quality?dir=' + encodeURIComponent(dir));
+    $('qmeta').textContent = `grade ${q.score}/100 · ${q.errors} err · ${q.warns} warn · ${q.files.length} files · ${q.functions} fns · ${q.duplication.length} dup`;
+    $('quality').textContent = q.violations.length
+      ? q.violations.slice(0,200).map((v) => `${v.file}:${v.line}  ${v.severity.toUpperCase()}  [${v.rule}] ${v.message}`).join('\n')
+      : 'clean — no violations';
+  } catch (e) { $('quality').textContent = '✗ ' + e; }
+};
+
+loadOps();
+poll();
+setInterval(poll, 4000);
+</script>
+</body>
+</html>
