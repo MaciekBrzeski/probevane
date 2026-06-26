@@ -8,7 +8,8 @@
 export interface QualityConfig {
   maxFileLoc: number; // lines per file
   maxFnLoc: number; // lines per function
-  maxComplexity: number; // branch points per function (cyclomatic-ish)
+  maxComplexity: number; // branch points per function (cyclomatic-ish; ESLint default 20)
+  maxCognitive: number; // nesting-weighted readability cost per function (SonarQube default 15)
   maxNesting: number; // brace-nesting depth per function
   maxParams: number; // parameters per function
   maxLineWidth: number; // characters per line
@@ -21,6 +22,7 @@ export const DEFAULT_QUALITY: QualityConfig = {
   maxFileLoc: 300,
   maxFnLoc: 50,
   maxComplexity: 12,
+  maxCognitive: 15,
   maxNesting: 4,
   maxParams: 5,
   maxLineWidth: 120,
@@ -45,7 +47,8 @@ export interface FnMetric {
   endLine: number;
   loc: number;
   params: number;
-  complexity: number;
+  complexity: number; // cyclomatic-ish (branch count + 1)
+  cognitive: number; // nesting-weighted (each branch costs 1 + its nesting depth)
   nesting: number;
 }
 
@@ -55,6 +58,8 @@ export interface FileReport {
   imports: number;
   longLines: number;
   debt: number;
+  longLineNos: number[]; // 1-based lines exceeding maxLineWidth
+  debtLineNos: number[]; // 1-based lines with a debt marker (in a comment)
   functions: FnMetric[];
 }
 
@@ -69,6 +74,7 @@ export interface QualityReport {
   functions: number;
   violations: QViolation[];
   duplication: Dup[];
+  duplicationCapped: boolean; // true if more duplicate blocks existed than the report cap
   errors: number;
   warns: number;
   score: number; // 0..100 health grade
@@ -185,13 +191,19 @@ export function detectFunctions(code: string[]): FnMetric[] {
     let depth = 0,
       started = false,
       maxDepth = 0,
-      branches = 0;
+      branches = 0,
+      cognitive = 0;
     let j = i;
     let openFound = false;
     for (; j < code.length; j++) {
       const t = code[j];
       if (!started && j > i && (j - i > 3 || /;\s*$/.test(t))) break; // no block here → bail
-      branches += (t.match(BRANCH) || []).length;
+      const bc = (t.match(BRANCH) || []).length;
+      branches += bc;
+      // Cognitive cost: each branch costs 1 + its nesting depth (SonarQube-style —
+      // depth here = braces open before this line; body top-level = nesting 0).
+      const nestingHere = Math.max(0, depth - 1);
+      cognitive += bc * (1 + nestingHere);
       for (const ch of t) {
         if (ch === '{') {
           depth++;
@@ -216,6 +228,7 @@ export function detectFunctions(code: string[]): FnMetric[] {
       loc: endLine - i + 1,
       params: countParams(params),
       complexity: branches + 1,
+      cognitive,
       nesting: maxDepth,
     });
     i = endLine + 1; // skip past this function (don't re-detect nested)
@@ -223,37 +236,85 @@ export function detectFunctions(code: string[]): FnMetric[] {
   return fns;
 }
 
+/** The comment portion of a line (after `//`, or inside a block comment), or ''. */
+function commentText(line: string): string {
+  const slash = line.indexOf('//');
+  if (slash >= 0) return line.slice(slash + 2);
+  const m = line.match(/\/\*(.*?)(\*\/|$)/);
+  return m ? m[1] : '';
+}
+
 export function analyzeFile(file: string, source: string, cfg: QualityConfig): FileReport {
   const lines = source.split('\n');
   const code = stripToCode(lines);
   const imports = code.filter((l) => /^\s*import\b/.test(l) || /\brequire\s*\(/.test(l)).length;
-  const longLines = lines.filter((l) => l.length > cfg.maxLineWidth).length;
-  const debt = cfg.debt ? lines.filter((l) => DEBT.test(l)).length : 0;
-  return { file, loc: lines.length, imports, longLines, debt, functions: detectFunctions(code) };
+  const longLineNos: number[] = [];
+  const debtLineNos: number[] = [];
+  lines.forEach((l, i) => {
+    if (l.length > cfg.maxLineWidth) longLineNos.push(i + 1);
+    // Debt only counts inside a COMMENT — not in a string literal or identifier.
+    if (cfg.debt && DEBT.test(commentText(l))) debtLineNos.push(i + 1);
+  });
+  return {
+    file,
+    loc: lines.length,
+    imports,
+    longLines: longLineNos.length,
+    debt: debtLineNos.length,
+    longLineNos,
+    debtLineNos,
+    functions: detectFunctions(code),
+  };
 }
 
-/** Cross-file duplicate-block detection on normalized code lines. */
+const DUP_CAP = 25;
+
+/** Cross-file duplicate-block detection — reports MAXIMAL blocks, not fixed-size
+ *  windows. A duplicated 10-line block is one Dup of `lines:10`, not five
+ *  overlapping 6-line ones. Returns whether the report was capped. */
 export function findDuplication(
   perFile: { file: string; code: string[] }[],
   minLines: number,
-): Dup[] {
+): { dups: Dup[]; capped: boolean } {
   const norm = (l: string) => l.trim().replace(/\s+/g, ' ');
   const trivial = (l: string) => l.length <= 2; // '', '}', '{', ');' etc.
-  const seen = new Map<string, { file: string; startLine: number }[]>();
-  for (const { file, code } of perFile) {
+  const normed = perFile.map((f) => ({ file: f.file, code: f.code.map(norm) }));
+
+  // Hash every minLines window → its occurrences (file + 0-based index).
+  const seen = new Map<string, { file: string; idx: number }[]>();
+  for (const { file, code } of normed) {
     for (let i = 0; i + minLines <= code.length; i++) {
-      const window = code.slice(i, i + minLines).map(norm);
-      if (window.filter((l) => !trivial(l)).length < minLines) continue; // mostly-blank block
+      const window = code.slice(i, i + minLines);
+      if (window.filter((l) => !trivial(l)).length < minLines) continue; // mostly-blank
       const key = window.join('\n');
-      (seen.get(key) ?? seen.set(key, []).get(key)!).push({ file, startLine: i + 1 });
+      (seen.get(key) ?? seen.set(key, []).get(key)!).push({ file, idx: i });
     }
   }
+  const codeOf = new Map(normed.map((f) => [f.file, f.code] as const));
+  const groups = [...seen.values()]
+    .filter((occ) => occ.length >= 2)
+    .sort((a, b) => a[0].file.localeCompare(b[0].file) || a[0].idx - b[0].idx);
+
+  const covered = new Set<string>(); // `${file}:${idx}` windows already inside an emitted block
   const dups: Dup[] = [];
-  for (const occ of seen.values()) {
-    if (occ.length >= 2) dups.push({ lines: minLines, count: occ.length, occurrences: occ });
+  for (const occ of groups) {
+    if (occ.some((o) => covered.has(`${o.file}:${o.idx}`))) continue;
+    // Extend the block while ALL occurrences keep matching the next line.
+    let len = minLines;
+    while (true) {
+      const next = occ.map((o) => codeOf.get(o.file)?.[o.idx + len]);
+      if (next.some((x) => x === undefined) || new Set(next).size !== 1) break;
+      len++;
+    }
+    for (const o of occ) for (let k = 0; k <= len - minLines; k++) covered.add(`${o.file}:${o.idx + k}`);
+    dups.push({
+      lines: len,
+      count: occ.length,
+      occurrences: occ.map((o) => ({ file: o.file, startLine: o.idx + 1 })),
+    });
   }
-  // Largest / most-repeated first; cap to avoid overlap-window noise flooding the report.
-  return dups.sort((a, b) => b.count - a.count).slice(0, 25);
+  dups.sort((a, b) => b.lines * b.count - a.lines * a.count);
+  return { dups: dups.slice(0, DUP_CAP), capped: dups.length > DUP_CAP };
 }
 
 export function analyzeProject(
@@ -288,13 +349,15 @@ export function analyzeProject(
     if (f.imports > cfg.maxImports)
       push(f.file, 1, 'import-fanout', 'warn', f.imports, cfg.maxImports, 'too many imports');
     if (f.longLines > 0)
-      push(f.file, 1, 'long-lines', 'warn', f.longLines, 0, `${f.longLines} line(s) over ${cfg.maxLineWidth} chars`);
-    if (f.debt > 0) push(f.file, 1, 'debt', 'warn', f.debt, 0, `${f.debt} debt marker(s)`);
+      push(f.file, f.longLineNos[0], 'long-lines', 'warn', f.longLines, 0, `${f.longLines} line(s) over ${cfg.maxLineWidth} chars`);
+    if (f.debt > 0) push(f.file, f.debtLineNos[0], 'debt', 'warn', f.debt, 0, `${f.debt} debt marker(s)`);
     for (const fn of f.functions) {
       if (fn.loc > cfg.maxFnLoc)
         push(f.file, fn.startLine, 'fn-size', 'error', fn.loc, cfg.maxFnLoc, `function ${fn.name} too long`);
       if (fn.complexity > cfg.maxComplexity)
-        push(f.file, fn.startLine, 'complexity', 'error', fn.complexity, cfg.maxComplexity, `function ${fn.name} too complex`);
+        push(f.file, fn.startLine, 'complexity', 'error', fn.complexity, cfg.maxComplexity, `function ${fn.name} too complex (cyclomatic)`);
+      if (fn.cognitive > cfg.maxCognitive)
+        push(f.file, fn.startLine, 'cognitive', 'warn', fn.cognitive, cfg.maxCognitive, `function ${fn.name} cognitively complex (nesting-weighted)`);
       if (fn.nesting > cfg.maxNesting)
         push(f.file, fn.startLine, 'nesting', 'warn', fn.nesting, cfg.maxNesting, `function ${fn.name} nested too deep`);
       if (fn.params > cfg.maxParams)
@@ -302,7 +365,7 @@ export function analyzeProject(
     }
   }
 
-  const duplication = findDuplication(
+  const { dups: duplication, capped: duplicationCapped } = findDuplication(
     inputs.map((x) => ({ file: x.file, code: stripToCode(x.source.split('\n')) })),
     cfg.dupMinLines,
   );
@@ -322,7 +385,7 @@ export function analyzeProject(
   const errors = violations.filter((v) => v.severity === 'error').length;
   const warns = violations.filter((v) => v.severity === 'warn').length;
   const score = Math.max(0, 100 - errors * 5 - warns * 2);
-  return { files, functions: fnCount, violations, duplication, errors, warns, score };
+  return { files, functions: fnCount, violations, duplication, duplicationCapped, errors, warns, score };
 }
 
 export function formatQuality(r: QualityReport): string {
