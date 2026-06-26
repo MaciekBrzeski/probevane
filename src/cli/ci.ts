@@ -1,6 +1,8 @@
 import { resolve, join } from 'node:path';
-import { access, appendFile } from 'node:fs/promises';
+import { access, appendFile, readFile } from 'node:fs/promises';
 import { selectAdapter } from '../adapters/registry.js';
+import { isEasyTarget } from '../loop/triage.js';
+import { simulateCost } from '../cost/simulate.js';
 import { loadConfig } from '../config.js';
 import { changedFiles, isSourceFile, specCandidatesFor } from '../git.js';
 import { getDiff, reviewDiffText, findingsMarkdown, findingsTask } from '../review/diff-review.js';
@@ -84,11 +86,24 @@ async function main() {
 
   const cov = await adapter.coverage(dir).catch(() => null);
 
+  // Cost preview: triage the untested changed files → estimated $ to cover them.
+  let costLine = '';
+  if (untested.length) {
+    let e = 0, h = 0;
+    for (const f of untested) {
+      const s = await readFile(join(dir, f), 'utf8').catch(() => '');
+      isEasyTarget({ sourcePath: f, name: f, kind: 'unit' } as any, s).easy ? e++ : h++;
+    }
+    const sim = simulateCost({ easy: e, hard: h });
+    costLine = `- est. cost to cover: **$${sim[0].cost.toFixed(2)}** all-api · hybrid $${sim[1].cost.toFixed(2)} · bridge $0  _(${e} local-draftable, ${h} bridge)_`;
+  }
+
   const md = [
     `### 🧪 probevane — ${adapter.id}`,
     ``,
     `- changed source files: **${changed.length}**`,
     `- changed files without tests: **${untested.length}**`,
+    costLine,
     cov?.ok ? `- coverage: **${cov.statements}%** statements` : `- coverage: n/a`,
     doGenerate ? `- generated tests: ${generated ? '✅ accepted' : '—'}` : '',
     untested.length ? `\n<details><summary>Untested changed files</summary>\n\n${untested.map((f) => `- \`${f}\``).join('\n')}\n</details>` : '',
