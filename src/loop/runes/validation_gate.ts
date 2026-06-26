@@ -60,9 +60,14 @@ export function validationGate(scope: RunScope = 'unit', full = false): Rune {
       const run = await ctx.adapter.run(ctx.workdir, scope, ours.length ? ours : undefined);
       ctx.validatedSinceEdit = true;
       if (!run.green) {
+        // Lead with the FIRST failing test + its assertion — weak/local models fix
+        // a precise signal far better than a 2500-char raw dump (fourier-nca lesson:
+        // minimal targeted signal; repair is the lever). Full tail stays, secondary.
+        const first = firstFailure(run.raw);
+        const focus = first ? `FIX THIS FIRST:\n${first}\n\n` : '';
         return block(
           `validation_gate: ${scope} tests not green`,
-          `The ${scope} tests are not green (passed=${run.passed} failed=${run.failed} skipped=${run.skipped}). Fix them:\n${tail(run.raw)}`,
+          `The ${scope} tests are not green (passed=${run.passed} failed=${run.failed} skipped=${run.skipped}).\n${focus}Full output:\n${tail(run.raw)}`,
         );
       }
       return ALLOW;
@@ -72,6 +77,27 @@ export function validationGate(scope: RunScope = 'unit', full = false): Rune {
 
 function tail(s: string, n = 2500): string {
   return s.length > n ? s.slice(-n) : s;
+}
+
+// First failing test + a few lines of its assertion, across runners. Weak models
+// repair a single precise failure far better than the whole dump.
+// cross/×/✕/✗ marks via \u escapes (avoid glyph copy ambiguity).
+const FAIL_MARKER = /(^|\n)\s*(?:[×✕✗]|FAIL(?:ED)?\b)\s|(AssertionError|Error:|expected .* (?:to|but)|^E\s{2,}|assert\b)/i;
+// next test-result line: a check/cross mark or PASS/FAIL (marks via \u to avoid glyph drift).
+const NEXT_RESULT = /^\s*(?:[✓✔✗✕×]|PASS(?:ED)?|FAIL(?:ED)?)/;
+export function firstFailure(raw: string, lines = 12): string | undefined {
+  if (!raw) return undefined;
+  const ls = raw.split('\n');
+  const i = ls.findIndex((l) => FAIL_MARKER.test(l));
+  if (i < 0) return undefined;
+  // Marker line + its (indented) assertion body, stopping at the NEXT test-result
+  // line so we don't bleed into subsequent passing tests.
+  const out = [ls[i]];
+  for (let k = i + 1; k < ls.length && out.length < lines; k++) {
+    if (NEXT_RESULT.test(ls[k])) break;
+    if (ls[k].trim()) out.push(ls[k]);
+  }
+  return out.join('\n').slice(0, 800);
 }
 
 /** Count `error TSxxxx` diagnostics in a tsc run (dedup-free, one per occurrence). */
