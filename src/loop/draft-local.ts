@@ -36,6 +36,10 @@ export async function draftLocal(opts: {
   const scope: RunScope = kind === 'e2e' ? 'e2e' : 'unit';
   const specPath = conventionalSpecPath(adapter.id, target.sourcePath);
   const abs = join(dir, specPath);
+  // Never clobber an existing spec — it may be a real committed test. Skip; the
+  // module is already covered. (Bug guard: draftLocal writes/rm's at this path.)
+  const exists = await readFile(abs, 'utf8').then(() => true).catch(() => false);
+  if (exists) return { accepted: false, specPath, reason: 'spec already exists — skipped (no clobber)' };
   const source = await readFile(join(dir, target.sourcePath), 'utf8').catch(() => '');
   if (!source) return { accepted: false, specPath, reason: 'unreadable source' };
 
