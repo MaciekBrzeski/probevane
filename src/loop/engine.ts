@@ -64,6 +64,8 @@ export interface RunOptions {
   onConsult?: (ctx: RunCtx) => Promise<string | undefined>;
   /** Accept a fenced code block in the model's prose as a write (non-tool-calling local models). */
   textExtract?: boolean;
+  /** Focused system prompt (skip the gate instruction-wall) for small local models. */
+  minimalSystem?: boolean;
   /** Fallback spec path when an extracted block names none (single-target runs). */
   specPathHint?: string;
   /** Stable id for the live event log file (defaults to a timestamp id). */
@@ -93,6 +95,16 @@ Follow the project's existing conventions. The specific rules for this task (wha
 what must stay green) are stated below. When you believe the work is complete and the gates will
 pass, STOP CALLING TOOLS and give a one-paragraph summary; the gates then verify.`;
 
+// Focused system for small NON-tool-calling local models (minimalSystem mode):
+// the full BASE_SYSTEM + every gate's systemPromptAddition is an instruction wall
+// that makes a 3B model emit nothing usable. Strip it to the one thing it must do;
+// the GATES still verify and feed failures back (the model learns from feedback,
+// not upfront rules).
+const MINIMAL_SYSTEM = `You write ONE test file for the task below.
+Use ONLY the symbols listed in GROUND TRUTH. Assert concrete values; cover edge and error cases.
+Output the COMPLETE test file as a SINGLE fenced code block (start it with a \`// <path>\` comment) and NOTHING else — no prose.
+If a gate reports a failure, fix THAT failure and output the full file again.`;
+
 export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   const { workdir, adapter, runes, task } = opts;
   const maxSteps = opts.maxSteps ?? 24;
@@ -106,15 +118,20 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
 
   const ctx = new RunCtx(workdir, adapter, task);
 
-  // Assemble system prompt: base + rune static additions + async prepare().
-  let system = BASE_SYSTEM;
-  for (const r of runes) {
-    const add = r.systemPromptAddition?.(ctx);
-    if (add) system += '\n\n' + add;
+  // Assemble system prompt. Minimal mode (small local models): focused system,
+  // SKIP the gate systemPromptAdditions (instruction wall) — but still run
+  // prepare() for its side-effects (e.g. validation_gate captures the baseline
+  // type-error count there) and discard the returned text. Full mode: base + all.
+  let system = opts.minimalSystem ? MINIMAL_SYSTEM : BASE_SYSTEM;
+  if (!opts.minimalSystem) {
+    for (const r of runes) {
+      const add = r.systemPromptAddition?.(ctx);
+      if (add) system += '\n\n' + add;
+    }
   }
   for (const r of runes) {
     const add = await r.prepare?.(ctx);
-    if (add) system += '\n\n' + add;
+    if (add && !opts.minimalSystem) system += '\n\n' + add;
   }
 
   const messages: Msg[] = [{ role: 'user', text: task }];
