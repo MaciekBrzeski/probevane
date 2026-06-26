@@ -1,5 +1,18 @@
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { adoClient, triggerWiql, parseDirective, summarize, type AdoConfig, type AdoDirective } from '../integrations/ado.js';
+
+/** PAT from env, else a gitignored file (so secrets never land in shell history/chat). */
+function resolvePat(): string {
+  if (process.env.AZURE_DEVOPS_PAT) return process.env.AZURE_DEVOPS_PAT;
+  try {
+    return readFileSync(join(homedir(), '.config', 'probevane', 'ado.pat'), 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
 
 // probevane ado <run|create> — Azure DevOps board integration.
 //   run     poll the board for tagged work items, run the loop per item, and
@@ -34,10 +47,10 @@ async function main() {
   const cfg: AdoConfig = {
     org: flag(args, '--org') ?? process.env.AZURE_DEVOPS_ORG ?? 'maciejbrzeski',
     project: flag(args, '--project') ?? process.env.AZURE_DEVOPS_PROJECT ?? 'probevane',
-    pat: process.env.AZURE_DEVOPS_PAT ?? '',
+    pat: resolvePat(),
   };
   if (!cfg.pat) {
-    console.error('[ado] set AZURE_DEVOPS_PAT (Work Items: Read & Write). Create one at https://dev.azure.com/' + cfg.org + '/_usersSettings/tokens');
+    console.error('[ado] no PAT. Set AZURE_DEVOPS_PAT or write it to ~/.config/probevane/ado.pat (Work Items: Read & Write). Token: https://dev.azure.com/' + cfg.org + '/_usersSettings/tokens');
     process.exit(2);
   }
   const client = adoClient(cfg);
