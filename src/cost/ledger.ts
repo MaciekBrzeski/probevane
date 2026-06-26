@@ -1,13 +1,13 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { mkdir, appendFile, readFile } from 'node:fs/promises';
 import { costOf } from './pricing.js';
+import { statePath } from '../util/state.js';
+import { appendJsonl, readJsonl } from '../util/jsonl.js';
 
-// Persistent cross-run cost ledger: one JSON line per run to
-// ~/.local/share/probevane/runs.jsonl. Feeds `probevane history` — total spend,
-// acceptance, how much the harness landed vs needed escalation/hand-finishing,
-// and per-model / per-path breakdowns. On by default; opt out PROBEVANE_LEDGER=0.
-export const LEDGER_PATH = join(homedir(), '.local/share/probevane/runs.jsonl');
+// Persistent cross-run cost ledger: one JSON line per run under the state root
+// (runs.jsonl). Feeds `probevane history` — total spend, acceptance, how much the
+// harness landed vs needed escalation/hand-finishing, per-model / per-path. On by
+// default; opt out PROBEVANE_LEDGER=0. Atomic append (no torn lines under
+// concurrent runs); path honors PROBEVANE_STATE for per-repo isolation.
+export const LEDGER_PATH = statePath('runs.jsonl');
 
 export interface RunRecord {
   ts: string;
@@ -29,15 +29,11 @@ export async function recordRun(rec: Omit<RunRecord, 'cost'>): Promise<void> {
   if (process.env.PROBEVANE_LEDGER === '0') return;
   const cost = rec.costUsd ?? costOf(rec.model, { input: rec.tokensIn, output: rec.tokensOut, cacheRead: rec.cacheRead });
   const full: RunRecord = { ...rec, cost };
-  try {
-    await mkdir(join(homedir(), '.local/share/probevane'), { recursive: true });
-    await appendFile(LEDGER_PATH, JSON.stringify(full) + '\n');
-  } catch { /* ledger is best-effort */ }
+  await appendJsonl(LEDGER_PATH, full).catch(() => {}); // best-effort
 }
 
 export async function readRuns(path = LEDGER_PATH): Promise<RunRecord[]> {
-  const txt = await readFile(path, 'utf8').catch(() => '');
-  return txt.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as RunRecord);
+  return readJsonl<RunRecord>(path);
 }
 
 export interface LedgerSummary {

@@ -13,6 +13,7 @@ export class RunCtx {
   adapter: StackAdapter;
   task: string;
 
+  runId = ''; // unique per run (set by the engine); diary/events key on it
   step = 0;
   toolCalls = 0;
   gateBlocks = 0;

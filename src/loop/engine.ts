@@ -142,7 +142,8 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
 
   // Live event log — one JSON line per step to <workdir>/.probevane/events-<runId>.jsonl,
   // tailed by `probevane serve`/`peek`. On by default; opt out with PROBEVANE_EVENTS=0.
-  const runId = opts.runId ?? `run-${Date.now().toString(36)}`;
+  const runId = opts.runId ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  ctx.runId = runId; // unique per run — diary/events key on it (no cross-run collision)
   const eventsOn = process.env.PROBEVANE_EVENTS !== '0';
   const eventsPath = join(workdir, '.probevane', `events-${runId}.jsonl`);
   if (eventsOn) mkdirSync(join(workdir, '.probevane'), { recursive: true });
