@@ -8,10 +8,10 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 |---|---|
 | `init` | Detect the stack and install test deps + config. |
 | `generate` | Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited). |
-| `refactor` | Characterization-first refactor: change source only, every test stays green (behavior_lock). |
-| `feature` | TDD red-first: write a failing test, implement, go green; existing tests protected. |
-| `repair` | After source changes, update the affected (stale) tests so the whole suite is green. |
-| `fix` | Apply described issues/findings to the code, keeping the suite green + audit-clean. |
+| `refactor` | Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress). |
+| `feature` | TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality. |
+| `repair` | After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality. |
+| `fix` | Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality. |
 | `review` | Read-only quality grade (0–100) of a suite: green, coverage, audit, flake. |
 | `a11y` | Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade. |
 | `bench` | Measure a suite: coverage, audit, and mutation score (does it catch bugs?). |
@@ -55,39 +55,39 @@ probevane init <dir>
 Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).
 
 ```bash
-probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--passk N] [--budget N] [--only <substr>] [--spec]
+probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--passk N] [--budget N] [--only <substr>] [--spec]
 # e.g. probevane generate ./my-app --kind unit --mock
 ```
 
 ### refactor
-Characterization-first refactor: change source only, every test stays green (behavior_lock).
+Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress).
 
 ```bash
-probevane refactor <dir> --task "<what to refactor>" [--model …] [--budget N]
-# e.g. probevane refactor ./app --task "extract helpers into utils.ts"
+probevane refactor <dir> --task "<what to refactor>" [--model …] [--budget N] [--quality]
+# e.g. probevane refactor ./app --task "extract helpers into utils.ts" --quality
 ```
 
 ### feature
-TDD red-first: write a failing test, implement, go green; existing tests protected.
+TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.
 
 ```bash
-probevane feature <dir> --task "<feature>" [--model …]
+probevane feature <dir> --task "<feature>" [--model …] [--quality]
 # e.g. probevane feature ./app --task "add a discount field to cartTotal"
 ```
 
 ### repair
-After source changes, update the affected (stale) tests so the whole suite is green.
+After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality.
 
 ```bash
-probevane repair <dir> [--since <ref>] [--model …]
+probevane repair <dir> [--since <ref>] [--model …] [--quality]
 # e.g. probevane repair ./app --since HEAD~1
 ```
 
 ### fix
-Apply described issues/findings to the code, keeping the suite green + audit-clean.
+Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality.
 
 ```bash
-probevane fix <dir> --task "<issues>" [--model …]
+probevane fix <dir> --task "<issues>" [--model …] [--quality]
 # e.g. probevane fix ./app --task "handle the null case in parse()"
 ```
 

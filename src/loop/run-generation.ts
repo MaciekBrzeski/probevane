@@ -34,6 +34,7 @@ export interface GenerateOpts {
   flakeGuard?: boolean;
   a11y?: boolean;
   visual?: boolean;
+  quality?: boolean; // opt-in source-quality gate (no-op for tests; useful with --target-gaps source edits)
   budget?: number;
   mock?: boolean; // synthesize + inject mocks (network/deps), enforce hermeticity
   targetGaps?: boolean; // run coverage first + steer the model at uncovered lines
@@ -149,6 +150,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     flakeGuard: opts.flakeGuard,
     a11y: opts.a11y,
     visual: opts.visual,
+    quality: opts.quality,
   });
   // Insert mock_inject right after context_inject (index 0) so its guidance lands early.
   if (mockRune) runes.splice(1, 0, mockRune);

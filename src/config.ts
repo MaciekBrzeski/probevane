@@ -18,6 +18,7 @@ export interface ProbevaneConfig {
   flakeGuard?: boolean;
   a11y?: boolean;
   visual?: boolean;
+  quality?: boolean; // opt-in source-quality gate on edited files (refactor/feature/fix/repair)
   takeover?: string;
   budget?: number; // hard output-token ceiling per run
 }

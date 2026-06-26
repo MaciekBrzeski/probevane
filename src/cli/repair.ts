@@ -46,7 +46,8 @@ async function main() {
     ...pairs.map((p) => `- ${p.source}${p.specs.length ? ` → ${p.specs.join(', ')}` : ' (no test found — add one if the behavior is now untested)'}`),
   ].join('\n');
 
-  const outcome = await runPath({ dir, adapter, profileName: "repair", task: fullTask, model, maxSteps, budget, log: (l) => console.error(l) });
+  const quality = args.includes('--quality') || cfg.quality === true;
+  const outcome = await runPath({ dir, adapter, profileName: "repair", task: fullTask, model, maxSteps, budget, quality, log: (l) => console.error(l) });
   console.log(
     `[probevane] ${outcome.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} (${outcome.stopReason}) steps=${outcome.steps} ` +
       `tokens=${outcome.tokensIn}/${outcome.tokensOut} cacheRead=${outcome.cacheRead}${outcome.tookOver ? ' (took over)' : ''}`,
