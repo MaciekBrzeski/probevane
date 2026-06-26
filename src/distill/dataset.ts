@@ -27,10 +27,15 @@ export function buildExamples(traces: Trace[]): ChatExample[] {
     const key = createHash('sha1').update(t.spec).digest('hex');
     if (seen.has(key)) continue; // dedup identical specs
     seen.add(key);
+    // Gate-feedback signal: the accepted spec is the version that cleared these
+    // gates, so naming them in the prompt teaches the model to pre-empt them.
+    const constraints = t.gateBlocks?.length
+      ? `\nGate failures corrected to reach the accepted version (avoid these): ${t.gateBlocks.join('; ')}.`
+      : '';
     out.push({
       messages: [
         { role: 'system', content: SYSTEM },
-        { role: 'user', content: `Stack: ${t.stack}\nTask: ${t.task}\nWrite the test at ${t.specPath}.` },
+        { role: 'user', content: `Stack: ${t.stack}\nTask: ${t.task}${constraints}\nWrite the test at ${t.specPath}.` },
         { role: 'assistant', content: t.spec },
       ],
     });
