@@ -56,6 +56,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `assert-score` | Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation). |
 | `simcost` | Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger. |
 | `factory` | Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted — into one cost/coverage/quality rollup (report.json). Unrecognized flags forward to generate per-repo. |
+| `quality` | Project source-quality gate — file size, function length/complexity/nesting/params, long lines, debt markers (TODO/FIXME), import fan-out, and duplication → a 0–100 health grade. --strict exits 1 on error-severity violations (CI). Complements audit (test specs), assert-score (assertions), bench (mutation). |
 | `daemon` | Long-running OPERATE/OBSERVE service — scans every ledger under the state root and serves /health, /aggregate (cost+acceptance over time), /alerts (cost spike / acceptance drop / error burst), /audit (library-mutation trail) over HTTP; periodically re-evaluates alerts to a structured log. Graceful shutdown; read-only over state. |
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
 
@@ -338,6 +339,15 @@ Run the gated generate loop over many repos concurrently — each with isolated 
 probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--state-root <dir>] [--no-checkpoint] [...generate flags]
 # e.g.
 probevane factory repos.txt --concurrency 4 --model auto
+```
+
+### quality
+Project source-quality gate — file size, function length/complexity/nesting/params, long lines, debt markers (TODO/FIXME), import fan-out, and duplication → a 0–100 health grade. --strict exits 1 on error-severity violations (CI). Complements audit (test specs), assert-score (assertions), bench (mutation).
+
+```
+probevane quality <dir> [--strict] [--json] [--max-file N] [--max-fn N] [--max-complexity N] [--max-nesting N] [--max-params N] [--max-width N] [--max-imports N] [--no-debt]
+# e.g.
+probevane quality ./app --strict
 ```
 
 ### daemon
