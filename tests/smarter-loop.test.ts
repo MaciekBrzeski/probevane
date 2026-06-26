@@ -14,6 +14,7 @@ import { auditGate } from '../src/loop/runes/audit_gate.js';
 import { jsAuditRules } from '../src/audit/rules-js.js';
 import { firstFailure } from '../src/loop/runes/validation_gate.js';
 import { isEasyTarget, factDensity, routeTargets } from '../src/loop/triage.js';
+import { simulateCost, savings, MEASURED } from '../src/cost/simulate.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -86,6 +87,30 @@ describe('validation_gate.firstFailure', () => {
   it('returns undefined on green/empty output', () => {
     expect(firstFailure('')).toBeUndefined();
     expect(firstFailure('all tests passed, 5 ok')).toBeUndefined();
+  });
+});
+
+// ---- cost simulator ---------------------------------------------------------
+describe('cost.simulateCost', () => {
+  it('all-api = easy*easyApi + hard*hardApi (measured)', () => {
+    const s = simulateCost({ easy: 10, hard: 5 }, 0.5);
+    expect(s[0].name).toBe('all-api');
+    expect(s[0].cost).toBeCloseTo(10 * MEASURED.easyApi + 5 * MEASURED.hardApi, 2); // 5.70
+  });
+  it('hybrid saves the local-hit fraction of easy cost', () => {
+    const s = simulateCost({ easy: 10, hard: 5 }, 0.5);
+    // hybrid = 10*0.5*0.16 + 5*0.82 = 0.8 + 4.1 = 4.9
+    expect(s[1].cost).toBeCloseTo(4.9, 2);
+    expect(s[2].cost).toBe(0); // bridge/local-only
+  });
+  it('localHitRate=1 zeroes the easy band; hard cost remains', () => {
+    const s = simulateCost({ easy: 8, hard: 3 }, 1);
+    expect(s[1].cost).toBeCloseTo(3 * MEASURED.hardApi, 2);
+  });
+  it('savings computes pct vs the all-api baseline', () => {
+    const rows = savings(simulateCost({ easy: 10, hard: 0 }, 1));
+    expect(rows[1].pct).toBe(100); // all-easy, full local → 100% saved
+    expect(rows[0].pct).toBe(0);
   });
 });
 
