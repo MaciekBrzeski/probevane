@@ -52,7 +52,7 @@ def main():
     ap.add_argument("--data", required=True)
     ap.add_argument("--val", default=None)
     ap.add_argument("--out", default="adapter")
-    ap.add_argument("--epochs", type=int, default=3)
+    ap.add_argument("--epochs", type=int, default=5)  # fourier-nca: 5 epochs converged on a small clean set
     ap.add_argument("--rank", type=int, default=16)
     ap.add_argument("--batch", type=int, default=1)
     ap.add_argument("--grad-accum", type=int, default=16)
@@ -123,8 +123,9 @@ def main():
     if args.load_4bit:
         from transformers import BitsAndBytesConfig  # noqa: E402
         load_kw["quantization_config"] = BitsAndBytesConfig(
-            load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_quant_type="nf4")
-        print("[train] QLoRA: base in 4-bit")
+            load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True)  # 4-bit-within-4-bit → more VRAM headroom (fourier-nca lesson)
+        print("[train] QLoRA: base in 4-bit (double-quant)")
     else:
         load_kw["torch_dtype"] = torch.bfloat16
     model = AutoModelForCausalLM.from_pretrained(args.base, **load_kw)
@@ -134,7 +135,10 @@ def main():
     model.gradient_checkpointing_enable()
     model = get_peft_model(model, LoraConfig(
         r=args.rank, lora_alpha=args.rank * 2, lora_dropout=0.05,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"], task_type="CAUSAL_LM"))
+        # All linear layers incl the MLP (gate/up/down), not just attention — more
+        # capacity to learn the test-writing CONVENTION (fourier-nca measured lesson).
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        task_type="CAUSAL_LM"))
     model.print_trainable_parameters()
 
     Trainer(
@@ -142,8 +146,9 @@ def main():
         args=TrainingArguments(
             output_dir=args.out, num_train_epochs=args.epochs,
             per_device_train_batch_size=args.batch, gradient_accumulation_steps=args.grad_accum,
-            learning_rate=args.lr, bf16=True, logging_steps=5, save_strategy="epoch",
-            report_to=[]),
+            # cosine schedule + brief warmup — fourier-nca's proven LoRA recipe.
+            learning_rate=args.lr, lr_scheduler_type="cosine", warmup_ratio=0.05,
+            bf16=True, logging_steps=5, save_strategy="epoch", report_to=[]),
         train_dataset=ds,
     ).train()
     model.save_pretrained(args.out)
