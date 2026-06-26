@@ -3,6 +3,8 @@ import { brainFor } from '../brain/select.js';
 import { assessComplexity, routeModels } from './complexity.js';
 import { profile, type ProfileName, type ProfileOpts } from './profiles.js';
 import { runLoop, type RunOutcome } from './engine.js';
+import { buildGraph } from '../mock/graph.js';
+import { focusDirective } from './scout.js';
 
 // Generic single-task path runner — shared by refactor / feature / repair. (The
 // test-generation path keeps its richer probe-grounding in run-generation.ts.)
@@ -17,6 +19,7 @@ export interface RunPathOpts {
   budget?: number;
   quality?: ProfileOpts['quality']; // opt-in source-quality gate
   forceStopAfter?: number; // barren-turn ceiling (raise for big-repo refactors that read/plan a lot before editing)
+  only?: string; // focus path — narrows context + injects a repo-map so the model edits instead of crawling
   log?: (l: string) => void;
 }
 
@@ -31,13 +34,23 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
   const takeoverBrain = brainFor(route.takeover);
   log(`[probevane] model=${brain.model}${cx.complex ? ` (complex: ${cx.reasons.join(', ')})` : ''} takeover=${takeoverBrain.model}`);
 
+  // --only: narrow the model's focus to one path + its importers, and hand it a
+  // repo-map up front so it edits instead of crawling the whole repo (the
+  // large-repo read-stall fix). buildGraph is best-effort.
+  let task = opts.task;
+  if (opts.only) {
+    const graph = await buildGraph(opts.dir).catch(() => null);
+    task += focusDirective(graph, opts.only);
+    log(`[probevane] focus: ${opts.only}${graph ? ' (repo-map injected)' : ''}`);
+  }
+
   return runLoop({
     workdir: opts.dir,
     adapter: opts.adapter,
     brain,
     takeoverBrain,
     runes: profile(opts.profileName, { kind: 'unit', quality: opts.quality }),
-    task: opts.task,
+    task,
     label: `${opts.profileName}:${opts.dir.split('/').pop()}`,
     maxSteps: opts.maxSteps ?? 30,
     forceStopAfter: opts.forceStopAfter ?? 8,

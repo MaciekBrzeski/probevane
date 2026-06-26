@@ -111,11 +111,16 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   const maxSteps = opts.maxSteps ?? 24;
   const forceStopAfter = opts.forceStopAfter ?? 6;
   const consultAfter = opts.consultAfter ?? Math.max(2, forceStopAfter - 3);
+  // Read-thrash nudge: fire EARLY (after a handful of non-edit turns) so a run
+  // that's crawling the repo gets pushed to plan+edit while it still has budget,
+  // before the never-edited hard stop. Always < forceStopAfter.
+  const nudgeAfter = Math.max(3, Math.min(6, forceStopAfter - 1));
   const log = opts.log ?? (() => {});
 
   let brain = opts.brain; // mutable: the consult ladder can swap in a stronger brain
   let tookOver = false;
   let consulted = false;
+  let nudged = false;
 
   const ctx = new RunCtx(workdir, adapter, task);
 
@@ -302,14 +307,32 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     // lesson: don't fire during the read/plan phase).
     const started = ctx.editedFiles.size > 0;
 
-    // Never-edited stall: a model that never writes a file (e.g. a weak local
-    // agent that emits the test as prose instead of calling write_file) keeps
-    // hitting the SAME stop-block and — because consult/forceStop/difficulty all
-    // gate on `started` — would otherwise churn to max_steps. If we've burned
-    // forceStopAfter turns with zero edits and the same block is repeating, give
-    // up early + propose. Deterministic only (a non-tool-calling model can't
-    // produce a useful LLM proposal, and the run must stay free).
-    if (!started && ctx.barren >= forceStopAfter && isCircular(ctx)) {
+    // Read-thrash nudge: a run that keeps READING and never edits (the large-repo
+    // refactor stall — distinct read_file calls never look "circular", so the
+    // never-edited stop alone would let it churn to max_steps). Push it to commit
+    // ONCE, early, while it still has turns left. Reads/plans both grow `barren`
+    // until the first edit, so barren == non-edit turns here.
+    if (!started && !nudged && ctx.barren >= nudgeAfter) {
+      nudged = true;
+      messages.push({
+        role: 'user',
+        text:
+          `You have taken ${ctx.step} turns reading without editing any file. You have enough ` +
+          `context now. STOP reading other files. Call \`plan\` (if you haven't), then make your ` +
+          `\`edit_file\`/\`write_file\` changes to the target. The test suite will verify correctness — ` +
+          `commit the edit; do not keep exploring.`,
+      });
+      log(`[engine] read-thrash nudge: ${ctx.barren} non-edit turns — pushing to plan+edit`);
+      continue;
+    }
+
+    // Never-edited stall: a run with ZERO edits after forceStopAfter non-edit turns
+    // is stalled — a weak model emitting prose instead of write_file, OR a strong
+    // model over-reading a large repo (distinct reads never trip isCircular). Fire
+    // deterministically on barren-without-edit; don't also require circularity
+    // (that let big-repo refactors churn all the way to max_steps). Deterministic
+    // proposal only (the run must stay free / replayable).
+    if (!started && ctx.barren >= forceStopAfter) {
       proposalText =
         `No test file produced in ${ctx.step} turns — the model isn't writing files ` +
         `(it may not support tool calls, or the target is too hard for it). ` +
