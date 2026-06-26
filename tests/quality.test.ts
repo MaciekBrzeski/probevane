@@ -120,7 +120,7 @@ describe('findDuplication', () => {
     const block = ['const a = compute(1);', 'const b = compute(2);', 'const c = compute(3);'];
     const fileA = stripToCode(['function one() {', ...block, 'return a;', '}']);
     const fileB = stripToCode(['function two() {', ...block, 'return b;', '}']);
-    const dups = findDuplication(
+    const { dups } = findDuplication(
       [
         { file: 'a.ts', code: fileA },
         { file: 'b.ts', code: fileB },
@@ -131,9 +131,26 @@ describe('findDuplication', () => {
     expect(dups[0].count).toBeGreaterThanOrEqual(2);
   });
 
+  it('reports a maximal block, not overlapping fixed-size windows', () => {
+    // a 5-line identical block with minLines 3 → ONE dup of lines:5, not 3 windows
+    const block = ['const a = f(1);', 'const b = f(2);', 'const c = f(3);', 'const d = f(4);', 'const e = f(5);'];
+    const fileA = stripToCode(['function one() {', ...block, 'return a;', '}']);
+    const fileB = stripToCode(['function two() {', ...block, 'return e;', '}']);
+    const { dups } = findDuplication(
+      [
+        { file: 'a.ts', code: fileA },
+        { file: 'b.ts', code: fileB },
+      ],
+      3,
+    );
+    expect(dups).toHaveLength(1);
+    expect(dups[0].lines).toBe(5);
+    expect(dups[0].count).toBe(2);
+  });
+
   it('ignores mostly-trivial blocks', () => {
     const trivial = stripToCode(['{', '}', '{', '}', '{', '}']);
-    const dups = findDuplication(
+    const { dups } = findDuplication(
       [
         { file: 'a.ts', code: trivial },
         { file: 'b.ts', code: trivial },
@@ -141,6 +158,41 @@ describe('findDuplication', () => {
       3,
     );
     expect(dups).toEqual([]);
+  });
+});
+
+describe('cognitive complexity', () => {
+  it('weights nested branches more than flat ones', () => {
+    const flat = ['function f(a, b, c) {', '  if (a) x();', '  if (b) y();', '  if (c) z();', '}'].join('\n');
+    const nested = ['function g(a, b, c) {', '  if (a) {', '    if (b) {', '      if (c) z();', '    }', '  }', '}'].join('\n');
+    const cf = detectFunctions(stripToCode(flat.split('\n')))[0];
+    const cg = detectFunctions(stripToCode(nested.split('\n')))[0];
+    // same 3 ifs ≈ same cyclomatic, but nested cognitive is higher
+    expect(cf.cognitive).toBe(3); // 1+1+1 at depth 0
+    expect(cg.cognitive).toBeGreaterThan(cf.cognitive); // 1 + 2 + 3 = 6
+  });
+
+  it('flags a cognitively-complex function (warn)', () => {
+    const nested = ['function deep(a, b, c, d) {', '  if (a) { if (b) { if (c) { if (d) {', '    work();', '  }}}}', '}'].join('\n');
+    const r = analyzeProject([{ file: 'x.ts', source: nested }], { ...DEFAULT_QUALITY, maxCognitive: 3 });
+    expect(r.violations.some((v) => v.rule === 'cognitive')).toBe(true);
+  });
+});
+
+describe('real line numbers + comment-scoped debt', () => {
+  it('points long-lines and debt at the actual line', () => {
+    const src = ['const ok = 1;', '// TODO fix later', `const wide = ${'9'.repeat(140)};`].join('\n');
+    const r = analyzeProject([{ file: 'd.ts', source: src }]);
+    const debt = r.violations.find((v) => v.rule === 'debt');
+    const long = r.violations.find((v) => v.rule === 'long-lines');
+    expect(debt?.line).toBe(2);
+    expect(long?.line).toBe(3);
+  });
+
+  it('does NOT flag debt markers in strings/identifiers (comment-only)', () => {
+    const src = ['const TODO_LIST = [];', 'const s = "TODO: not a real marker";', 'function f() { return TODO_LIST; }'].join('\n');
+    const r = analyzeProject([{ file: 'i.ts', source: src }]);
+    expect(r.violations.some((v) => v.rule === 'debt')).toBe(false);
   });
 });
 

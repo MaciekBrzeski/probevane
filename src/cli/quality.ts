@@ -4,13 +4,13 @@ import { formatQuality, DEFAULT_QUALITY, type QualityConfig } from '../quality/a
 import { scanProject } from '../quality/scan.js';
 
 // probevane quality <dir> [--json] [--strict] [--max-file N] [--max-fn N]
-//                        [--max-complexity N] [--max-nesting N] [--max-params N]
-//                        [--max-width N] [--max-imports N] [--no-debt]
+//                        [--max-complexity N] [--max-cognitive N] [--max-nesting N]
+//                        [--max-params N] [--max-width N] [--max-imports N] [--no-debt]
 //
-// Project source-quality gate: file size, function length / complexity / nesting /
-// params, long lines, debt markers, import fan-out, and duplication. Reports a
-// 0–100 health grade. --strict exits 1 on any error-severity violation (CI gate),
-// complementing audit (test specs), assert-score (assertions), and bench (mutation).
+// Project source-quality gate: file size, function length / cyclomatic + cognitive
+// complexity / nesting / params, long lines, debt markers, import fan-out, and
+// duplication. Reports a 0–100 health grade. --strict exits 1 on any error-severity
+// violation (CI gate), complementing audit (test specs), assert-score, bench.
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -21,19 +21,31 @@ async function main() {
   const args = process.argv.slice(2);
   const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
   const cfg = await loadConfig(dir).catch(() => ({}) as any);
-  const num = (s?: string) => (s !== undefined ? parseInt(s, 10) : undefined);
+  // Parse + validate a numeric flag: a present-but-bad value (NaN / ≤0) is a hard
+  // error, not a silent pass-through that would weaken the gate.
+  const num = (name: string): number | undefined => {
+    const s = flag(args, name);
+    if (s === undefined) return undefined;
+    const n = parseInt(s, 10);
+    if (!Number.isFinite(n) || n <= 0) {
+      console.error(`[probevane] quality: ${name} must be a positive integer (got "${s}")`);
+      process.exit(2);
+    }
+    return n;
+  };
 
   const qc: QualityConfig = {
     ...DEFAULT_QUALITY,
     ...(cfg.quality ?? {}),
     ...clean({
-      maxFileLoc: num(flag(args, '--max-file')),
-      maxFnLoc: num(flag(args, '--max-fn')),
-      maxComplexity: num(flag(args, '--max-complexity')),
-      maxNesting: num(flag(args, '--max-nesting')),
-      maxParams: num(flag(args, '--max-params')),
-      maxLineWidth: num(flag(args, '--max-width')),
-      maxImports: num(flag(args, '--max-imports')),
+      maxFileLoc: num('--max-file'),
+      maxFnLoc: num('--max-fn'),
+      maxComplexity: num('--max-complexity'),
+      maxCognitive: num('--max-cognitive'),
+      maxNesting: num('--max-nesting'),
+      maxParams: num('--max-params'),
+      maxLineWidth: num('--max-width'),
+      maxImports: num('--max-imports'),
     }),
     debt: !args.includes('--no-debt'),
   };
@@ -51,8 +63,10 @@ async function main() {
     if (report.violations.length) console.log(formatQuality(report));
     console.log(
       `\n[probevane] quality: ${report.files.length} file(s), ${report.functions} function(s), ` +
-        `${report.errors} error(s), ${report.warns} warn(s), ${report.duplication.length} dup block(s), grade ${report.score}/100`,
+        `${report.errors} error(s), ${report.warns} warn(s), ` +
+        `${report.duplication.length}${report.duplicationCapped ? '+' : ''} dup block(s), grade ${report.score}/100`,
     );
+    if (report.duplicationCapped) console.error('[probevane] quality: duplicate-block report capped — more exist.');
   }
 
   if (args.includes('--strict') && report.errors > 0) process.exit(1);
