@@ -1,5 +1,7 @@
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
+import { isEasyTarget } from '../loop/triage.js';
 import { anthropicBrain } from '../brain/anthropic-sdk.js';
 import { generateTests } from '../loop/run-generation.js';
 import { loadConfig, pick } from '../config.js';
@@ -34,6 +36,27 @@ async function main() {
   // the escalation tier.
   const model = flag(args, '--model') ?? cfg.model ?? 'auto';
   console.error(`[probevane] generate kind=${kind} adapter=${adapter.id} model=${model} dir=${dir}`);
+
+  // Easy-band triage (dry run): classify discovered targets into local-draftable
+  // (pure, low-fact, $0) vs bridge-needed (IO/component/fact-heavy). Routing hint
+  // for a hybrid run — local clears the easy band free, bridge handles the rest.
+  if (args.includes('--triage')) {
+    let targets = await adapter.discover(dir, kind);
+    const only = flag(args, '--only');
+    if (only) targets = targets.filter((t) => t.sourcePath.includes(only));
+    const rows = await Promise.all(targets.map(async (t) => {
+      const src = await readFile(join(dir, t.sourcePath), 'utf8').catch(() => '');
+      return { t, tri: isEasyTarget(t, src) };
+    }));
+    const easy = rows.filter((r) => r.tri.easy);
+    const hard = rows.filter((r) => !r.tri.easy);
+    console.log(`[triage] ${easy.length} local-draftable ($0), ${hard.length} bridge-needed, of ${rows.length} target(s)\n`);
+    console.log('LOCAL ($0 easy band):');
+    easy.forEach((r) => console.log(`  + ${r.t.sourcePath}`));
+    console.log('\nBRIDGE (fact-heavy / IO / component):');
+    hard.slice(0, 40).forEach((r) => console.log(`  - ${r.t.sourcePath}  [${r.tri.reasons.join(', ')}]`));
+    return;
+  }
 
   // Shape B: --delegate hands the WHOLE task to an external harness (claude -p),
   // then runs probevane's gates on the diff. `--model cc:<m>`/`claude-code` picks
