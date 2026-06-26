@@ -38,6 +38,7 @@ export interface GenerateOpts {
   mock?: boolean; // synthesize + inject mocks (network/deps), enforce hermeticity
   targetGaps?: boolean; // run coverage first + steer the model at uncovered lines
   property?: boolean; // teach property/invariant testing (prefer for pure functions)
+  mutationTarget?: boolean; // find surviving mutants first, steer the model to kill them
   log?: (l: string) => void;
 }
 
@@ -83,6 +84,16 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     if (d) { gapGround = `\n\n=== ${d}`; log(`[probevane] ${gaps.length} file(s) with coverage gaps`); }
   }
 
+  // Mutation-driven targeting: find mutants the current suite misses, steer the
+  // model to write tests that kill them (the strongest "does it catch bugs" signal).
+  let mutantGround = '';
+  if (opts.mutationTarget) {
+    const { survivingMutants, mutantDigest } = await import('./mutation.js');
+    const surv = await survivingMutants(dir, adapter).catch(() => []);
+    const d = mutantDigest(surv);
+    if (d) { mutantGround = `\n\n=== ${d}`; log(`[probevane] ${surv.length} surviving mutant(s) to target`); }
+  }
+
   // Mock maker: synthesize the app's mock boundary, write MSW handlers, and
   // prepare a rune that injects the plan. hermetic_gate then enforces use.
   let mockRune;
@@ -112,6 +123,7 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     ground,
     mockGround,
     gapGround,
+    mutantGround,
   ].join('\n');
 
   // Consult: when stalled, surface the most-similar WORKED EXAMPLE for this

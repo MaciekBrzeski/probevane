@@ -60,6 +60,7 @@ async function main() {
     mock,
     targetGaps,
     property: args.includes('--property'),
+    mutationTarget: args.includes('--mutation-target'),
     log: (l: string) => console.error(l),
   });
 
