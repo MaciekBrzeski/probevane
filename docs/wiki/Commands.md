@@ -30,6 +30,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `eval` | Run probevane's fixture eval (self-test of the harness); --live regenerates. |
 | `watch` | Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop. |
 | `skill` | Generate/check the probevane control skill (this doc). --check fails on drift. |
+| `improve-cycle` | Close the self-improvement loop — promote a model as the loop default (writes <state>/model.json, which generate reads when no --model/config given), or --compare two eval results and promote the better (higher acceptance, then lower cost). LoRA training stays distill train --execute; this auto-measures/auto-promotes. |
 | `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
@@ -242,6 +243,14 @@ Generate/check the probevane control skill (this doc). --check fails on drift.
 ```bash
 probevane skill [--check]
 # e.g. probevane skill --check
+```
+
+### improve-cycle
+Close the self-improvement loop — promote a model as the loop default (writes <state>/model.json, which generate reads when no --model/config given), or --compare two eval results and promote the better (higher acceptance, then lower cost). LoRA training stays distill train --execute; this auto-measures/auto-promotes.
+
+```bash
+probevane improve-cycle [--promote <model>] [--compare <a.json> <b.json>] [--status]
+# e.g. probevane improve-cycle --status
 ```
 
 ### distill
