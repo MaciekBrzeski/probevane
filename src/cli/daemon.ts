@@ -10,6 +10,7 @@ import { readRuns, type RunRecord } from '../cost/ledger.js';
 import { appendJsonl, readJsonl } from '../util/jsonl.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
 import { computeAlerts, DEFAULT_ALERT_OPTS } from '../observe/alerts.js';
+import { buildAlertPayload, newAlerts, alertKey } from '../observe/notify.js';
 import { readAudit } from '../observe/audit.js';
 import { validateLaunch } from '../observe/launch.js';
 import { reduceJobs, jobsToEvict, type PersistedJob } from '../observe/jobs.js';
@@ -326,12 +327,32 @@ const server = createServer((req, res) => {
 // Periodic alert evaluation → structured log (so alerts are recorded even with no
 // client polling /alerts; an external notifier can tail daemon.log.jsonl).
 let timer: NodeJS.Timeout | undefined;
+const WEBHOOK = process.env.PROBEVANE_ALERT_WEBHOOK; // POST new alerts here (Slack-compatible)
+const sentAlerts = new Set<string>(); // dedup across intervals — post each alert once
 async function evalAlerts() {
   const { records, ledgers } = await scanRuns();
   const { daily } = aggregateOverTime(records);
   const alerts = computeAlerts(daily, alertOpts);
   await log('info', 'scan', { ledgers, runs: records.length, alerts: alerts.length });
   for (const a of alerts) await log(a.severity, `alert.${a.kind}`, { message: a.message, value: a.value, threshold: a.threshold });
+
+  // Push genuinely-new alerts to the external webhook (once each).
+  if (WEBHOOK) {
+    const fresh = newAlerts(alerts, sentAlerts);
+    if (fresh.length) {
+      try {
+        await fetch(WEBHOOK, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(buildAlertPayload(fresh)),
+        });
+        for (const a of fresh) sentAlerts.add(alertKey(a));
+        await log('info', 'alert_webhook', { posted: fresh.length });
+      } catch (e: any) {
+        await log('error', 'alert_webhook_failed', { error: String(e?.message ?? e) });
+      }
+    }
+  }
 }
 
 // Supervision: log uncaught errors but keep serving.
