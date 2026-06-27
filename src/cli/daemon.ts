@@ -9,7 +9,9 @@ import { stateRoot } from '../util/state.js';
 import { readRuns, type RunRecord } from '../cost/ledger.js';
 import { appendJsonl, readJsonl } from '../util/jsonl.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
-import { computeAlerts, DEFAULT_ALERT_OPTS } from '../observe/alerts.js';
+import { computeAlerts, shouldHalt, DEFAULT_ALERT_OPTS } from '../observe/alerts.js';
+import { overCap } from '../cost/budget.js';
+import { backoffMs } from '../observe/quarantine.js';
 import { buildAlertPayload, newAlerts, alertKey } from '../observe/notify.js';
 import { readAudit } from '../observe/audit.js';
 import { tracesPayload, metricsPayload, prometheusText } from '../observe/otel.js';
@@ -233,6 +235,11 @@ const QUEUE_PATH = join(ROOT, 'queue.jsonl');
 const QUEUE_ON = process.env.PROBEVANE_QUEUE === '1';
 const SHIP_ON = process.env.PROBEVANE_SHIP === '1';
 const QUEUE_TICK = Number(process.env.PROBEVANE_QUEUE_TICK ?? 2) * 1000;
+// Safety rails (Pillar C).
+const BUDGET_CAP = Number(process.env.PROBEVANE_BUDGET_CAP ?? 0); // USD over the window; 0 = no cap
+const BUDGET_WINDOW = Number(process.env.PROBEVANE_BUDGET_WINDOW ?? 24); // hours
+const QUARANTINE = Number(process.env.PROBEVANE_QUARANTINE ?? 3); // re-queue with backoff up to N attempts, then quarantine
+const HALT_ON_ALERT = process.env.PROBEVANE_HALT_ON_ALERT === '1';
 let queue: QueueItem[] = [];
 let supervising = false; // one in-flight dispatch at a time
 let paused = false; // safety: set by Pillar C alert-halt / budget cap
@@ -257,7 +264,19 @@ async function dispatch(item: QueueItem) {
     child.on('error', () => res(1));
   });
   const accepted = code === 0;
-  await persistItem(mark(queue.find((q) => q.id === item.id)!, accepted ? 'done' : 'error', { exitCode: code, endedAt: new Date().toISOString() }));
+  const ran = queue.find((q) => q.id === item.id)!; // has the bumped attempts
+  if (accepted) {
+    await persistItem(mark(ran, 'done', { exitCode: code, endedAt: new Date().toISOString() }));
+  } else if (ran.attempts < QUARANTINE) {
+    // Re-queue with exponential backoff (cross-run recovery).
+    const nextAt = Date.now() + backoffMs(ran.attempts);
+    await persistItem(mark(ran, 'queued', { exitCode: code, nextAt }));
+    await log('info', 'queue_retry', { id: item.id, attempts: ran.attempts, backoffMs: backoffMs(ran.attempts) });
+  } else {
+    // Quarantine: stop retrying a poisoned target.
+    await persistItem(mark(ran, 'error', { exitCode: code, endedAt: new Date().toISOString() }));
+    await log('error', 'queue_quarantine', { id: item.id, attempts: ran.attempts });
+  }
   await log(accepted ? 'info' : 'error', 'queue_done', { id: item.id, exitCode: code });
   if (accepted && SHIP_ON) {
     const diary = await latestDiary(item.dir);
@@ -271,6 +290,15 @@ async function dispatch(item: QueueItem) {
 /** Supervisor tick: pull the next ready item and run it (one at a time). */
 async function supervise() {
   if (!QUEUE_ON || supervising || paused) return;
+  // Global budget ceiling: over the cap → pause the line (keep serving).
+  if (BUDGET_CAP > 0) {
+    const { records } = await scanRuns();
+    if (overCap(records, BUDGET_CAP, BUDGET_WINDOW, Date.now())) {
+      paused = true;
+      await log('error', 'budget_halt', { capUsd: BUDGET_CAP, windowHrs: BUDGET_WINDOW });
+      return;
+    }
+  }
   await loadQueue(); // pick up items enqueued externally (CLI / other writers)
   const item = nextReady(queue, Date.now());
   if (!item) return;
@@ -419,6 +447,12 @@ async function evalAlerts() {
   const { daily } = aggregateOverTime(records);
   const alerts = computeAlerts(daily, alertOpts);
   await log('info', 'scan', { ledgers, runs: records.length, alerts: alerts.length });
+
+  // Circuit-breaker: an error-severity alert halts the line (observability stays up).
+  if (HALT_ON_ALERT && !paused && shouldHalt(alerts)) {
+    paused = true;
+    await log('error', 'alert_halt', { kinds: alerts.filter((a) => a.severity === 'error').map((a) => a.kind) });
+  }
   for (const a of alerts) await log(a.severity, `alert.${a.kind}`, { message: a.message, value: a.value, threshold: a.threshold });
 
   // Push genuinely-new alerts to the external webhook (once each).

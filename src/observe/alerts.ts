@@ -92,3 +92,8 @@ export function computeAlerts(daily: DailyBucket[], opts: Partial<AlertOpts> = {
 
   return alerts;
 }
+
+/** Circuit-breaker: should the line halt? True on any error-severity alert. */
+export function shouldHalt(alerts: Alert[]): boolean {
+  return alerts.some((a) => a.severity === 'error');
+}
