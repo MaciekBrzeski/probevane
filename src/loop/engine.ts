@@ -194,6 +194,9 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
           process.env.PROBEVANE_NO_TRANSCRIPT_CACHE === '1'
             ? undefined
             : stableCacheIndex(messages.length),
+        // Live tokens (opt-in): stream throttled deltas into the event log so
+        // serve/peek/daemon can show partial output as it's generated.
+        onDelta: process.env.PROBEVANE_STREAM_TOKENS === '1' ? (delta) => emit({ delta }) : undefined,
       });
     } catch (e) {
       log(`[engine] brain error: ${String(e)}`);
