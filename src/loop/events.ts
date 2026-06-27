@@ -23,6 +23,8 @@ export interface LoopEvent {
   tokensOut: number;
   /** Source files edited during this step */
   editedFiles?: string[];
+  /** Live-token text chunk (PROBEVANE_STREAM_TOKENS=1) — partial model output. */
+  delta?: string;
   /** Reason the LLM stopped (e.g. "end_turn", "max_tokens") */
   stopReason?: string;
   /** Whether the run was ultimately accepted */

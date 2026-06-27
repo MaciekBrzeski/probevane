@@ -15,6 +15,12 @@ export interface BrainRequest {
    * Undefined → cache only the system+tools prefix (the old behaviour).
    */
   cachePrefixIndex?: number;
+  /**
+   * Optional live-token sink. When set (and the backend streams), the brain calls
+   * this with throttled text chunks as they arrive — the engine wires it to the
+   * event log for live display. Only the anthropic backend streams; others ignore it.
+   */
+  onDelta?: (text: string) => void;
 }
 
 export interface Brain {

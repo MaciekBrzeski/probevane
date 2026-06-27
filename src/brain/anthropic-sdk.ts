@@ -9,6 +9,19 @@ import { apiLimiter } from './limiter.js';
 
 const DEFAULT_MODEL = process.env.PROBEVANE_MODEL ?? 'claude-haiku-4-5-20251001';
 const MAX_RETRIES = 5;
+const DELTA_FLUSH = 200; // chars — throttle live-token deltas so the event log stays bounded
+
+/** Split a growing buffer into >=flushAt-char chunks; return the chunks + remainder.
+ *  Pure — bounds how many delta events a stream emits. */
+export function flushBuffer(buffer: string, flushAt: number): { chunks: string[]; rest: string } {
+  const chunks: string[] = [];
+  let rest = buffer;
+  while (rest.length >= flushAt) {
+    chunks.push(rest.slice(0, flushAt));
+    rest = rest.slice(flushAt);
+  }
+  return { chunks, rest };
+}
 
 export function anthropicBrain(model = DEFAULT_MODEL): Brain {
   const client = new Anthropic(); // reads ANTHROPIC_API_KEY
@@ -67,6 +80,19 @@ export function anthropicBrain(model = DEFAULT_MODEL): Brain {
           try {
             if (noStream) return fromApi(await client.messages.create(body as any));
             const stream = client.messages.stream(body as any);
+            // Live tokens: throttle text deltas to the engine's sink (opt-in upstream).
+            if (req.onDelta) {
+              let buf = '';
+              stream.on('text', (t: string) => {
+                buf += t;
+                const { chunks, rest } = flushBuffer(buf, DELTA_FLUSH);
+                buf = rest;
+                for (const c of chunks) req.onDelta!(c);
+              });
+              const msg = await stream.finalMessage();
+              if (buf) req.onDelta(buf); // flush the tail
+              return fromApi(msg);
+            }
             return fromApi(await stream.finalMessage());
           } catch (e: any) {
             lastErr = e;

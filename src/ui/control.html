@@ -161,7 +161,14 @@ function stream(dir) {
   es = new EventSource('/stream?dir=' + encodeURIComponent(dir));
   es.onmessage = (ev) => {
     const el = $('live'); el.classList.remove('muted');
-    el.textContent += ev.data + '\n'; el.scrollTop = el.scrollHeight;
+    // Render live-token deltas inline (no newline); other events as a compact line.
+    let line = ev.data;
+    try {
+      const e = JSON.parse(ev.data);
+      if (e.delta !== undefined) { el.textContent += e.delta; el.scrollTop = el.scrollHeight; return; }
+      line = `[step ${e.step ?? '?'}] ${e.tool ?? e.stopReason ?? ''}`.trimEnd();
+    } catch {}
+    el.textContent += line + '\n'; el.scrollTop = el.scrollHeight;
   };
 }
 
