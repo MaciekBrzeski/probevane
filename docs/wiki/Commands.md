@@ -64,7 +64,7 @@ probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local
 Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress).
 
 ```bash
-probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality]
+probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe]
 # e.g. probevane refactor ./app --task "extract helpers into utils.ts" --quality
 ```
 
@@ -72,7 +72,7 @@ probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model �
 TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.
 
 ```bash
-probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality]
+probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]
 # e.g. probevane feature ./app --task "add a discount field to cartTotal"
 ```
 
@@ -80,7 +80,7 @@ probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--forc
 After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality.
 
 ```bash
-probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality]
+probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]
 # e.g. probevane repair ./app --since HEAD~1
 ```
 
@@ -88,7 +88,7 @@ probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-st
 Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality.
 
 ```bash
-probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality]
+probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]
 # e.g. probevane fix ./app --task "handle the null case in parse()"
 ```
 

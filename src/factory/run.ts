@@ -6,6 +6,8 @@ import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { isGitRepo, headSha, revertEdits } from '../util/git.js';
 import { runPool } from '../util/concurrent.js';
 import { aggregate, slug, type FactoryReport, type FactoryRepoResult } from './report.js';
+import { readFederation } from '../mfe/scan.js';
+import { versionAlign, type RepoShared } from '../mfe/standards.js';
 import type { TestKind, RunScope } from '../adapters/adapter.js';
 
 // The factory runner (Phase 3, substrate = local-concurrent): point probevane at
@@ -167,5 +169,21 @@ export async function runFactory(opts: FactoryOpts): Promise<FactoryReport> {
     },
     opts.concurrency,
   );
-  return aggregate(results, new Date().toISOString());
+  const report = aggregate(results, new Date().toISOString());
+
+  // Cross-repo: if ≥2 repos are Module-Federation MFEs, check shared-version
+  // alignment across the fleet (a singleton at different versions breaks at runtime).
+  const feds: RepoShared[] = [];
+  for (const repo of opts.repos) {
+    const cfg = await readFederation(resolve(repo)).catch(() => null);
+    if (cfg) {
+      const pkg = await readFile(join(resolve(repo), 'package.json'), 'utf8').then(JSON.parse).catch(() => ({}));
+      feds.push({ name: cfg.name || repo, shared: cfg.shared, pkg });
+    }
+  }
+  if (feds.length >= 2) {
+    const align = versionAlign(feds);
+    if (align.length) report.mfeVersionAlign = align;
+  }
+  return report;
 }

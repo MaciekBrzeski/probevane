@@ -19,6 +19,7 @@ export interface ProbevaneConfig {
   a11y?: boolean;
   visual?: boolean;
   quality?: boolean; // opt-in source-quality gate on edited files (refactor/feature/fix/repair)
+  mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
   takeover?: string;
   budget?: number; // hard output-token ceiling per run
 }

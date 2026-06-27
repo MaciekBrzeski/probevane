@@ -15,6 +15,7 @@ import { flakeGate } from './runes/flake_gate.js';
 import { behaviorLock } from './runes/behavior_lock.js';
 import { redFirst } from './runes/red_first.js';
 import { qualityGate } from './runes/quality_gate.js';
+import { mfeGate } from './runes/mfe_gate.js';
 import type { QualityConfig } from '../quality/analyze.js';
 import { sessionDiary } from './runes/session_diary.js';
 import { caveatHarvest } from './runes/caveat_harvest.js';
@@ -36,12 +37,18 @@ export interface ProfileOpts {
   a11y?: boolean; // opt-in a11y gate (component specs must assert accessibility)
   visual?: boolean; // opt-in visual gate (e2e specs must capture a screenshot checkpoint)
   quality?: boolean | Partial<QualityConfig>; // opt-in source-quality gate (edited files mustn't regress)
+  mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
 }
 
 /** Build the opt-in quality gate (or [] when off). */
 function maybeQuality(q: ProfileOpts['quality']) {
   if (!q) return [];
   return [qualityGate(typeof q === 'object' ? q : undefined)];
+}
+
+/** Build the opt-in MFE standards gate (or [] when off; itself a no-op off-federation). */
+function maybeMfe(on: boolean | undefined) {
+  return on ? [mfeGate()] : [];
 }
 
 export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
@@ -80,6 +87,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         planFirst,
         behaviorLock(),
         ...maybeQuality(opts.quality),
+        ...maybeMfe(opts.mfe),
         sessionDiary,
         caveatHarvest,
       ];
@@ -96,6 +104,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         hermeticGate,
         acceptanceGate({ scope: 'unit', minTests: opts.minTests ?? 1 }),
         ...maybeQuality(opts.quality),
+        ...maybeMfe(opts.mfe),
         sessionDiary,
         caveatHarvest,
         distillTrace,
@@ -111,6 +120,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         auditGate,
         hermeticGate,
         ...maybeQuality(opts.quality),
+        ...maybeMfe(opts.mfe),
         sessionDiary,
         caveatHarvest,
         distillTrace,
@@ -126,6 +136,7 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         auditGate,
         hermeticGate,
         ...maybeQuality(opts.quality),
+        ...maybeMfe(opts.mfe),
         sessionDiary,
         caveatHarvest,
         distillTrace,
