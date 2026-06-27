@@ -14,6 +14,8 @@ export interface FactoryRepoResult {
   tokensOut: number;
   reverted: boolean;
   cached?: boolean; // skipped via --resume (carried from a prior report)
+  shipped?: boolean; // delivered as a branch/PR (--ship)
+  prUrl?: string;
   error?: string;
 }
 

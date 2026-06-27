@@ -16,6 +16,7 @@ export default defineConfig({
         'src/mfe/scan.ts', // fs walk/read glue; pure parser+rules in federation.ts/standards.ts are tested
         'src/mfe/contract-scan.ts', // fs glue; pure templating in contract.ts is tested
         'src/mfe/driver.ts', // process/fs orchestration; pure rollup in report.ts is tested
+        'src/ship/ship.ts', // git/fs orchestration; pure builders in pr.ts are tested
       ],
       // Floors set just below current (stmts/lines 46.6, branch 81.8, funcs 64.2)
       // so the gate catches a real regression but doesn't flake on noise. Raise

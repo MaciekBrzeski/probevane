@@ -4,6 +4,7 @@ import { readFile, readdir, stat, mkdir } from 'node:fs/promises';
 import { readRuns, summarize, type RunRecord } from '../cost/ledger.js';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { isGitRepo, headSha, revertEdits } from '../util/git.js';
+import { shipRun } from '../ship/ship.js';
 import { runPool } from '../util/concurrent.js';
 import { aggregate, slug, type FactoryReport, type FactoryRepoResult } from './report.js';
 import { readFederation } from '../mfe/scan.js';
@@ -27,6 +28,7 @@ export interface FactoryOpts {
   passThrough: string[]; // extra flags forwarded verbatim to `generate`
   binPath: string; // path to bin/probevane
   checkpoint: boolean; // revert a repo's edits if its run errors
+  ship: boolean; // on accept, branch + commit + open a PR (autonomous delivery)
   retry: boolean; // retry once on a transient (error) child failure
   skip: Set<string>; // repos to skip (carried from a prior report via --resume)
   prior: FactoryReport | null; // prior report whose accepted repos we carry on resume
@@ -124,6 +126,15 @@ async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepo
         base.coverage = (await adapter.coverage(dir).catch(() => null))?.lines ?? null;
       } catch (e: any) {
         base.error = `measure: ${e?.message ?? e}`;
+      }
+    }
+    // Autonomous delivery: branch + commit + PR the accepted run.
+    if (opts.ship) {
+      const diary = await latestDiary(dir);
+      if (diary) {
+        const r = await shipRun(dir, diary, { op: 'generate', repo, tests: base.tests, coverage: base.coverage, cost: base.cost }, opts.log).catch(() => null);
+        base.shipped = !!r?.shipped;
+        base.prUrl = r?.prUrl;
       }
     }
   } else if (opts.checkpoint && (await isGitRepo(dir))) {

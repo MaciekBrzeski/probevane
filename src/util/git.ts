@@ -41,6 +41,36 @@ export async function showFile(dir: string, sha: string, file: string): Promise<
   return r.ok ? r.out : '';
 }
 
+// --- ship helpers (Pillar A) — deliver an accepted run as a branch/commit/PR ---
+
+/** Current branch name (e.g. 'main'), or '' outside a repo / detached HEAD. */
+export async function currentBranch(dir: string): Promise<string> {
+  const r = await git(dir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+  return r.ok ? r.out.trim() : '';
+}
+
+/** Create + switch to a new branch off HEAD. */
+export async function createBranch(dir: string, name: string): Promise<boolean> {
+  return (await git(dir, ['checkout', '-b', name])).ok;
+}
+
+/** Stage the given files and commit them; returns false if nothing committed. */
+export async function commitFiles(dir: string, files: string[], message: string): Promise<boolean> {
+  if (!files.length) return false;
+  if (!(await git(dir, ['add', '--', ...files])).ok) return false;
+  return (await git(dir, ['commit', '-m', message])).ok;
+}
+
+/** Push `branch` to origin (sets upstream). False if no remote / push fails. */
+export async function push(dir: string, branch: string): Promise<boolean> {
+  return (await git(dir, ['push', '-u', 'origin', branch])).ok;
+}
+
+/** True if the repo has an `origin` remote (a push target exists). */
+export async function hasRemote(dir: string): Promise<boolean> {
+  return (await git(dir, ['remote', 'get-url', 'origin'])).ok;
+}
+
 /**
  * Undo a run's edits: restore each file to its content at `sha` if it existed
  * then, else remove it (the run created it). The shared core of `revert` and the

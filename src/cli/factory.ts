@@ -28,6 +28,7 @@ const OWN: Record<string, 0 | 1> = {
   '--no-retry': 0,
   '--emit-matrix': 0,
   '--out': 1,
+  '--ship': 0,
 };
 
 async function main() {
@@ -121,6 +122,7 @@ async function main() {
     passThrough,
     binPath,
     checkpoint,
+    ship: own['--ship'] === true,
     retry,
     skip,
     prior,
@@ -154,7 +156,8 @@ function rowLine(r: FactoryRepoResult): string {
   const name = r.repo.replace(/\/+$/, '').split('/').pop() || r.repo;
   if (r.accepted) {
     const cov = r.coverage != null ? `cov ${r.coverage}%` : 'cov n/a';
-    return `${name}  ✓ ${r.tests} tests  ${cov}  $${r.cost.toFixed(4)}${r.cached ? '  (cached)' : ''}`;
+    const ship = r.shipped ? `  → ${r.prUrl ?? 'shipped'}` : '';
+    return `${name}  ✓ ${r.tests} tests  ${cov}  $${r.cost.toFixed(4)}${r.cached ? '  (cached)' : ''}${ship}`;
   }
   const tail = r.reverted ? 'reverted' : r.error ? r.error : r.stopReason;
   return `${name}  ✗ ${r.stopReason}${tail !== r.stopReason ? ` (${tail})` : ''}`;
