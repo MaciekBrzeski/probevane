@@ -15,6 +15,7 @@ export const TOOL_SPECS: ToolSpec[] = [
       type: 'object',
       properties: { path: { type: 'string', description: 'project-relative path' } },
       required: ['path'],
+      additionalProperties: false,
     },
   },
   {
@@ -22,7 +23,9 @@ export const TOOL_SPECS: ToolSpec[] = [
     description: 'List entries of a directory relative to the project dir.',
     inputSchema: {
       type: 'object',
-      properties: { path: { type: 'string', description: 'project-relative dir (default ".")' } },
+      properties: { path: { type: 'string', description: 'project-relative dir (use "." for root)' } },
+      required: ['path'],
+      additionalProperties: false,
     },
   },
   {
@@ -35,6 +38,7 @@ export const TOOL_SPECS: ToolSpec[] = [
         contents: { type: 'string' },
       },
       required: ['path', 'contents'],
+      additionalProperties: false,
     },
   },
   {
@@ -48,6 +52,7 @@ export const TOOL_SPECS: ToolSpec[] = [
         new_string: { type: 'string' },
       },
       required: ['path', 'old_string', 'new_string'],
+      additionalProperties: false,
     },
   },
   {
@@ -58,6 +63,7 @@ export const TOOL_SPECS: ToolSpec[] = [
       type: 'object',
       properties: { path: { type: 'string' } },
       required: ['path'],
+      additionalProperties: false,
     },
   },
   {
@@ -68,6 +74,7 @@ export const TOOL_SPECS: ToolSpec[] = [
       type: 'object',
       properties: { plan: { type: 'string', description: 'the test plan' } },
       required: ['plan'],
+      additionalProperties: false,
     },
   },
 ];
