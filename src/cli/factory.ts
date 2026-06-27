@@ -124,6 +124,10 @@ async function main() {
       (modes ? ` · failures: ${modes}` : '') +
       ` → ${reportPath}`,
   );
+  if (report.mfeVersionAlign?.length) {
+    console.log('\n[factory] MFE cross-repo shared-version misalignment:');
+    for (const v of report.mfeVersionAlign) console.log('  ' + v.message);
+  }
 
   if (report.accepted < report.repos) process.exit(1);
 }

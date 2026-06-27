@@ -1,6 +1,7 @@
 // Pure factory report core — repo-list parsing, per-repo slug, and the rollup.
 // Kept separate from run.ts (process/fs orchestration) so it's unit-testable and
 // counts toward coverage; run.ts is excluded like the other I/O glue.
+import type { MfeViolation } from '../mfe/standards.js';
 
 export interface FactoryRepoResult {
   repo: string;
@@ -24,6 +25,7 @@ export interface FactoryReport {
   totalCost: number;
   totalTests: number;
   byStopReason: Record<string, number>; // error-mode breakdown across repos
+  mfeVersionAlign?: MfeViolation[]; // cross-repo MF shared-version misalignments (when MFEs)
   results: FactoryRepoResult[];
 }
 

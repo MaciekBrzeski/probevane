@@ -34,7 +34,8 @@ async function main() {
   const quality = args.includes('--quality') || cfg.quality === true;
   const fsaRaw = flag(args, '--force-stop-after'); const forceStopAfter = fsaRaw ? parseInt(fsaRaw, 10) : undefined;
   const only = flag(args, '--only');
-  const outcome = await runPath({ dir, adapter, profileName: 'fix', task: fullTask, model, maxSteps, budget, quality, forceStopAfter, only, log: (l) => console.error(l) });
+  const mfe = args.includes('--mfe') || cfg.mfe === true;
+  const outcome = await runPath({ dir, adapter, profileName: 'fix', task: fullTask, model, maxSteps, budget, quality, mfe, forceStopAfter, only, log: (l) => console.error(l) });
   console.log(
     `[probevane] ${outcome.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} (${outcome.stopReason}) steps=${outcome.steps} ` +
       `tokens=${outcome.tokensIn}/${outcome.tokensOut}${outcome.tookOver ? ' (took over)' : ''}`,
