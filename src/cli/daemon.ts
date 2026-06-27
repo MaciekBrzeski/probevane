@@ -12,6 +12,7 @@ import { aggregateOverTime } from '../observe/aggregate.js';
 import { computeAlerts, DEFAULT_ALERT_OPTS } from '../observe/alerts.js';
 import { buildAlertPayload, newAlerts, alertKey } from '../observe/notify.js';
 import { readAudit } from '../observe/audit.js';
+import { tracesPayload, metricsPayload, prometheusText } from '../observe/otel.js';
 import { validateLaunch } from '../observe/launch.js';
 import { reduceJobs, jobsToEvict, type PersistedJob } from '../observe/jobs.js';
 import { scanProject } from '../quality/scan.js';
@@ -305,6 +306,19 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       const entries = await readAudit();
       return sendJson(res, 200, { count: entries.length, entries: entries.slice(-AUDIT_RETURN) });
     }
+    if (url === '/metrics') {
+      const { records } = await scanRuns(); // Prometheus scrape over the whole fleet
+      res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8' });
+      return res.end(prometheusText(records));
+    }
+    if (url === '/otel/traces') {
+      const { records } = await scanRuns();
+      return sendJson(res, 200, tracesPayload(records));
+    }
+    if (url === '/otel/metrics') {
+      const { records } = await scanRuns();
+      return sendJson(res, 200, metricsPayload(records, new Date().toISOString()));
+    }
     if (url === '/' || url === '/index') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(DASHBOARD);
@@ -376,7 +390,7 @@ server.listen(PORT, '127.0.0.1', async () => {
   await loadJobs(); // restore launched-job history (orphaned 'running' → 'error')
   await log('info', 'listen', { port: PORT, root: ROOT, intervalSec: INTERVAL / 1000, version: VERSION, jobs: jobs.size });
   console.log(`probevane daemon → http://127.0.0.1:${PORT}  (state: ${ROOT})`);
-  console.log(`  /health  /aggregate  /alerts  /audit  /jobs  (POST /run, /cancel?id=)`);
+  console.log(`  /health  /aggregate  /alerts  /audit  /jobs  /metrics  /otel/{traces,metrics}  (POST /run, /cancel?id=)`);
   await evalAlerts();
   timer = setInterval(() => void evalAlerts(), INTERVAL);
 });
