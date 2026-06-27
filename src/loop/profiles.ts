@@ -26,7 +26,7 @@ import { libraryPromote } from './runes/library_promote.js';
 // Profiles — ordered Rune pipelines per task type (ported from runestone
 // profiles.rs). beforeToolCall order: plan_first → no_regression. shouldStop
 // order: validation (fast fail) → audit (static) → acceptance (count/coverage).
-export type ProfileName = 'write_tests' | 'refactor' | 'feature' | 'repair' | 'fix' | 'bare';
+export type ProfileName = 'write_tests' | 'refactor' | 'feature' | 'repair' | 'fix' | 'migrate' | 'document' | 'bare';
 
 export interface ProfileOpts {
   kind: TestKind;
@@ -146,6 +146,22 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
         distillTrace,
         libraryPromote,
       ];
+    case 'migrate':
+      // Codemod / framework-version move: change source, every test stays green.
+      // Same safety net as refactor (behavior_lock) + opt-in quality/mfe gates.
+      return [
+        contextInject('unit'),
+        pathGuard,
+        planFirst,
+        behaviorLock(),
+        ...maybeQuality(opts.quality),
+        ...maybeMfe(opts.mfe),
+        sessionDiary,
+        caveatHarvest,
+      ];
+    case 'document':
+      // Add docs/JSDoc only — no behavior change: tests + typecheck stay green.
+      return [contextInject('unit'), pathGuard, planFirst, behaviorLock(), sessionDiary, caveatHarvest];
     case 'bare':
       return [];
   }
