@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Brain, BrainRequest } from './brain.js';
 import type { BrainResponse, ToolCall } from '../loop/types.js';
 import { statePath } from '../util/state.js';
+import { estimateRequestTokens, estimateOutputTokens } from '../cost/estimate.js';
 
 // bridge brain — delegates each turn to a subagent running in the HOST harness
 // (a Claude Code session), via a filesystem request/response queue. probevane
@@ -38,7 +39,9 @@ export function bridgeBrain(): Brain {
       const res = await poll(resPath);
       rmSync(reqPath, { force: true });
       rmSync(resPath, { force: true });
-      return toResponse(res);
+      // Meter tokens even though the bridge bills $0 — Phase-5 cost projection
+      // reprices this volume at API rates (host may also report exact counts).
+      return toResponse(res, estimateRequestTokens(req));
     },
   };
 }
@@ -58,16 +61,20 @@ function poll(resPath: string): Promise<any> {
   });
 }
 
-export function toResponse(res: any): BrainResponse {
+export function toResponse(res: any, estimatedInput = 0): BrainResponse {
   const calls: ToolCall[] = Array.isArray(res?.tool_calls)
     ? res.tool_calls
         .filter((c: any) => c && typeof c.name === 'string')
         .map((c: any, i: number) => ({ id: `bridge-${i}`, name: c.name, input: c.input ?? {} }))
     : [];
+  const text = typeof res?.text === 'string' ? res.text : '';
+  // Prefer host-reported exact counts; otherwise fall back to the heuristic estimate.
+  const input = typeof res?.usage?.input === 'number' ? res.usage.input : estimatedInput;
+  const output = typeof res?.usage?.output === 'number' ? res.usage.output : estimateOutputTokens(text, calls);
   return {
-    text: typeof res?.text === 'string' ? res.text : '',
+    text,
     toolCalls: calls,
     stopReason: calls.length ? 'tool_use' : 'end_turn',
-    usage: { input: 0, output: 0, costUsd: typeof res?.costUsd === 'number' ? res.costUsd : 0 },
+    usage: { input, output, costUsd: typeof res?.costUsd === 'number' ? res.costUsd : 0 },
   };
 }
