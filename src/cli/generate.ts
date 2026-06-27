@@ -174,6 +174,16 @@ async function main() {
     );
   }
 
+  // Autonomous delivery: on accept, branch + commit + open a PR for this run.
+  if (args.includes('--ship') && outcome.accepted) {
+    const { shipRun, latestDiary } = await import('../ship/ship.js');
+    const diary = await latestDiary(dir);
+    if (diary) {
+      const r = await shipRun(dir, diary, { op: 'generate', repo: dir, tests: outcome.tests, coverage: outcome.coverage, cost: undefined }, (l) => console.error(l));
+      console.log(`[probevane] ship: ${r.shipped ? r.prUrl ?? r.branch ?? 'delivered' : 'skipped — ' + r.reason}`);
+    }
+  }
+
   // Produce/refresh the project spec as part of the run (reflects the new tests' coverage).
   if (args.includes('--spec')) {
     const { buildSpec } = await import('../spec/build.js');

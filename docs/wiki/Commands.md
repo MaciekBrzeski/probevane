@@ -70,7 +70,7 @@ probevane plan <dir> [--kind unit|e2e] [--json]
 Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).
 
 ```bash
-probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec]
+probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec] [--ship]
 # e.g. probevane generate ./my-app --kind unit --mock
 ```
 
@@ -326,7 +326,7 @@ probevane simcost [dir] [--easy N --hard M] [--local-hit R] [--json]
 Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted + retried once — into one cost/coverage/quality rollup (report.json, with an error-mode breakdown). --resume skips repos already accepted in a prior report. Unrecognized flags forward to generate per-repo.
 
 ```bash
-probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--state-root <dir>] [--resume] [--no-retry] [--no-checkpoint] [--emit-matrix [--out <file>]] [...generate flags]
+probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--state-root <dir>] [--resume] [--no-retry] [--no-checkpoint] [--ship] [--emit-matrix [--out <file>]] [...generate flags]
 # e.g. probevane factory repos.txt --concurrency 4 --model auto
 ```
 
