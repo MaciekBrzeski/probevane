@@ -15,6 +15,8 @@ import { readAudit } from '../observe/audit.js';
 import { tracesPayload, metricsPayload, prometheusText } from '../observe/otel.js';
 import { validateLaunch } from '../observe/launch.js';
 import { reduceJobs, jobsToEvict, type PersistedJob } from '../observe/jobs.js';
+import { reduceQueue, nextReady, newItem, mark, queueSummary, type QueueItem } from '../observe/queue.js';
+import { shipRun, latestDiary } from '../ship/ship.js';
 import { scanProject } from '../quality/scan.js';
 import { tailFrom, sseFrame } from '../loop/observe.js';
 
@@ -226,6 +228,62 @@ function cancelJob(id: string, res: ServerResponse) {
   return sendJson(res, 200, { id, status: 'cancelled' });
 }
 
+// --- supervisor + queue (Pillar B) — the daemon pulls work + dispatches -----
+const QUEUE_PATH = join(ROOT, 'queue.jsonl');
+const QUEUE_ON = process.env.PROBEVANE_QUEUE === '1';
+const SHIP_ON = process.env.PROBEVANE_SHIP === '1';
+const QUEUE_TICK = Number(process.env.PROBEVANE_QUEUE_TICK ?? 2) * 1000;
+let queue: QueueItem[] = [];
+let supervising = false; // one in-flight dispatch at a time
+let paused = false; // safety: set by Pillar C alert-halt / budget cap
+
+async function loadQueue() {
+  queue = reduceQueue(await readJsonl<QueueItem>(QUEUE_PATH).catch(() => []));
+}
+async function persistItem(item: QueueItem) {
+  const i = queue.findIndex((q) => q.id === item.id);
+  if (i >= 0) queue[i] = item;
+  else queue.push(item);
+  await appendJsonl(QUEUE_PATH, item).catch(() => {});
+}
+
+/** Dispatch one queued item: spawn the op, mark it, ship on accept. */
+async function dispatch(item: QueueItem) {
+  await persistItem(mark(item, 'running'));
+  await log('info', 'queue_run', { id: item.id, op: item.op, dir: item.dir });
+  const code: number = await new Promise((res) => {
+    const child = spawn(BIN, [item.op, item.dir, ...item.flags], { stdio: ['ignore', 'ignore', 'ignore'] });
+    child.on('close', (c) => res(c ?? 1));
+    child.on('error', () => res(1));
+  });
+  const accepted = code === 0;
+  await persistItem(mark(queue.find((q) => q.id === item.id)!, accepted ? 'done' : 'error', { exitCode: code, endedAt: new Date().toISOString() }));
+  await log(accepted ? 'info' : 'error', 'queue_done', { id: item.id, exitCode: code });
+  if (accepted && SHIP_ON) {
+    const diary = await latestDiary(item.dir);
+    if (diary) {
+      const r = await shipRun(item.dir, diary, { op: item.op, repo: item.dir }, (l) => void log('info', 'ship', { line: l })).catch(() => null);
+      await log('info', 'queue_ship', { id: item.id, shipped: !!r?.shipped, pr: r?.prUrl });
+    }
+  }
+}
+
+/** Supervisor tick: pull the next ready item and run it (one at a time). */
+async function supervise() {
+  if (!QUEUE_ON || supervising || paused) return;
+  await loadQueue(); // pick up items enqueued externally (CLI / other writers)
+  const item = nextReady(queue, Date.now());
+  if (!item) return;
+  supervising = true;
+  try {
+    await dispatch(item);
+  } catch (e: any) {
+    await log('error', 'supervise_error', { error: String(e?.message ?? e) });
+  } finally {
+    supervising = false;
+  }
+}
+
 // SSE tail of a launched run's event log (<dir>/.probevane/events-*.jsonl).
 async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
   res.writeHead(200, {
@@ -262,6 +320,17 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       if (!id) return sendJson(res, 400, { error: 'id query param required' });
       return cancelJob(id, res);
     }
+    if (req.method === 'POST' && url === '/enqueue') {
+      let body: unknown;
+      try { body = JSON.parse((await readBody(req)) || '{}'); } catch { return sendJson(res, 400, { error: 'invalid JSON body' }); }
+      const v = validateLaunch(body);
+      if (!v.ok) return sendJson(res, 400, { error: v.error });
+      const item = newItem(randomUUID().slice(0, 8), v.plan.op, resolve(v.plan.dir), v.plan.flags, new Date().toISOString());
+      await persistItem(item);
+      await log('info', 'enqueue', { id: item.id, op: item.op, dir: item.dir });
+      return sendJson(res, 200, { id: item.id, status: 'queued' });
+    }
+    if (url === '/queue') return sendJson(res, 200, { paused, summary: queueSummary(queue), items: queue.slice(-100) });
     if (url === '/jobs') {
       // snapshot() drops the ChildProcess handle (not serializable) + caps the tail.
       return sendJson(res, 200, {
@@ -291,6 +360,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
         uptimeSec: Math.round((Date.now() - STARTED) / 1000),
         stateRoot: ROOT,
         ledgers,
+        queue: QUEUE_ON ? queueSummary(queue) : undefined,
+        paused,
       });
     }
     if (url === '/aggregate') {
@@ -378,6 +449,7 @@ async function shutdown(sig: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   if (timer) clearInterval(timer);
+  if (queueTimer) clearInterval(queueTimer);
   await log('info', 'shutdown', { signal: sig }); // flush before we close
   server.close(() => process.exit(0));
   // Hard cap so a hung connection can't block exit forever.
@@ -386,11 +458,15 @@ async function shutdown(sig: string) {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
+let queueTimer: NodeJS.Timeout | undefined;
 server.listen(PORT, '127.0.0.1', async () => {
   await loadJobs(); // restore launched-job history (orphaned 'running' → 'error')
-  await log('info', 'listen', { port: PORT, root: ROOT, intervalSec: INTERVAL / 1000, version: VERSION, jobs: jobs.size });
+  await loadQueue();
+  await log('info', 'listen', { port: PORT, root: ROOT, intervalSec: INTERVAL / 1000, version: VERSION, jobs: jobs.size, queue: QUEUE_ON ? queue.length : undefined });
   console.log(`probevane daemon → http://127.0.0.1:${PORT}  (state: ${ROOT})`);
-  console.log(`  /health  /aggregate  /alerts  /audit  /jobs  /metrics  /otel/{traces,metrics}  (POST /run, /cancel?id=)`);
+  console.log(`  /health  /aggregate  /alerts  /audit  /jobs  /queue  /metrics  /otel/{traces,metrics}  (POST /run, /enqueue, /cancel?id=)`);
+  if (QUEUE_ON) console.log(`  supervisor ON (tick ${QUEUE_TICK / 1000}s${SHIP_ON ? ', ship' : ''}) — pulls /queue + dispatches`);
   await evalAlerts();
   timer = setInterval(() => void evalAlerts(), INTERVAL);
+  if (QUEUE_ON) queueTimer = setInterval(() => void supervise(), QUEUE_TICK);
 });

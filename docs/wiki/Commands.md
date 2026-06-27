@@ -33,6 +33,8 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
+| `enqueue` | Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake. |
+| `scan` | Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon). |
 | `otel` | Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans — one per run — + metrics: token usage, runs, acceptance, cost by model) → write a file, POST to a collector (--endpoint / OTEL_EXPORTER_OTLP_ENDPOINT), or emit Prometheus text (--prometheus). $0, reads runs.jsonl. |
 | `history` | Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown. |
 | `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
@@ -45,7 +47,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `mfe-audit` | Micro-frontend (Module Federation) standards gate — per repo: boundaries (no deep cross-remote imports), shared singletons, runtime resilience (Suspense + error boundary), typed contracts; across repos: shared version alignment. Pure analysis ($0, no LLM) → grade + violations; --strict exits 1 (CI). The fitness function the refactor loop enforces. |
 | `mfe-contract` | Generate Module Federation contract tests (deterministic, $0) — remote-side compile-time conformance (exposed module satisfies its published contract) + host-side mocked tests (consume each federated remote against its contract). Auto-detects the type source (*-contracts pkg / sibling .contract.ts / @mf-types) and falls back to a structural smoke with a publish-types note. Dry-run by default; --write emits. |
 | `mfe` | Drive the micro-frontend (Module Federation) refactor pipeline over a polyrepo fleet — per repo: audit → (contract tests) → (generate) → (fix standards via refactor --mfe --quality), then cross-repo shared-version alignment + a combined report. Default (no LLM flags) = a $0 fleet standards report; --contract adds deterministic contract tests; --generate/--fix run the loop. |
-| `daemon` | Long-running OPERATE/OBSERVE + control-center service — an HTML dashboard (/) plus /health, /aggregate (cost+acceptance over time), /alerts (cost spike / acceptance drop / error burst), /audit (library-mutation trail), /jobs, /metrics (Prometheus scrape), /otel/{traces,metrics} (OTLP JSON), and POST /run (launch an op) + /cancel?id= (kill it). Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval + optional webhook. Binds 127.0.0.1; read-only over ledgers. |
+| `daemon` | Long-running OPERATE/OBSERVE + control-center service — an HTML dashboard (/) plus /health, /aggregate (cost+acceptance over time), /alerts (cost spike / acceptance drop / error burst), /audit (library-mutation trail), /jobs, /queue, /metrics (Prometheus scrape), /otel/{traces,metrics} (OTLP JSON), and POST /run (launch an op) + /enqueue + /cancel?id=. With PROBEVANE_QUEUE=1 it becomes a SUPERVISOR — pulls <state>/queue.jsonl on a tick and dispatches runs (+ships on accept with PROBEVANE_SHIP=1), lights-out. Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval + optional webhook. Binds 127.0.0.1; read-only over ledgers. |
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
 
 ## Reference
@@ -266,6 +268,22 @@ probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--r
 # e.g. probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"
 ```
 
+### enqueue
+Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake.
+
+```bash
+probevane enqueue <op> <dir> [--root <stateDir>] [...op flags]
+# e.g. probevane enqueue generate ./app --kind unit
+```
+
+### scan
+Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon).
+
+```bash
+probevane scan <repos.txt | dir...> [--op generate] [--root <stateDir>]
+# e.g. probevane scan repos.txt --op generate
+```
+
 ### otel
 Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans — one per run — + metrics: token usage, runs, acceptance, cost by model) → write a file, POST to a collector (--endpoint / OTEL_EXPORTER_OTLP_ENDPOINT), or emit Prometheus text (--prometheus). $0, reads runs.jsonl.
 
@@ -363,7 +381,7 @@ probevane mfe <repos.txt | dir...> [--contract] [--generate] [--fix] [--model �
 ```
 
 ### daemon
-Long-running OPERATE/OBSERVE + control-center service — an HTML dashboard (/) plus /health, /aggregate (cost+acceptance over time), /alerts (cost spike / acceptance drop / error burst), /audit (library-mutation trail), /jobs, /metrics (Prometheus scrape), /otel/{traces,metrics} (OTLP JSON), and POST /run (launch an op) + /cancel?id= (kill it). Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval + optional webhook. Binds 127.0.0.1; read-only over ledgers.
+Long-running OPERATE/OBSERVE + control-center service — an HTML dashboard (/) plus /health, /aggregate (cost+acceptance over time), /alerts (cost spike / acceptance drop / error burst), /audit (library-mutation trail), /jobs, /queue, /metrics (Prometheus scrape), /otel/{traces,metrics} (OTLP JSON), and POST /run (launch an op) + /enqueue + /cancel?id=. With PROBEVANE_QUEUE=1 it becomes a SUPERVISOR — pulls <state>/queue.jsonl on a tick and dispatches runs (+ships on accept with PROBEVANE_SHIP=1), lights-out. Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval + optional webhook. Binds 127.0.0.1; read-only over ledgers.
 
 ```bash
 probevane daemon [--port N] [--root <stateDir>] [--interval SEC]
