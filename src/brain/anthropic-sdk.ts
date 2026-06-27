@@ -42,10 +42,15 @@ export function anthropicBrain(model = DEFAULT_MODEL): Brain {
       // Marking the end of that prefix with cache_control makes every turn after
       // the first re-read it from cache instead of re-billing it as input — the
       // big self-host token lever (runestone measured ~88% input-token drop).
+      // strict tool inputs (additionalProperties:false + all-required schemas) —
+      // opt-in (PROBEVANE_STRICT_TOOLS=1) since strict rejects any optional prop and
+      // can't be verified live here; default-off keeps current behaviour.
+      const strict = process.env.PROBEVANE_STRICT_TOOLS === '1';
       const tools = req.tools.map((t, i) => ({
         name: t.name,
         description: t.description,
         input_schema: t.inputSchema as any,
+        ...(strict ? { strict: true } : {}),
         // breakpoint on the last tool caches everything before it (system + tools)
         ...(i === req.tools.length - 1 ? { cache_control: { type: 'ephemeral' } } : {}),
       }));

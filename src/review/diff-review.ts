@@ -1,5 +1,6 @@
 import { sh } from '../util/exec.js';
 import type { Brain } from '../brain/brain.js';
+import { extractJsonStrict } from '../brain/json.js';
 
 // LLM code review over a PR diff → structured findings. One brain call (not the
 // full loop). Findings feed the `fix` path for auto-remediation.
@@ -35,24 +36,17 @@ export async function reviewDiff(dir: string, base: string, brain: Brain): Promi
 }
 
 export function parseFindings(text: string): Finding[] {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start === -1 || end === -1) return [];
-  try {
-    const arr = JSON.parse(text.slice(start, end + 1));
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .filter((f) => f && f.file && f.issue)
-      .map((f) => ({
-        file: String(f.file),
-        line: typeof f.line === 'number' ? f.line : undefined,
-        severity: ['error', 'warn', 'nit'].includes(f.severity) ? f.severity : 'warn',
-        issue: String(f.issue),
-        fix: String(f.fix ?? ''),
-      }));
-  } catch {
-    return [];
-  }
+  const arr = extractJsonStrict(text, (x): x is any[] => Array.isArray(x));
+  if (!arr) return [];
+  return arr
+    .filter((f) => f && f.file && f.issue)
+    .map((f) => ({
+      file: String(f.file),
+      line: typeof f.line === 'number' ? f.line : undefined,
+      severity: ['error', 'warn', 'nit'].includes(f.severity) ? f.severity : 'warn',
+      issue: String(f.issue),
+      fix: String(f.fix ?? ''),
+    }));
 }
 
 export function findingsMarkdown(findings: Finding[]): string {

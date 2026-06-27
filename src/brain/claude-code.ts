@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import type { Brain, BrainRequest } from './brain.js';
 import type { BrainResponse, Msg, ToolSpec, ToolCall } from '../loop/types.js';
+import { extractJsonStrict } from './json.js';
 
 // claude-code brain — drives the loop via the headless Claude Code CLI
 // (`claude -p`) instead of the Messages API. A skill/contract tells the subagent
@@ -88,35 +89,9 @@ export function parseDecision(text: string): { text?: string; toolCalls: ToolCal
   return { text: typeof obj.text === 'string' && obj.text ? obj.text : undefined, toolCalls: calls };
 }
 
-/** First top-level JSON object in the text (handles ```json fences + leading prose). */
+/** First top-level JSON object in the text — the shared strict extractor, object-shaped. */
 export function extractJson(text: string): any | null {
-  const fenced = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-  const candidate = fenced ? fenced[1] : sliceBalanced(text);
-  if (!candidate) return null;
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    return null;
-  }
-}
-
-function sliceBalanced(text: string): string | null {
-  const start = text.indexOf('{');
-  if (start < 0) return null;
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === '\\') esc = true;
-      else if (ch === '"') inStr = false;
-    } else if (ch === '"') inStr = true;
-    else if (ch === '{') depth++;
-    else if (ch === '}' && --depth === 0) return text.slice(start, i + 1);
-  }
-  return null;
+  return extractJsonStrict<Record<string, unknown>>(text, (x): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x));
 }
 
 function run(cmd: string, args: string[], input: string, env: NodeJS.ProcessEnv): Promise<string> {
