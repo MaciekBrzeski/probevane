@@ -55,13 +55,19 @@ export function anthropicBrain(model = DEFAULT_MODEL): Brain {
         messages,
       };
 
+      // Stream by default — assembling the final message avoids request timeouts
+      // on long generations (the SDK's own guidance). Same BrainResponse out.
+      // PROBEVANE_NO_STREAM=1 falls back to a single create() call.
+      const noStream = process.env.PROBEVANE_NO_STREAM === '1';
+
       // Bound in-flight API calls so concurrent targets/repos don't blow the TPM.
       return apiLimiter.run(async () => {
         let lastErr: unknown;
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
-            const resp = await client.messages.create(body as any);
-            return fromApi(resp);
+            if (noStream) return fromApi(await client.messages.create(body as any));
+            const stream = client.messages.stream(body as any);
+            return fromApi(await stream.finalMessage());
           } catch (e: any) {
             lastErr = e;
             const status = e?.status ?? e?.response?.status;
@@ -107,7 +113,7 @@ export function toApiMsg(m: Msg): any {
   return { role: m.role, content: content.length ? content : (m.text ?? '') };
 }
 
-function fromApi(resp: any): BrainResponse {
+export function fromApi(resp: any): BrainResponse {
   let text = '';
   const toolCalls: ToolCall[] = [];
   for (const block of resp.content ?? []) {
