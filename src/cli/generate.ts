@@ -56,6 +56,8 @@ async function main() {
     flakeGuard,
     a11y,
     visual,
+    flakeTolerance: num(flag(args, '--flake-tolerance')),
+    assertMin: num(flag(args, '--assert-min')),
     quality: args.includes('--quality') || cfg.quality === true,
     budget,
     mock,

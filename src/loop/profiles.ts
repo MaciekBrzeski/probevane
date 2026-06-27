@@ -16,6 +16,7 @@ import { behaviorLock } from './runes/behavior_lock.js';
 import { redFirst } from './runes/red_first.js';
 import { qualityGate } from './runes/quality_gate.js';
 import { mfeGate } from './runes/mfe_gate.js';
+import { assertionGate } from './runes/assertion_gate.js';
 import type { QualityConfig } from '../quality/analyze.js';
 import { sessionDiary } from './runes/session_diary.js';
 import { caveatHarvest } from './runes/caveat_harvest.js';
@@ -34,6 +35,8 @@ export interface ProfileOpts {
   shellChecks?: string[];
   mutation?: boolean; // opt-in mutation gate (slow)
   flakeGuard?: boolean; // opt-in flake gate (runs new specs N times)
+  flakeTolerance?: number; // allow up to K outlier runs in the flake gate (default 0)
+  assertMin?: number; // opt-in assertion-quality floor (0..100) fed back into the loop
   a11y?: boolean; // opt-in a11y gate (component specs must assert accessibility)
   visual?: boolean; // opt-in visual gate (e2e specs must capture a screenshot checkpoint)
   quality?: boolean | Partial<QualityConfig>; // opt-in source-quality gate (edited files mustn't regress)
@@ -69,7 +72,8 @@ export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
           minCoverage: opts.minCoverage,
           shellChecks: opts.shellChecks,
         }),
-        ...(opts.flakeGuard ? [flakeGate()] : []),
+        ...(opts.flakeGuard ? [flakeGate(3, opts.flakeTolerance ?? 0)] : []),
+        ...(opts.assertMin ? [assertionGate(opts.assertMin)] : []),
         ...(opts.mutation ? [mutationGate({ enforce: true })] : []),
         ...(opts.a11y ? [a11yGate] : []),
         ...(opts.visual && scope === 'e2e' ? [visualGate] : []),
