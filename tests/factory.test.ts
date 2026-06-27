@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseRepoList, slug, aggregate, acceptedRepos, type FactoryRepoResult } from '../src/factory/report.js';
+import { buildMatrix } from '../src/factory/matrix.js';
 
 const ok = (repo: string, over: Partial<FactoryRepoResult> = {}): FactoryRepoResult => ({
   repo,
@@ -94,6 +95,20 @@ describe('aggregate', () => {
       't',
     );
     expect(r.byStopReason).toEqual({ accepted: 1, error: 2, difficulty: 1 });
+  });
+});
+
+describe('buildMatrix (gh-actions distribution)', () => {
+  it('emits one include entry per repo with a stable slug', () => {
+    const m = buildMatrix(['apps/host', 'apps/cart']);
+    expect(m.include).toEqual([
+      { repo: 'apps/host', slug: 'apps_host' },
+      { repo: 'apps/cart', slug: 'apps_cart' },
+    ]);
+  });
+  it('dedups and skips blanks', () => {
+    const m = buildMatrix(['a', 'a', '', '  ', 'b']);
+    expect(m.include.map((i) => i.repo)).toEqual(['a', 'b']);
   });
 });
 
