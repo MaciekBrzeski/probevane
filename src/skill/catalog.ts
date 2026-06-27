@@ -16,6 +16,7 @@ export interface Command {
 
 export const COMMANDS: Command[] = [
   { name: 'init', summary: 'Detect the stack and install test deps + config.', usage: 'probevane init <dir>', example: 'probevane init ./my-app' },
+  { name: 'plan', summary: 'Read-only action plan ($0, no LLM) — untested targets + coverage gaps + source-quality errors + MFE standards errors → a prioritized generate/refactor/fix/mfe-fix to-do list. The map before pointing the loop at a repo.', usage: 'probevane plan <dir> [--kind unit|e2e] [--json]', example: 'probevane plan ./app' },
   { name: 'generate', summary: 'Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).', usage: 'probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--passk N] [--budget N] [--only <substr>] [--spec]', example: 'probevane generate ./my-app --kind unit --mock' },
   { name: 'refactor', summary: 'Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn\'t regress).', usage: 'probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe]', example: 'probevane refactor ./app --task "extract helpers into utils.ts" --quality' },
   { name: 'feature', summary: 'TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.', usage: 'probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]', example: 'probevane feature ./app --task "add a discount field to cartTotal"' },
@@ -55,7 +56,7 @@ export const COMMANDS: Command[] = [
 ];
 
 /** Commands accepted by bin/probevane that intentionally aren't user-facing skill entries. */
-export const UNDOCUMENTED = new Set(['plan', 'version', '-v', '--version', 'help', '-h', '--help']);
+export const UNDOCUMENTED = new Set(['version', '-v', '--version', 'help', '-h', '--help']);
 
 /** Parse the command names the bin dispatcher accepts (the `a|b|c)` case line). */
 export async function binCommands(): Promise<string[]> {
