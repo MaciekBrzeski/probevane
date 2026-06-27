@@ -26,6 +26,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | command | what it does |
 |---|---|
 | `init` | Detect the stack and install test deps + config. |
+| `plan` | Read-only action plan ($0, no LLM) — untested targets + coverage gaps + source-quality errors + MFE standards errors → a prioritized generate/refactor/fix/mfe-fix to-do list. The map before pointing the loop at a repo. |
 | `generate` | Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited). |
 | `refactor` | Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress). |
 | `feature` | TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality. |
@@ -72,6 +73,15 @@ Detect the stack and install test deps + config.
 probevane init <dir>
 # e.g.
 probevane init ./my-app
+```
+
+### plan
+Read-only action plan ($0, no LLM) — untested targets + coverage gaps + source-quality errors + MFE standards errors → a prioritized generate/refactor/fix/mfe-fix to-do list. The map before pointing the loop at a repo.
+
+```
+probevane plan <dir> [--kind unit|e2e] [--json]
+# e.g.
+probevane plan ./app
 ```
 
 ### generate
