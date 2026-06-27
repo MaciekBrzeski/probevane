@@ -32,6 +32,8 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `feature` | TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality. |
 | `repair` | After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality. |
 | `fix` | Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality. |
+| `migrate` | Codemod / framework-version migration: change source to the new API/version while every existing test stays green (behavior_lock). --quality/--mfe gates optional; run repair after if expectations legitimately change. |
+| `document` | Add documentation only — JSDoc/TSDoc on exported APIs + comments on non-obvious logic; no behavior change (tests + typecheck stay green). --only focuses one area. |
 | `review` | Read-only quality grade (0–100) of a suite: green, coverage, audit, flake. |
 | `a11y` | Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade. |
 | `bench` | Measure a suite: coverage, audit, and mutation score (does it catch bugs?). |
@@ -127,6 +129,24 @@ Apply described issues/findings to the code, keeping the suite green + audit-cle
 probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]
 # e.g.
 probevane fix ./app --task "handle the null case in parse()"
+```
+
+### migrate
+Codemod / framework-version migration: change source to the new API/version while every existing test stays green (behavior_lock). --quality/--mfe gates optional; run repair after if expectations legitimately change.
+
+```
+probevane migrate <dir> --task "<migration>" | --to <pkg@version> [--only <path>] [--model …] [--quality] [--mfe] [--force-stop-after N]
+# e.g.
+probevane migrate ./app --to react@19
+```
+
+### document
+Add documentation only — JSDoc/TSDoc on exported APIs + comments on non-obvious logic; no behavior change (tests + typecheck stay green). --only focuses one area.
+
+```
+probevane document <dir> [--only <path>] [--task "<focus>"] [--model …] [--force-stop-after N]
+# e.g.
+probevane document ./app --only src/api.ts
 ```
 
 ### review
