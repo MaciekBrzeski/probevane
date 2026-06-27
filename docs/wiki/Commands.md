@@ -40,6 +40,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `quality` | Project source-quality gate — file size, function length/cyclomatic+cognitive complexity/nesting/params, long lines, debt markers (TODO/FIXME, comment-scoped), import fan-out, and (maximal-block) duplication → a 0–100 health grade. --strict exits 1 on error-severity violations (CI). Complements audit (test specs), assert-score (assertions), bench (mutation). |
 | `mfe-audit` | Micro-frontend (Module Federation) standards gate — per repo: boundaries (no deep cross-remote imports), shared singletons, runtime resilience (Suspense + error boundary), typed contracts; across repos: shared version alignment. Pure analysis ($0, no LLM) → grade + violations; --strict exits 1 (CI). The fitness function the refactor loop enforces. |
 | `mfe-contract` | Generate Module Federation contract tests (deterministic, $0) — remote-side compile-time conformance (exposed module satisfies its published contract) + host-side mocked tests (consume each federated remote against its contract). Auto-detects the type source (*-contracts pkg / sibling .contract.ts / @mf-types) and falls back to a structural smoke with a publish-types note. Dry-run by default; --write emits. |
+| `mfe` | Drive the micro-frontend (Module Federation) refactor pipeline over a polyrepo fleet — per repo: audit → (contract tests) → (generate) → (fix standards via refactor --mfe --quality), then cross-repo shared-version alignment + a combined report. Default (no LLM flags) = a $0 fleet standards report; --contract adds deterministic contract tests; --generate/--fix run the loop. |
 | `daemon` | Long-running OPERATE/OBSERVE + control-center service — an HTML dashboard (/) plus /health, /aggregate (cost+acceptance over time), /alerts (cost spike / acceptance drop / error burst), /audit (library-mutation trail), /jobs, and POST /run (launch an op) + /cancel?id= (kill it). Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval. Binds 127.0.0.1; read-only over ledgers. |
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
 
@@ -315,6 +316,14 @@ Generate Module Federation contract tests (deterministic, $0) — remote-side co
 ```bash
 probevane mfe-contract <dir> [--write] [--json]
 # e.g. probevane mfe-contract ./cart --write
+```
+
+### mfe
+Drive the micro-frontend (Module Federation) refactor pipeline over a polyrepo fleet — per repo: audit → (contract tests) → (generate) → (fix standards via refactor --mfe --quality), then cross-repo shared-version alignment + a combined report. Default (no LLM flags) = a $0 fleet standards report; --contract adds deterministic contract tests; --generate/--fix run the loop.
+
+```bash
+probevane mfe <repos.txt | dir...> [--contract] [--generate] [--fix] [--model …] [--concurrency N] [--report <path>] [--strict] [--json]
+# e.g. probevane mfe repos.txt --contract
 ```
 
 ### daemon
