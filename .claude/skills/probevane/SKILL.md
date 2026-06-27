@@ -369,7 +369,7 @@ probevane simcost ./app --local-hit 0.6
 Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted + retried once — into one cost/coverage/quality rollup (report.json, with an error-mode breakdown). --resume skips repos already accepted in a prior report. Unrecognized flags forward to generate per-repo.
 
 ```
-probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--state-root <dir>] [--resume] [--no-retry] [--no-checkpoint] [...generate flags]
+probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--state-root <dir>] [--resume] [--no-retry] [--no-checkpoint] [--emit-matrix [--out <file>]] [...generate flags]
 # e.g.
 probevane factory repos.txt --concurrency 4 --model auto
 ```

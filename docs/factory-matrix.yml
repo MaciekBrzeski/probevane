@@ -1,0 +1,37 @@
+# Reusable workflow: fan a probevane factory run across a repo fleet on GitHub
+# Actions (one runner per repo). The matrix comes from `probevane factory
+# <repos.txt> --emit-matrix` — generate it in a setup job (or commit it), then
+# this job runs `generate` per repo and uploads each report.
+#
+# This is the cheapest distribution substrate beyond local-concurrent; a
+# daemon-queue / docker-queue is the heavier next step.
+name: probevane-factory
+on:
+  workflow_dispatch:
+    inputs:
+      matrix:
+        description: 'JSON from `probevane factory <repos.txt> --emit-matrix`'
+        required: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm i -g probevane # or: npx probevane@latest
+      - name: generate tests for ${{ matrix.repo }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROBEVANE_STATE: ${{ runner.temp }}/pv-${{ matrix.slug }} # isolate per repo
+        run: probevane generate "${{ matrix.repo }}" --report report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-${{ matrix.slug }}
+          path: report.json

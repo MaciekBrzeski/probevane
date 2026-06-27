@@ -4,6 +4,7 @@ import { statePath } from '../util/state.js';
 import { loadConfig } from '../config.js';
 import { runFactory } from '../factory/run.js';
 import { parseRepoList, acceptedRepos, type FactoryReport, type FactoryRepoResult } from '../factory/report.js';
+import { buildMatrix } from '../factory/matrix.js';
 import type { TestKind } from '../adapters/adapter.js';
 
 // probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e]
@@ -25,6 +26,8 @@ const OWN: Record<string, 0 | 1> = {
   '--no-checkpoint': 0,
   '--resume': 0,
   '--no-retry': 0,
+  '--emit-matrix': 0,
+  '--out': 1,
 };
 
 async function main() {
@@ -61,9 +64,24 @@ async function main() {
   }
   if (!repos.length) {
     console.error(
-      'usage: probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [...generate flags]',
+      'usage: probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--emit-matrix] [...generate flags]',
     );
     process.exit(2);
+  }
+
+  // --emit-matrix: don't run anything — emit the GH Actions matrix the reusable
+  // workflow (docs/factory-matrix.yml) fans the fleet out on. Cheapest substrate.
+  if (own['--emit-matrix'] === true) {
+    const matrix = buildMatrix(repos);
+    const json = JSON.stringify(matrix, null, 2);
+    const out = own['--out'] as string | undefined;
+    if (out) {
+      await writeFile(resolve(out), json);
+      console.error(`[factory] wrote matrix (${matrix.include.length} repo(s)) → ${resolve(out)}`);
+    } else {
+      console.log(json);
+    }
+    return;
   }
 
   const kind = ((own['--kind'] as string) ?? 'unit') as TestKind;
