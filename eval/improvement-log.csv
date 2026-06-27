@@ -348,3 +348,11 @@ timestamp,target,kind,pass,audit_score,tests,coverage,flake,library_good,library
 2026-06-27T12:18:03.633Z,svelte-counter,unit,1,5,6,100,0,,,ci-baseline
 2026-06-27T12:18:03.633Z,rust-calc,unit,1,5,4,0,0,,,ci-baseline
 2026-06-27T12:18:03.633Z,angular-counter,unit,1,5,3,100,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,react-todo,unit,1,5,2,92.85,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,react-forms,unit,1,5,6,100,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,py-calc,unit,0,5,5,100,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,vue-counter,unit,1,5,7,100,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,go-calc,unit,1,5,4,100,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,svelte-counter,unit,1,5,6,100,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,rust-calc,unit,1,5,4,0,0,,,ci-baseline
+2026-06-27T12:21:56.272Z,angular-counter,unit,1,5,3,100,0,,,ci-baseline

@@ -36,8 +36,10 @@ async function main() {
   const adapter = await selectAdapterOrThrow(dir);
   // --model auto (default) detects complex code and routes it to a stronger
   // model up front; or pin haiku|sonnet|opus|<id>. Explicit --takeover overrides
-  // the escalation tier.
-  const model = flag(args, '--model') ?? cfg.model ?? 'auto';
+  // the escalation tier. With no flag/config, an improve-cycle-promoted model
+  // (model.json) becomes the default — the self-improvement loop's effect.
+  const { readModelPointer } = await import('../distill/improve.js');
+  const model = flag(args, '--model') ?? cfg.model ?? (await readModelPointer()) ?? 'auto';
   console.error(`[probevane] generate kind=${kind} adapter=${adapter.id} model=${model} dir=${dir}`);
 
   const takeoverOverride = flag(args, '--takeover');
