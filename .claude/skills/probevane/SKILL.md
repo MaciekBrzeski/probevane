@@ -88,7 +88,7 @@ probevane plan ./app
 Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).
 
 ```
-probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--passk N] [--budget N] [--only <substr>] [--spec]
+probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec]
 # e.g.
 probevane generate ./my-app --kind unit --mock
 ```

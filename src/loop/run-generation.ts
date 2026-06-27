@@ -34,6 +34,8 @@ export interface GenerateOpts {
   flakeGuard?: boolean;
   a11y?: boolean;
   visual?: boolean;
+  flakeTolerance?: number; // allow K outlier runs in the flake gate
+  assertMin?: number; // assertion-quality floor (0..100) fed back into the loop
   quality?: boolean; // opt-in source-quality gate (no-op for tests; useful with --target-gaps source edits)
   budget?: number;
   mock?: boolean; // synthesize + inject mocks (network/deps), enforce hermeticity
@@ -151,6 +153,8 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
     a11y: opts.a11y,
     visual: opts.visual,
     quality: opts.quality,
+    flakeTolerance: opts.flakeTolerance,
+    assertMin: opts.assertMin,
   });
   // Insert mock_inject right after context_inject (index 0) so its guidance lands early.
   if (mockRune) runes.splice(1, 0, mockRune);
