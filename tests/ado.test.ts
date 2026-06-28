@@ -43,6 +43,17 @@ describe('ado parseDirective', () => {
     expect(d.kind).toBe('unit');
     expect(d.dir).toBe('.');
   });
+  it('decodes an HTML-encoded description (ADO stores it as HTML)', () => {
+    // ADO returns System.Description as HTML: quotes → &quot;, body wrapped in tags.
+    const d = parseDirective('[probevane] feature .', '<div>feature . --kind unit --task &quot;add blink module&quot;</div>')!;
+    expect(d).toMatchObject({ command: 'feature', dir: '.', task: 'add blink module' });
+  });
+  it('tolerates a TRUNCATED description (lost closing quote) — takes the rest as the task', () => {
+    // ADO can truncate a long Description, dropping the closing &quot;.
+    const d = parseDirective('[probevane] feature .', 'feature . --kind unit --task &quot;add a long blink module that got cut off')!;
+    expect(d.command).toBe('feature');
+    expect(d.task).toBe('add a long blink module that got cut off');
+  });
   it('returns null when no command present', () => {
     expect(parseDirective('Buy milk and fix the sink')).not.toBeNull(); // "fix" is a command
     expect(parseDirective('Buy milk for the office')).toBeNull();
