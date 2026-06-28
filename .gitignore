@@ -28,3 +28,5 @@ SPEC.md
 .probevane-live/
 test-results/
 playwright-report/
+.screens/
+.playwright-mcp/
