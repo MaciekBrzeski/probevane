@@ -1,5 +1,6 @@
 import type { Rune } from './rune.js';
 import type { TestKind, RunScope } from '../adapters/adapter.js';
+import type { AcceptanceOpts } from './runes/acceptance_gate.js';
 import { contextInject } from './runes/context_inject.js';
 import { pathGuard } from './runes/path_guard.js';
 import { planFirst } from './runes/plan_first.js';
@@ -54,115 +55,116 @@ function maybeMfe(on: boolean | undefined) {
   return on ? [mfeGate()] : [];
 }
 
-export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
+// --- Subroutines: proven, reused rune sequences. Profiles compose from these
+// (via profileSegments below). Each returns a contiguous run of Runes; the
+// boundaries are what describe.ts buckets into named subroutines for the graph. ---
+
+/** Subroutine identities — a labelled segment of a profile's pipeline. */
+export type SubroutineId = 'preamble' | 'green-gates' | 'safety-net' | 'opt-in' | 'harvest';
+
+/** Setup: context + write-scope guard + plan gate, with optional TDD red gate / regression guard. */
+function preamble(kind: TestKind, o: { redFirst?: boolean; noRegression?: boolean } = {}): Rune[] {
+  return [
+    contextInject(kind),
+    pathGuard,
+    ...(o.redFirst ? [redFirst()] : []),
+    planFirst,
+    ...(o.noRegression ? [noRegression()] : []),
+  ];
+}
+
+/** Green-suite gate stack: fast validation → static audit → hermetic → optional acceptance. */
+function greenGates(scope: RunScope, o: { fullSuite?: boolean; acceptance?: AcceptanceOpts } = {}): Rune[] {
+  return [
+    validationGate(scope, o.fullSuite),
+    auditGate,
+    hermeticGate,
+    ...(o.acceptance ? [acceptanceGate(o.acceptance)] : []),
+  ];
+}
+
+/** Opt-in gates. `extras` adds the write_tests-only suite (flake/assert/mutation/a11y/visual). */
+function optInGates(opts: ProfileOpts, scope: RunScope, o: { extras?: boolean; mfe?: boolean } = {}): Rune[] {
+  const out: Rune[] = [];
+  if (o.extras) {
+    if (opts.flakeGuard) out.push(flakeGate(3, opts.flakeTolerance ?? 0));
+    if (opts.assertMin) out.push(assertionGate(opts.assertMin));
+    if (opts.mutation) out.push(mutationGate({ enforce: true }));
+    if (opts.a11y) out.push(a11yGate);
+    if (opts.visual && scope === 'e2e') out.push(visualGate);
+  }
+  out.push(...maybeQuality(opts.quality));
+  if (o.mfe) out.push(...maybeMfe(opts.mfe));
+  return out;
+}
+
+/** Harvest tail. `full` adds distill + library-promote on top of diary + caveat. */
+function harvest(o: { full?: boolean } = {}): Rune[] {
+  return [sessionDiary, caveatHarvest, ...(o.full ? [distillTrace, libraryPromote] : [])];
+}
+
+export interface Segment {
+  sub: SubroutineId;
+  runes: Rune[];
+}
+
+/**
+ * The profile's pipeline as labelled subroutine segments — the single source of
+ * truth. `profile()` is just this flattened; describe.ts reads each rune's
+ * subroutine off the segment it came from (no second mapping to drift).
+ */
+export function profileSegments(name: ProfileName, opts: ProfileOpts): Segment[] {
   const scope: RunScope = opts.kind === 'e2e' ? 'e2e' : 'unit';
+  const seg = (sub: SubroutineId, runes: Rune[]): Segment => ({ sub, runes });
   switch (name) {
     case 'write_tests':
       return [
-        contextInject(opts.kind),
-        pathGuard,
-        planFirst,
-        noRegression(),
-        validationGate(scope),
-        auditGate,
-        hermeticGate,
-        acceptanceGate({
-          scope,
-          minTests: opts.minTests,
-          minCoverage: opts.minCoverage,
-          shellChecks: opts.shellChecks,
-        }),
-        ...(opts.flakeGuard ? [flakeGate(3, opts.flakeTolerance ?? 0)] : []),
-        ...(opts.assertMin ? [assertionGate(opts.assertMin)] : []),
-        ...(opts.mutation ? [mutationGate({ enforce: true })] : []),
-        ...(opts.a11y ? [a11yGate] : []),
-        ...(opts.visual && scope === 'e2e' ? [visualGate] : []),
-        ...maybeQuality(opts.quality),
-        sessionDiary,
-        caveatHarvest,
-        distillTrace,
-        libraryPromote,
-      ];
-    case 'refactor':
-      // Characterization-first: tests are the contract, source is what changes.
-      return [
-        contextInject('unit'),
-        pathGuard,
-        planFirst,
-        behaviorLock(),
-        ...maybeQuality(opts.quality),
-        ...maybeMfe(opts.mfe),
-        sessionDiary,
-        caveatHarvest,
+        seg('preamble', preamble(opts.kind, { noRegression: true })),
+        seg('green-gates', greenGates(scope, {
+          acceptance: { scope, minTests: opts.minTests, minCoverage: opts.minCoverage, shellChecks: opts.shellChecks },
+        })),
+        // write_tests carries the full extras suite but NOT the mfe gate.
+        seg('opt-in', optInGates(opts, scope, { extras: true })),
+        seg('harvest', harvest({ full: true })),
       ];
     case 'feature':
       // TDD red-first: failing spec → implement → green, existing tests protected.
       return [
-        contextInject('unit'),
-        pathGuard,
-        redFirst(),
-        planFirst,
-        noRegression(),
-        validationGate('unit'),
-        auditGate,
-        hermeticGate,
-        acceptanceGate({ scope: 'unit', minTests: opts.minTests ?? 1 }),
-        ...maybeQuality(opts.quality),
-        ...maybeMfe(opts.mfe),
-        sessionDiary,
-        caveatHarvest,
-        distillTrace,
-        libraryPromote,
+        seg('preamble', preamble('unit', { redFirst: true, noRegression: true })),
+        seg('green-gates', greenGates('unit', { acceptance: { scope: 'unit', minTests: opts.minTests ?? 1 } })),
+        seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
+        seg('harvest', harvest({ full: true })),
       ];
     case 'repair':
-      // Update affected specs so the whole suite is green again after a source change.
-      return [
-        contextInject('unit'),
-        pathGuard,
-        planFirst,
-        validationGate('unit', true), // full suite must be green
-        auditGate,
-        hermeticGate,
-        ...maybeQuality(opts.quality),
-        ...maybeMfe(opts.mfe),
-        sessionDiary,
-        caveatHarvest,
-        distillTrace,
-        libraryPromote,
-      ];
     case 'fix':
-      // Apply review findings (source or tests), keep the whole suite green + clean.
+      // Get the whole suite green + clean again after a source change / review fix.
       return [
-        contextInject('unit'),
-        pathGuard,
-        planFirst,
-        validationGate('unit', true), // full suite must stay green
-        auditGate,
-        hermeticGate,
-        ...maybeQuality(opts.quality),
-        ...maybeMfe(opts.mfe),
-        sessionDiary,
-        caveatHarvest,
-        distillTrace,
-        libraryPromote,
+        seg('preamble', preamble('unit')),
+        seg('green-gates', greenGates('unit', { fullSuite: true })), // full suite must be green
+        seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
+        seg('harvest', harvest({ full: true })),
       ];
+    case 'refactor':
     case 'migrate':
-      // Codemod / framework-version move: change source, every test stays green.
-      // Same safety net as refactor (behavior_lock) + opt-in quality/mfe gates.
+      // Characterization-first: tests are the contract, source is what changes.
       return [
-        contextInject('unit'),
-        pathGuard,
-        planFirst,
-        behaviorLock(),
-        ...maybeQuality(opts.quality),
-        ...maybeMfe(opts.mfe),
-        sessionDiary,
-        caveatHarvest,
+        seg('preamble', preamble('unit')),
+        seg('safety-net', [behaviorLock()]),
+        seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
+        seg('harvest', harvest()),
       ];
     case 'document':
       // Add docs/JSDoc only — no behavior change: tests + typecheck stay green.
-      return [contextInject('unit'), pathGuard, planFirst, behaviorLock(), sessionDiary, caveatHarvest];
+      return [
+        seg('preamble', preamble('unit')),
+        seg('safety-net', [behaviorLock()]),
+        seg('harvest', harvest()),
+      ];
     case 'bare':
       return [];
   }
+}
+
+export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
+  return profileSegments(name, opts).flatMap((s) => s.runes);
 }

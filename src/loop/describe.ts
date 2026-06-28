@@ -1,5 +1,6 @@
-import { profile, type ProfileName, type ProfileOpts } from './profiles.js';
+import { profileSegments, type ProfileName, type ProfileOpts, type SubroutineId } from './profiles.js';
 import type { Rune } from './rune.js';
+import { describeRune, HOOK_DESCRIPTIONS } from './rune-descriptions.js';
 
 // Pure description of an assembled loop pipeline — no run required. `profile()` is a pure
 // (config) -> Rune[] function, so we can introspect each rune's hooks to bucket it into a
@@ -13,23 +14,32 @@ const HOOKS = [
 type Hook = (typeof HOOKS)[number];
 
 export type Phase = 'context' | 'guard' | 'observer' | 'gate' | 'harvest';
-export const PHASES: { id: Phase; label: string }[] = [
-  { id: 'context', label: 'Context / prepare' },
-  { id: 'guard', label: 'Per-turn guards (beforeToolCall — first block wins)' },
-  { id: 'observer', label: 'Observers (afterToolCall)' },
-  { id: 'gate', label: 'Finish gates (shouldStop — first block injects + continues)' },
-  { id: 'harvest', label: 'Harvest (onStop)' },
+export const PHASES: { id: Phase; label: string; detail: string }[] = [
+  { id: 'context', label: 'Context / prepare', detail: 'Before the run: prepare()/systemPromptAddition runes seed the model with project context, rules, and few-shot exemplars.' },
+  { id: 'guard', label: 'Per-turn guards (beforeToolCall — first block wins)', detail: 'On every tool call, beforeToolCall runes can veto it before it runs. The first rune to block wins, so order matters.' },
+  { id: 'observer', label: 'Observers (afterToolCall)', detail: 'After a tool completes, afterToolCall runes observe the result to track state — they do not block.' },
+  { id: 'gate', label: 'Finish gates (shouldStop — first block injects + continues)', detail: "When the model tries to finish, shouldStop runes gate it. A block injects feedback and the loop continues; acceptance needs every gate green." },
+  { id: 'harvest', label: 'Harvest (onStop)', detail: 'On termination, onStop runes record and learn — diaries, caveats, traces, library promotion.' },
+];
+
+/** Subroutines — the reused pipeline segments a profile composes from (ordered). */
+export const SUBROUTINES: { id: SubroutineId; label: string; detail: string }[] = [
+  { id: 'preamble', label: 'Preamble (context + guards + plan)', detail: 'Shared setup every working profile starts with: inject context, guard the write scope, and require a plan — plus optional TDD red-gate / regression guard.' },
+  { id: 'green-gates', label: 'Green-suite gates (validation → audit → hermetic → acceptance)', detail: 'The finish-gate stack that proves the change is real: typecheck + tests green, audit-clean, hermetic, and meets the acceptance bar.' },
+  { id: 'safety-net', label: 'Safety net (behavior lock)', detail: 'The characterization-first alternative to green-gates for source-changing profiles: lock the tests so only source changes and behavior is provably preserved.' },
+  { id: 'opt-in', label: 'Opt-in gates (quality / mfe / extras)', detail: 'Toggle-enabled extra gates — source quality, micro-frontend standards, and the write_tests extras (flake / assertion / mutation / a11y / visual).' },
+  { id: 'harvest', label: 'Harvest (diary / caveats / distil)', detail: 'The on-stop tail that turns each run into learning: session diary, caveat capture, and (full) distil trace + library promotion.' },
 ];
 
 /** Toggle knobs that ADD runes (ProfileOpts fields). UI label -> the ProfileOpts key. */
-export const TOGGLES: { key: keyof ProfileOpts; label: string }[] = [
-  { key: 'quality', label: 'quality' },
-  { key: 'mutation', label: 'mutation' },
-  { key: 'flakeGuard', label: 'flake' },
-  { key: 'assertMin', label: 'assertion' },
-  { key: 'a11y', label: 'a11y' },
-  { key: 'visual', label: 'visual' },
-  { key: 'mfe', label: 'mfe' },
+export const TOGGLES: { key: keyof ProfileOpts; label: string; detail: string }[] = [
+  { key: 'quality', label: 'quality', detail: 'Adds quality_gate — blocks finishing if the source you edited regresses in quality (oversized files/functions, etc.).' },
+  { key: 'mutation', label: 'mutation', detail: 'Adds mutation_gate — mutates the source and requires the new tests to catch the mutants (slow, strongest signal).' },
+  { key: 'flakeGuard', label: 'flake', detail: 'Adds flake_gate — runs the new specs several times and rejects nondeterminism.' },
+  { key: 'assertMin', label: 'assertion', detail: 'Adds assertion_gate — enforces an assertion-quality floor on the new tests.' },
+  { key: 'a11y', label: 'a11y', detail: 'Adds a11y_gate — requires component/e2e specs to assert accessibility (roles / labels / axe).' },
+  { key: 'visual', label: 'visual', detail: 'Adds visual_gate (e2e only) — requires e2e specs to capture a screenshot checkpoint.' },
+  { key: 'mfe', label: 'mfe', detail: 'Adds mfe_gate — enforces Module Federation standards on a micro-frontend project (no-op off-federation).' },
 ];
 
 export interface RuneInfo {
@@ -37,6 +47,14 @@ export interface RuneInfo {
   hooks: Hook[];
   /** Primary loop phase for layout: a tool-vetoing rune is a guard even if it also gates. */
   phase: Phase;
+  /** Which reused subroutine segment this rune came from (for the subroutine view). */
+  subroutine: SubroutineId;
+  /** Human-readable one-liner (curated). */
+  summary: string;
+  /** Human-readable paragraph: what it does + why (curated). */
+  detail: string;
+  /** The literal rule this rune injects into the model, read live from systemPromptAddition(). */
+  rule?: string;
 }
 
 function hooksOf(r: Rune): Hook[] {
@@ -51,12 +69,15 @@ function phaseOf(hooks: Hook[]): Phase {
   return 'context';
 }
 
-/** The ordered runes of a profile+options, each with its hooks + primary phase. */
+/** The ordered runes of a profile+options, each with its hooks + primary phase + subroutine. */
 export function describePipeline(name: ProfileName, opts: ProfileOpts): { profile: ProfileName; runes: RuneInfo[] } {
-  const runes = profile(name, opts).map((r): RuneInfo => {
-    const hooks = hooksOf(r);
-    return { name: r.name, hooks, phase: phaseOf(hooks) };
-  });
+  const runes = profileSegments(name, opts).flatMap((seg) =>
+    seg.runes.map((r): RuneInfo => {
+      const hooks = hooksOf(r);
+      const d = describeRune(r.name, r);
+      return { name: r.name, hooks, phase: phaseOf(hooks), subroutine: seg.sub, summary: d.summary, detail: d.detail, rule: d.rule };
+    }),
+  );
   return { profile: name, runes };
 }
 
@@ -97,11 +118,17 @@ export function pipelineModel(name: ProfileName): ModelRune[] {
 }
 
 /** The whole-model (all profiles) for the wiki demo client. */
-export function fullModel(): { profiles: PipelineModel; toggles: typeof TOGGLES; phases: typeof PHASES } {
+export function fullModel(): {
+  profiles: PipelineModel;
+  toggles: typeof TOGGLES;
+  phases: typeof PHASES;
+  subroutines: typeof SUBROUTINES;
+  hookDescriptions: typeof HOOK_DESCRIPTIONS;
+} {
   const names: ProfileName[] = ['write_tests', 'feature', 'refactor', 'repair', 'fix', 'migrate', 'document', 'bare'];
   const profiles: PipelineModel = {};
   for (const n of names) profiles[n] = pipelineModel(n);
-  return { profiles, toggles: TOGGLES, phases: PHASES };
+  return { profiles, toggles: TOGGLES, phases: PHASES, subroutines: SUBROUTINES, hookDescriptions: HOOK_DESCRIPTIONS };
 }
 
 function nodeId(name: string): string {

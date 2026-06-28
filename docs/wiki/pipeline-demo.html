@@ -27,6 +27,34 @@
  pre.mermaid svg{max-width:none!important;height:auto}
  pre.cfg{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:11px;color:var(--muted);white-space:pre-wrap;word-break:break-all}
  .note{font-size:11px;color:var(--muted)}
+ .legend{margin:10px 0;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+ .legend b{color:var(--accent);font-family:ui-monospace,monospace}
+ /* clickable affordance on graph nodes + cluster titles */
+ pre.mermaid .node,pre.mermaid .cluster .cluster-label{cursor:pointer}
+ pre.mermaid .node:hover .label{text-decoration:underline}
+ .toggles .ti{display:flex;align-items:center;gap:6px}
+ .toggles .i{cursor:pointer;color:var(--muted);border:1px solid var(--border);border-radius:50%;width:15px;height:15px;line-height:13px;text-align:center;font-size:10px;flex:0 0 auto}
+ .toggles .i:hover{color:var(--accent);border-color:var(--accent)}
+ .hint{font-size:11px;color:var(--muted);margin:6px 0 0;font-style:italic}
+ /* slide-over drawer */
+ #drawer{position:fixed;top:49px;right:300px;bottom:0;width:380px;max-width:80vw;background:var(--bg);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.35);padding:16px 18px;overflow:auto;transform:translateX(calc(100% + 300px));transition:transform .18s ease;z-index:20}
+ #drawer.open{transform:translateX(0)}
+ #drawer .x{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+ #drawer .x:hover{color:var(--fg)}
+ #drawer h3{margin:0 6px 0 0;font-size:16px;font-family:ui-monospace,monospace}
+ #drawer .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:2px 0 12px}
+ #drawer .badges{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+ #drawer .badge{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)}
+ #drawer .badge.gate{border-color:var(--warn);color:var(--warn)}
+ #drawer .badge.guard{border-color:var(--accent);color:var(--accent)}
+ #drawer .summary{font-size:14px;font-weight:600;margin:0 0 8px}
+ #drawer .detail{font-size:13px;color:var(--fg);margin:0 0 14px}
+ #drawer .sec{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:14px 0 5px}
+ #drawer .hooks{display:flex;flex-direction:column;gap:5px;margin:0}
+ #drawer .hooks div{font-size:12px}#drawer .hooks code{font-size:11.5px}
+ #drawer pre.rule{background:var(--side);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;white-space:pre-wrap;color:var(--fg);margin:0}
+ #drawer ul{margin:4px 0 0;padding-left:18px;font-size:12.5px}#drawer ul li{margin:2px 0}
+ #drawer .members b{font-family:ui-monospace,monospace;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -39,15 +67,20 @@
   <div class="stage">
     <p class="meta" id="meta"></p>
     <pre class="mermaid" id="graph">loading…</pre>
+    <p class="hint">Click any node, group header, or a gate's ⓘ for a plain-English explanation (gates show the actual rule they inject).</p>
+    <div id="legend" class="legend" style="display:none"></div>
     <h2>equivalent probevane.config.json</h2>
     <pre class="cfg" id="cfg"></pre>
   </div>
+  <aside id="drawer" aria-hidden="true"><span class="x" id="drawerX" title="close (Esc)">✕</span><div id="drawerBody"></div></aside>
   <aside class="knobs">
     <div class="row"><button id="reset">Reset</button></div>
     <label class="knob"><span>Profile</span>
       <select id="profile"></select></label>
     <label class="knob"><span>Kind</span>
       <select id="kind"><option value="unit">unit</option><option value="e2e">e2e</option></select></label>
+    <label class="knob"><span>Group by</span>
+      <select id="groupBy"><option value="phase">loop phase</option><option value="subroutine">subroutine</option></select></label>
     <label class="knob"><span>Model (annotation)</span>
       <select id="model"><option>auto</option><option>haiku</option><option>sonnet</option><option>opus</option></select></label>
     <h2>Gates (toggle runes)</h2>
@@ -70,25 +103,30 @@ mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default' });
 
 // toggle label -> probevane.config.json key (assertion is numeric: assertMin)
 const TOGGLE_KEY = { quality:'quality', mutation:'mutation', flake:'flakeGuard', assertion:'assertMin', a11y:'a11y', visual:'visual', mfe:'mfe' };
-const DEFAULTS = { profile:'write_tests', kind:'unit', model:'auto', maxSteps:24, minTests:'', minCoverage:'', budget:'' };
+const DEFAULTS = { profile:'write_tests', kind:'unit', groupBy:'phase', model:'auto', maxSteps:24, minTests:'', minCoverage:'', budget:'' };
 let MODEL = null;
 const state = { ...DEFAULTS, toggles:{} };
 const $ = (id) => document.getElementById(id);
 const nid = (s) => s.replace(/[^a-zA-Z0-9_]/g,'_');
 
-function mermaidFor(runes){
+// Build a phase-grouped OR subroutine-grouped flowchart. `groups` is the ordered
+// group metadata (MODEL.phases | MODEL.subroutines); `keyOf` maps a rune to its
+// group id. Node coloring always keys off r.phase so gates/guards read the same
+// in either view.
+function mermaidFor(runes, groups, keyOf){
+  const byGroup = {}; for(const r of runes) (byGroup[keyOf(r)] ??= []).push(r);
   const byPhase = {}; for(const r of runes) (byPhase[r.phase] ??= []).push(r);
   const lines = ['flowchart TD']; const anchors = [];
-  for(const ph of MODEL.phases){
-    const rs = byPhase[ph.id]; if(!rs || !rs.length) continue;
-    lines.push('subgraph '+ph.id+'["'+ph.label+'"]','direction TB');
+  for(const grp of groups){
+    const rs = byGroup[grp.id]; if(!rs || !rs.length) continue;
+    lines.push('subgraph '+nid(grp.id)+'["'+grp.label+'"]','direction TB');
     let prev = '';
     for(const r of rs){
       const id = nid(r.name);
       let lbl = r.requiredBy ? r.name+'\\n(+'+r.requiredBy+')' : r.name;
       if(r.name==='acceptance_gate' && (state.minTests || state.minCoverage))
         lbl += '\\n≥'+(state.minTests||'-')+'t / '+(state.minCoverage||'-')+'%';
-      const cls = ph.id==='gate' ? ':::gate' : ph.id==='guard' ? ':::guard' : '';
+      const cls = r.phase==='gate' ? ':::gate' : r.phase==='guard' ? ':::guard' : '';
       lines.push(id+'["'+lbl+'"]'+cls);
       if(prev) lines.push(prev+'-->'+id);
       prev = id;
@@ -121,24 +159,115 @@ function configJson(){
   return c;
 }
 
+// ---- click-to-explain drawer ----
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function openDrawer(html){ $('drawerBody').innerHTML = html; $('drawer').classList.add('open'); $('drawer').setAttribute('aria-hidden','false'); }
+function closeDrawer(){ $('drawer').classList.remove('open'); $('drawer').setAttribute('aria-hidden','true'); }
+
+function openRune(name){
+  const r = currentRunes.find(x => x.name === name);
+  if(!r) return;
+  const badges = ['<span class="badge '+r.phase+'">'+r.phase+'</span>',
+    '<span class="badge">'+esc(r.subroutine)+'</span>',
+    r.requiredBy ? '<span class="badge">+'+esc(r.requiredBy)+' toggle</span>' : '',
+    r.e2eOnly ? '<span class="badge">e2e only</span>' : ''].join('');
+  const hooks = (r.hooks||[]).map(h => '<div><code>'+h+'</code> — '+esc(MODEL.hookDescriptions[h]||'')+'</div>').join('') || '<div class="detail">(no hooks)</div>';
+  const ruleSec = r.rule
+    ? '<div class="sec">Rule injected into the model</div><pre class="rule">'+esc(r.rule)+'</pre>'
+    : '<div class="sec">Rule injected into the model</div><div class="detail">— none (pure '+r.phase+' rune)</div>';
+  const gateNote = r.phase==='gate' ? '<p class="hint">On a stop attempt this gate runs; a block injects its message and the loop continues.</p>' : '';
+  openDrawer('<h3>'+esc(r.name)+'</h3><div class="kind">rune</div><div class="badges">'+badges+'</div>'+
+    '<div class="summary">'+esc(r.summary)+'</div><div class="detail">'+esc(r.detail)+'</div>'+
+    '<div class="sec">Hooks</div><div class="hooks">'+hooks+'</div>'+ruleSec+gateNote);
+}
+function openGroup(id){
+  const meta = (state.groupBy==='subroutine' ? MODEL.subroutines : MODEL.phases).find(g => g.id === id);
+  if(!meta) return;
+  const keyOf = state.groupBy==='subroutine' ? (r)=>r.subroutine : (r)=>r.phase;
+  const members = currentRunes.filter(r => keyOf(r)===id).map(r => '<li class="members"><b>'+esc(r.name)+'</b> — '+esc(r.summary)+'</li>').join('');
+  openDrawer('<h3>'+esc(meta.label)+'</h3><div class="kind">'+state.groupBy+'</div>'+
+    '<div class="detail">'+esc(meta.detail)+'</div>'+
+    '<div class="sec">Runes here ('+currentRunes.filter(r=>keyOf(r)===id).length+')</div><ul>'+(members||'<li>(none in this config)</li>')+'</ul>');
+}
+function openToggle(label){
+  const t = MODEL.toggles.find(x => x.label === label);
+  if(!t) return;
+  const adds = [...new Set(Object.values(MODEL.profiles).flat().filter(r => r.requiredBy===label).map(r => r.name))];
+  const on = !!state.toggles[label];
+  openDrawer('<h3>'+esc(label)+'</h3><div class="kind">gate toggle · '+(on?'ON':'off')+'</div>'+
+    '<div class="detail">'+esc(t.detail)+'</div>'+
+    '<div class="sec">Runes it adds</div><ul>'+(adds.map(n=>'<li class="members"><b>'+esc(n)+'</b></li>').join('')||'<li>(none)</li>')+'</ul>');
+}
+
+// delegated clicks on the rendered SVG: a node -> its rune; a cluster title -> its group.
+function wireGraphClicks(){
+  $('graph').addEventListener('click', (e) => {
+    // Node first: a rune box wins over its enclosing cluster. Only a click on the
+    // cluster's own title/background (no .node ancestor) opens the group.
+    const node = e.target.closest('.node');
+    if(!node){
+      const cluster = e.target.closest('.cluster');
+      if(cluster){
+        // the cluster's OWN label (not a child node's) — don't descend into nodes
+        const lbl = cluster.querySelector(':scope > .cluster-label, :scope > foreignObject .cluster-label, .cluster-label');
+        const text = (lbl?.textContent || '').replace(/\s+/g,' ').trim();
+        const meta = (state.groupBy==='subroutine' ? MODEL.subroutines : MODEL.phases).find(g => g.label.replace(/\s+/g,' ') === text);
+        if(meta){ openGroup(meta.id); return; }
+      }
+      closeDrawer(); return;
+    }
+    {
+      const text = (node.querySelector('.nodeLabel')?.textContent || node.textContent || '').replace(/\s+/g,' ').trim();
+      // SVG may concat multi-line labels (name + "(+toggle)" / "≥Nt") — resolve to the
+      // longest rune name that the label starts with.
+      const match = currentRunes
+        .map(r => r.name)
+        .filter(n => text === n || text.startsWith(n))
+        .sort((a,b) => b.length - a.length)[0];
+      if(match) openRune(match);
+      return;
+    }
+    // click on empty graph area closes the drawer
+    closeDrawer();
+  });
+}
+
+function groupingFor(){
+  return state.groupBy==='subroutine'
+    ? { groups: MODEL.subroutines, keyOf: (r)=>r.subroutine }
+    : { groups: MODEL.phases, keyOf: (r)=>r.phase };
+}
+
+let currentRunes = [];
 async function render(){
   const runes = selectedRunes();
+  currentRunes = runes;
   $('meta').textContent = state.profile+' · '+state.kind+' · model='+state.model+' · maxSteps='+state.maxSteps+' · '+runes.length+' rune(s)';
+  const { groups, keyOf } = groupingFor();
   const pre = $('graph'); pre.removeAttribute('data-processed');
-  pre.textContent = runes.length ? mermaidFor(runes) : 'flowchart TD\n  empty["(bare — no runes)"]';
+  pre.textContent = runes.length ? mermaidFor(runes, groups, keyOf) : 'flowchart TD\n  empty["(bare — no runes)"]';
   $('cfg').textContent = JSON.stringify(configJson(), null, 2);
+  // legend: which subroutines this profile uses (in order)
+  if(state.groupBy==='subroutine'){
+    const used = []; for(const r of runes) if(!used.includes(r.subroutine)) used.push(r.subroutine);
+    $('legend').innerHTML = MODEL.subroutines.filter(s=>used.includes(s.id))
+      .map(s=>'<div><b>'+s.id+'</b> — '+s.label+'</div>').join('');
+    $('legend').style.display = '';
+  } else $('legend').style.display = 'none';
   try { await mermaid.run({ nodes:[pre] }); } catch(e){ pre.textContent = 'mermaid error: '+e; }
 }
 
 function buildToggles(){
   $('toggles').innerHTML = MODEL.toggles.map(t =>
-    '<label><input type="checkbox" data-t="'+t.label+'">'+t.label+'</label>').join('');
+    '<div class="ti"><label><input type="checkbox" data-t="'+t.label+'">'+t.label+'</label>'+
+    '<span class="i" data-ti="'+t.label+'" title="what does '+t.label+' add?">ⓘ</span></div>').join('');
   $('toggles').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
     state.toggles[cb.dataset.t] = cb.checked; render();
   }));
+  $('toggles').querySelectorAll('.i').forEach(el => el.addEventListener('click', () => openToggle(el.dataset.ti)));
 }
 function syncKnobsFromState(){
-  $('profile').value = state.profile; $('kind').value = state.kind; $('model').value = state.model;
+  $('profile').value = state.profile; $('kind').value = state.kind; $('groupBy').value = state.groupBy; $('model').value = state.model;
   $('maxSteps').value = state.maxSteps; $('msV').textContent = state.maxSteps;
   $('minTests').value = state.minTests; $('minCoverage').value = state.minCoverage; $('budget').value = state.budget;
   $('toggles').querySelectorAll('input').forEach(cb => cb.checked = !!state.toggles[cb.dataset.t]);
@@ -147,10 +276,13 @@ function syncKnobsFromState(){
 function wire(){
   $('profile').addEventListener('change', e => { state.profile = e.target.value; render(); });
   $('kind').addEventListener('change', e => { state.kind = e.target.value; render(); });
+  $('groupBy').addEventListener('change', e => { state.groupBy = e.target.value; render(); });
   $('model').addEventListener('change', e => { state.model = e.target.value; render(); });
   $('maxSteps').addEventListener('input', e => { state.maxSteps = e.target.value; $('msV').textContent = e.target.value; render(); });
   for(const k of ['minTests','minCoverage','budget']) $(k).addEventListener('input', e => { state[k] = e.target.value; render(); });
   $('reset').addEventListener('click', () => { Object.assign(state, DEFAULTS, {toggles:{}}); syncKnobsFromState(); render(); });
+  $('drawerX').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', e => { if(e.key==='Escape') closeDrawer(); });
   $('apply').addEventListener('click', () => {
     try{
       const c = JSON.parse($('cfgin').value);
@@ -168,7 +300,7 @@ function wire(){
 (async () => {
   MODEL = await (await fetch('/raw/pipeline-model.json')).json();
   $('profile').innerHTML = Object.keys(MODEL.profiles).map(p => '<option>'+p+'</option>').join('');
-  buildToggles(); wire(); syncKnobsFromState(); render();
+  buildToggles(); wire(); wireGraphClicks(); syncKnobsFromState(); render();
 })();
 </script>
 </body>

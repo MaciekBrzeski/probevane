@@ -7,7 +7,9 @@ fully derivable without running anything.
 
 → **[Loop pipeline (demo)](/demo/pipeline)** — an interactive configurator: pick a profile,
 toggle gates, set params, and see the runes it assembles as a phase-grouped graph. Paste a
-`probevane.config.json` to see how *that* config looks.
+`probevane.config.json` to see how *that* config looks. **Click any node, group header, or a
+gate toggle's ⓘ** for a plain-English explanation — a rune's panel also shows the *literal rule
+it injects into the model* (read live from its `systemPromptAddition`, so it can't drift).
 
 ## Loop phases (a rune's hooks place it here)
 
@@ -22,6 +24,27 @@ toggle gates, set params, and see the runes it assembles as a phase-grouped grap
    `assertion_gate`, `quality_gate`, `mfe_gate`).
 5. **Harvest** — `onStop`: record/learn on termination (`session_diary`, `caveat_harvest`,
    `distill_trace`, `library_promote`).
+
+## Subroutines (reused segments)
+
+Profiles aren't bespoke — they **compose from a few proven subroutines**
+(`profileSegments()` in `src/loop/profiles.ts` is the single source of truth;
+`profile()` is just that flattened). Each subroutine is a contiguous segment:
+
+1. **preamble** — `context_inject` + `path_guard` + `plan_first`, plus the optional
+   `red_first` (TDD) and `no_regression` guards.
+2. **green-gates** — `validation_gate` → `audit_gate` → `hermetic_gate`, plus an optional
+   `acceptance_gate` (test-count / coverage / shell checks).
+3. **safety-net** — `behavior_lock`: the characterization-first alternative to green-gates
+   for source-changing profiles (refactor / migrate / document).
+4. **opt-in** — the toggle gates (quality / mfe, plus write_tests' extras suite of
+   flake / assertion / mutation / a11y / visual).
+5. **harvest** — `session_diary` + `caveat_harvest`, plus `distill_trace` + `library_promote`
+   on the "full" tail.
+
+Because of this, **`repair` ≡ `fix`** and **`refactor` ≡ `migrate`** share the exact same
+composition. Switch the demo's **Group by** knob to *subroutine* to see profiles as these
+reused blocks instead of by loop phase.
 
 ## Profiles
 
