@@ -72,8 +72,12 @@ async function main() {
   if (sub === 'attach') {
     // probevane ado attach <id> <file...> [--comment "label"]
     const id = Number(args[1]);
-    const files = args.slice(2).filter((a) => !a.startsWith('--') && a !== String(id));
-    if (!id || !files.length) { console.error('usage: probevane ado attach <id> <file...>'); process.exit(2); }
+    // Files are the positional args after <id>, up to the first --flag (so a --comment
+    // value is never mistaken for a filename).
+    const rest = args.slice(2);
+    const stop = rest.findIndex((a) => a.startsWith('--'));
+    const files = (stop < 0 ? rest : rest.slice(0, stop)).filter((a) => a !== String(id));
+    if (!id || !files.length) { console.error('usage: probevane ado attach <id> <file...> [--comment label]'); process.exit(2); }
     for (const f of files) {
       const { url } = await client.attach(basename(f), new Uint8Array(readFileSync(f)));
       await client.linkAttachment(id, url, flag(args, '--comment') ?? basename(f));
