@@ -5,25 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>probevane — loop pipeline (demo)</title>
 <style>
- :root{--fg:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--bg:#0d1117;--side:#161b22;--border:#30363d;--ok:#3fb950;--warn:#d29922}
- @media(prefers-color-scheme:light){:root{--fg:#1b1f24;--muted:#6a737d;--accent:#2b6cb0;--bg:#fff;--side:#f6f8fa;--border:#e1e4e8}}
+ :root{--fg:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--bg:#0d1117;--side:#161b22;--border:#30363d;--ok:#3fb950;--warn:#d29922;--shadow:0 1px 3px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.25)}
+ @media(prefers-color-scheme:light){:root{--fg:#1b1f24;--muted:#6a737d;--accent:#2b6cb0;--bg:#fff;--side:#f6f8fa;--border:#e1e4e8;--shadow:0 1px 2px rgba(27,31,36,.06),0 6px 18px rgba(27,31,36,.08)}}
  *{box-sizing:border-box}
- body{margin:0;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg)}
- header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--side)}
- header b{font-size:15px}header span{color:var(--muted);font-size:12.5px}header a{margin-left:auto;color:var(--accent);text-decoration:none}
+ body{margin:0;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased}
+ header{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--side);position:sticky;top:0;z-index:30}
+ header b{font-size:15px;letter-spacing:-.01em}header b::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:middle}
+ header span{color:var(--muted);font-size:12.5px}header a{margin-left:auto;color:var(--accent);text-decoration:none;font-size:13px}header a:hover{text-decoration:underline}
  .wrap{display:grid;grid-template-columns:1fr 300px;min-height:calc(100vh - 49px)}
- .stage{padding:16px;overflow:auto}
- .knobs{border-left:1px solid var(--border);background:var(--side);padding:14px;overflow:auto;display:flex;flex-direction:column;gap:9px}
+ .stage{padding:22px;overflow:auto;display:flex;flex-direction:column}
+ .knobs{border-left:1px solid var(--border);background:var(--side);padding:16px;overflow:auto;display:flex;flex-direction:column;gap:10px}
  .knob{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
  .knob>span{display:flex;justify-content:space-between}.knob>span b{color:var(--accent)}
- .knob select,.knob input,.knob textarea{background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:5px;padding:5px;font-size:12.5px}
- .toggles{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+ .knob select,.knob input,.knob textarea{background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;padding:6px 7px;font-size:12.5px}
+ .knob select:focus,.knob input:focus,.knob textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+ .toggles{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px}
  .toggles label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg)}
- .row{display:flex;gap:8px}.row button{flex:1;padding:6px;background:#243044;color:#cfe0ff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12.5px}
- .row button:hover{background:#2c3a52}
- h2{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:6px 0 2px}
- .meta{color:var(--muted);font-size:12px;margin:0 0 10px}
- pre.mermaid{background:var(--side);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto}
+ .toggles input{accent-color:var(--accent)}
+ .row{display:flex;gap:8px}.row button{flex:1;padding:7px;background:transparent;color:var(--accent);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;transition:background .12s,border-color .12s}
+ .row button:hover{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:var(--accent)}
+ h2{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:12px 0 3px;font-weight:700}
+ .meta{color:var(--muted);font-size:12px;margin:0 0 12px;font-variant-numeric:tabular-nums}
+ pre.mermaid{background:var(--side);border:1px solid var(--border);border-radius:10px;padding:18px;overflow:auto;box-shadow:var(--shadow);align-self:stretch;display:flex;justify-content:center}
  pre.mermaid svg{max-width:none!important;height:auto}
  pre.cfg{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:11px;color:var(--muted);white-space:pre-wrap;word-break:break-all}
  .note{font-size:11px;color:var(--muted)}
@@ -99,7 +102,23 @@
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default' });
+// Palette tuned to the page chrome so the graph stops looking like a stock
+// mermaid diagram (the default theme's bright-yellow clusters clashed hard).
+const P = dark
+  ? { node:'#1b2330', nodeBorder:'#3a4658', text:'#e6edf3', line:'#586273', cluster:'#11161d', clusterBorder:'#2b333d',
+      gateBg:'#37291a', gateBorder:'#d29922', gateText:'#f1dcae', guardBg:'#16263a', guardBorder:'#58a6ff', guardText:'#bcd9ff' }
+  : { node:'#eef2f7', nodeBorder:'#cbd5e1', text:'#1b2733', line:'#aeb7c2', cluster:'#f6f8fa', clusterBorder:'#e3e8ee',
+      gateBg:'#fcf3da', gateBorder:'#c8961a', gateText:'#7a5b10', guardBg:'#e7f0fb', guardBorder:'#2b6cb0', guardText:'#1d4e80' };
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  themeVariables: {
+    primaryColor: P.node, primaryBorderColor: P.nodeBorder, primaryTextColor: P.text,
+    lineColor: P.line, clusterBkg: P.cluster, clusterBorder: P.clusterBorder,
+    fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif', fontSize: '13px',
+  },
+  flowchart: { padding: 10, nodeSpacing: 28, rankSpacing: 34, curve: 'basis', useMaxWidth: true },
+});
 
 // toggle label -> probevane.config.json key (assertion is numeric: assertMin)
 const TOGGLE_KEY = { quality:'quality', mutation:'mutation', flake:'flakeGuard', assertion:'assertMin', a11y:'a11y', visual:'visual', mfe:'mfe' };
@@ -137,8 +156,8 @@ function mermaidFor(runes, groups, keyOf){
   // gates can inject + continue the loop -> a feedback edge back to the guards
   const g = byPhase.gate, gd = byPhase.guard;
   if(g && gd) lines.push(nid(g[0].name)+'-. "block: inject + continue" .-> '+nid(gd[0].name));
-  lines.push('classDef gate fill:#3a2233,stroke:#d29922,color:#eee;');
-  lines.push('classDef guard fill:#1f2a3a,stroke:#58a6ff,color:#eee;');
+  lines.push('classDef gate fill:'+P.gateBg+',stroke:'+P.gateBorder+',color:'+P.gateText+';');
+  lines.push('classDef guard fill:'+P.guardBg+',stroke:'+P.guardBorder+',color:'+P.guardText+';');
   return lines.join('\n');
 }
 
