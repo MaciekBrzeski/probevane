@@ -177,5 +177,43 @@ export function adoClient(cfg: AdoConfig, doFetch: typeof fetch = fetch) {
       });
       await json(res);
     },
+
+    /** Patch arbitrary System.* fields (e.g. System.Description). */
+    async update(id: number, fields: Record<string, string>): Promise<void> {
+      const res = await doFetch(`${base}/workitems/${id}?api-version=7.1`, {
+        method: 'PATCH',
+        headers: { ...headers, 'content-type': 'application/json-patch+json' },
+        body: JSON.stringify(fieldPatch(fields)),
+      });
+      await json(res);
+    },
+
+    /** Current HTML description of a work item. */
+    async describe(id: number): Promise<string> {
+      const res = await doFetch(`${base}/workitems/${id}?fields=System.Description&api-version=7.1`, { headers });
+      return (await json(res)).fields?.['System.Description'] ?? '';
+    },
+
+    /** Upload a file to the attachment store → { id, url } (not yet linked to any item). */
+    async attach(fileName: string, data: Uint8Array): Promise<{ id: string; url: string }> {
+      const res = await doFetch(`${base}/attachments?fileName=${encodeURIComponent(fileName)}&api-version=7.1`, {
+        method: 'POST',
+        headers: { authorization: headers.authorization, 'content-type': 'application/octet-stream' },
+        body: data as unknown as BodyInit,
+      });
+      const d = await json(res);
+      return { id: d.id, url: d.url };
+    },
+
+    /** Link an uploaded attachment (its url) to a work item as an AttachedFile relation. */
+    async linkAttachment(id: number, url: string, comment = ''): Promise<void> {
+      const patch = [{ op: 'add', path: '/relations/-', value: { rel: 'AttachedFile', url, attributes: { comment } } }];
+      const res = await doFetch(`${base}/workitems/${id}?api-version=7.1`, {
+        method: 'PATCH',
+        headers: { ...headers, 'content-type': 'application/json-patch+json' },
+        body: JSON.stringify(patch),
+      });
+      await json(res);
+    },
   };
 }
