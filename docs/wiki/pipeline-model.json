@@ -1,0 +1,849 @@
+{
+  "profiles": {
+    "write_tests": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "no_regression",
+        "hooks": [
+          "prepare",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "acceptance_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "flake_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "flake",
+        "e2eOnly": false
+      },
+      {
+        "name": "assertion_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "assertion",
+        "e2eOnly": false
+      },
+      {
+        "name": "mutation_gate",
+        "hooks": [
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "mutation",
+        "e2eOnly": false
+      },
+      {
+        "name": "a11y_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "a11y",
+        "e2eOnly": false
+      },
+      {
+        "name": "visual_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "visual",
+        "e2eOnly": true
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "feature": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "red_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall",
+          "afterToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "no_regression",
+        "hooks": [
+          "prepare",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "acceptance_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "refactor": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "behavior_lock",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "beforeToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "repair": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "fix": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "migrate": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "behavior_lock",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "beforeToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "document": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "behavior_lock",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "beforeToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "bare": []
+  },
+  "toggles": [
+    {
+      "key": "quality",
+      "label": "quality"
+    },
+    {
+      "key": "mutation",
+      "label": "mutation"
+    },
+    {
+      "key": "flakeGuard",
+      "label": "flake"
+    },
+    {
+      "key": "assertMin",
+      "label": "assertion"
+    },
+    {
+      "key": "a11y",
+      "label": "a11y"
+    },
+    {
+      "key": "visual",
+      "label": "visual"
+    },
+    {
+      "key": "mfe",
+      "label": "mfe"
+    }
+  ],
+  "phases": [
+    {
+      "id": "context",
+      "label": "Context / prepare"
+    },
+    {
+      "id": "guard",
+      "label": "Per-turn guards (beforeToolCall — first block wins)"
+    },
+    {
+      "id": "observer",
+      "label": "Observers (afterToolCall)"
+    },
+    {
+      "id": "gate",
+      "label": "Finish gates (shouldStop — first block injects + continues)"
+    },
+    {
+      "id": "harvest",
+      "label": "Harvest (onStop)"
+    }
+  ]
+}

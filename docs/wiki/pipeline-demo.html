@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>probevane — loop pipeline (demo)</title>
+<style>
+ :root{--fg:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--bg:#0d1117;--side:#161b22;--border:#30363d;--ok:#3fb950;--warn:#d29922}
+ @media(prefers-color-scheme:light){:root{--fg:#1b1f24;--muted:#6a737d;--accent:#2b6cb0;--bg:#fff;--side:#f6f8fa;--border:#e1e4e8}}
+ *{box-sizing:border-box}
+ body{margin:0;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg)}
+ header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--side)}
+ header b{font-size:15px}header span{color:var(--muted);font-size:12.5px}header a{margin-left:auto;color:var(--accent);text-decoration:none}
+ .wrap{display:grid;grid-template-columns:1fr 300px;min-height:calc(100vh - 49px)}
+ .stage{padding:16px;overflow:auto}
+ .knobs{border-left:1px solid var(--border);background:var(--side);padding:14px;overflow:auto;display:flex;flex-direction:column;gap:9px}
+ .knob{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+ .knob>span{display:flex;justify-content:space-between}.knob>span b{color:var(--accent)}
+ .knob select,.knob input,.knob textarea{background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:5px;padding:5px;font-size:12.5px}
+ .toggles{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+ .toggles label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg)}
+ .row{display:flex;gap:8px}.row button{flex:1;padding:6px;background:#243044;color:#cfe0ff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12.5px}
+ .row button:hover{background:#2c3a52}
+ h2{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:6px 0 2px}
+ .meta{color:var(--muted);font-size:12px;margin:0 0 10px}
+ pre.mermaid{background:var(--side);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto}
+ pre.mermaid svg{max-width:none!important;height:auto}
+ pre.cfg{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:11px;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+ .note{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <b>probevane — Loop pipeline</b>
+  <span>simulated demo: pick a config, see the runes it assembles (pure — no run)</span>
+  <a href="/">← wiki</a>
+</header>
+<div class="wrap">
+  <div class="stage">
+    <p class="meta" id="meta"></p>
+    <pre class="mermaid" id="graph">loading…</pre>
+    <h2>equivalent probevane.config.json</h2>
+    <pre class="cfg" id="cfg"></pre>
+  </div>
+  <aside class="knobs">
+    <div class="row"><button id="reset">Reset</button></div>
+    <label class="knob"><span>Profile</span>
+      <select id="profile"></select></label>
+    <label class="knob"><span>Kind</span>
+      <select id="kind"><option value="unit">unit</option><option value="e2e">e2e</option></select></label>
+    <label class="knob"><span>Model (annotation)</span>
+      <select id="model"><option>auto</option><option>haiku</option><option>sonnet</option><option>opus</option></select></label>
+    <h2>Gates (toggle runes)</h2>
+    <div class="toggles" id="toggles"></div>
+    <h2>Params (annotate only)</h2>
+    <label class="knob"><span>maxSteps<b id="msV">24</b></span><input id="maxSteps" type="range" min="1" max="80" value="24"></label>
+    <label class="knob"><span>minTests</span><input id="minTests" type="number" min="0" placeholder="(unset)"></label>
+    <label class="knob"><span>minCoverage %</span><input id="minCoverage" type="number" min="0" max="100" placeholder="(unset)"></label>
+    <label class="knob"><span>budget (tok)</span><input id="budget" type="number" min="0" placeholder="(unset)"></label>
+    <p class="note">Numeric/model knobs annotate the graph; they don't add or remove runes.</p>
+    <h2>Load config</h2>
+    <textarea id="cfgin" rows="4" placeholder='paste probevane.config.json'></textarea>
+    <div class="row"><button id="apply">Apply config</button></div>
+  </aside>
+</div>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default' });
+
+// toggle label -> probevane.config.json key (assertion is numeric: assertMin)
+const TOGGLE_KEY = { quality:'quality', mutation:'mutation', flake:'flakeGuard', assertion:'assertMin', a11y:'a11y', visual:'visual', mfe:'mfe' };
+const DEFAULTS = { profile:'write_tests', kind:'unit', model:'auto', maxSteps:24, minTests:'', minCoverage:'', budget:'' };
+let MODEL = null;
+const state = { ...DEFAULTS, toggles:{} };
+const $ = (id) => document.getElementById(id);
+const nid = (s) => s.replace(/[^a-zA-Z0-9_]/g,'_');
+
+function mermaidFor(runes){
+  const byPhase = {}; for(const r of runes) (byPhase[r.phase] ??= []).push(r);
+  const lines = ['flowchart TD']; const anchors = [];
+  for(const ph of MODEL.phases){
+    const rs = byPhase[ph.id]; if(!rs || !rs.length) continue;
+    lines.push('subgraph '+ph.id+'["'+ph.label+'"]','direction TB');
+    let prev = '';
+    for(const r of rs){
+      const id = nid(r.name);
+      let lbl = r.requiredBy ? r.name+'\\n(+'+r.requiredBy+')' : r.name;
+      if(r.name==='acceptance_gate' && (state.minTests || state.minCoverage))
+        lbl += '\\n≥'+(state.minTests||'-')+'t / '+(state.minCoverage||'-')+'%';
+      const cls = ph.id==='gate' ? ':::gate' : ph.id==='guard' ? ':::guard' : '';
+      lines.push(id+'["'+lbl+'"]'+cls);
+      if(prev) lines.push(prev+'-->'+id);
+      prev = id;
+    }
+    lines.push('end'); anchors.push(nid(rs[0].name));
+  }
+  for(let i=0;i+1<anchors.length;i++) lines.push(anchors[i]+'-->'+anchors[i+1]);
+  // gates can inject + continue the loop -> a feedback edge back to the guards
+  const g = byPhase.gate, gd = byPhase.guard;
+  if(g && gd) lines.push(nid(g[0].name)+'-. "block: inject + continue" .-> '+nid(gd[0].name));
+  lines.push('classDef gate fill:#3a2233,stroke:#d29922,color:#eee;');
+  lines.push('classDef guard fill:#1f2a3a,stroke:#58a6ff,color:#eee;');
+  return lines.join('\n');
+}
+
+function selectedRunes(){
+  const all = MODEL.profiles[state.profile] || [];
+  return all.filter(r => (r.requiredBy===null || state.toggles[r.requiredBy]) && (!r.e2eOnly || state.kind==='e2e'));
+}
+function configJson(){
+  const c = { profile: state.profile, model: state.model, kind: state.kind, maxSteps: Number(state.maxSteps) };
+  if(state.minTests!=='') c.minTests = Number(state.minTests);
+  if(state.minCoverage!=='') c.minCoverage = Number(state.minCoverage);
+  if(state.budget!=='') c.budget = Number(state.budget);
+  for(const [lbl,on] of Object.entries(state.toggles)){
+    if(!on) continue;
+    const key = TOGGLE_KEY[lbl];
+    c[key] = key==='assertMin' ? (Number(state.minTests)||80) : true;
+  }
+  return c;
+}
+
+async function render(){
+  const runes = selectedRunes();
+  $('meta').textContent = state.profile+' · '+state.kind+' · model='+state.model+' · maxSteps='+state.maxSteps+' · '+runes.length+' rune(s)';
+  const pre = $('graph'); pre.removeAttribute('data-processed');
+  pre.textContent = runes.length ? mermaidFor(runes) : 'flowchart TD\n  empty["(bare — no runes)"]';
+  $('cfg').textContent = JSON.stringify(configJson(), null, 2);
+  try { await mermaid.run({ nodes:[pre] }); } catch(e){ pre.textContent = 'mermaid error: '+e; }
+}
+
+function buildToggles(){
+  $('toggles').innerHTML = MODEL.toggles.map(t =>
+    '<label><input type="checkbox" data-t="'+t.label+'">'+t.label+'</label>').join('');
+  $('toggles').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
+    state.toggles[cb.dataset.t] = cb.checked; render();
+  }));
+}
+function syncKnobsFromState(){
+  $('profile').value = state.profile; $('kind').value = state.kind; $('model').value = state.model;
+  $('maxSteps').value = state.maxSteps; $('msV').textContent = state.maxSteps;
+  $('minTests').value = state.minTests; $('minCoverage').value = state.minCoverage; $('budget').value = state.budget;
+  $('toggles').querySelectorAll('input').forEach(cb => cb.checked = !!state.toggles[cb.dataset.t]);
+}
+
+function wire(){
+  $('profile').addEventListener('change', e => { state.profile = e.target.value; render(); });
+  $('kind').addEventListener('change', e => { state.kind = e.target.value; render(); });
+  $('model').addEventListener('change', e => { state.model = e.target.value; render(); });
+  $('maxSteps').addEventListener('input', e => { state.maxSteps = e.target.value; $('msV').textContent = e.target.value; render(); });
+  for(const k of ['minTests','minCoverage','budget']) $(k).addEventListener('input', e => { state[k] = e.target.value; render(); });
+  $('reset').addEventListener('click', () => { Object.assign(state, DEFAULTS, {toggles:{}}); syncKnobsFromState(); render(); });
+  $('apply').addEventListener('click', () => {
+    try{
+      const c = JSON.parse($('cfgin').value);
+      if(c.profile && MODEL.profiles[c.profile]) state.profile = c.profile;
+      if(c.kind) state.kind = c.kind; if(c.model) state.model = c.model;
+      if(c.maxSteps!=null) state.maxSteps = c.maxSteps;
+      state.minTests = c.minTests ?? ''; state.minCoverage = c.minCoverage ?? ''; state.budget = c.budget ?? '';
+      state.toggles = {};
+      for(const [lbl,key] of Object.entries(TOGGLE_KEY)) if(c[key]) state.toggles[lbl] = true;
+      syncKnobsFromState(); render();
+    }catch(err){ alert('bad config JSON: '+err); }
+  });
+}
+
+(async () => {
+  MODEL = await (await fetch('/raw/pipeline-model.json')).json();
+  $('profile').innerHTML = Object.keys(MODEL.profiles).map(p => '<option>'+p+'</option>').join('');
+  buildToggles(); wire(); syncKnobsFromState(); render();
+})();
+</script>
+</body>
+</html>
