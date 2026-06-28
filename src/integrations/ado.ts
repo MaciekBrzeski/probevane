@@ -30,6 +30,28 @@ export interface AdoDirective {
 
 const COMMANDS = ['generate', 'fix', 'refactor', 'feature', 'repair'] as const;
 
+/**
+ * ADO stores the work-item Description as HTML, so quotes/ampersands arrive encoded
+ * (`&quot;`, `&amp;`, `&#39;`) and the body may be wrapped in tags (`<div>…<br>`). Strip
+ * tags + decode the common entities so directive parsing (esp. `--task "…"`) sees the
+ * raw text. Without this, a `--task "…"` written in the description never matches.
+ */
+export function htmlToText(s: string): string {
+  return s
+    .replace(/<br\s*\/?>(?=)/gi, '\n')
+    .replace(/<\/(p|div|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&amp;/g, '&'); // last: don't re-introduce entities
+}
+
 /** Basic auth header from a PAT (username empty, password = PAT). */
 export function authHeader(pat: string): string {
   return 'Basic ' + Buffer.from(':' + pat).toString('base64');
@@ -63,17 +85,23 @@ export function triggerWiql(tag: string, state: string): string {
  * if no command is found.
  */
 export function parseDirective(title: string, description = ''): AdoDirective | null {
-  const text = `${title}\n${description}`.replace(/\[probevane\]|probevane:/gi, ' ');
+  const text = `${title}\n${htmlToText(description)}`.replace(/\[probevane\]|probevane:/gi, ' ');
   const lower = text.toLowerCase();
   const command = COMMANDS.find((c) => new RegExp(`\\b${c}\\b`).test(lower));
   if (!command) return null;
   const kind: 'unit' | 'e2e' = /\b(--kind\s+)?e2e\b/.test(lower) ? 'e2e' : 'unit';
   const only = text.match(/--only\s+(\S+)/)?.[1];
-  const taskMatch = text.match(/--task\s+"([^"]+)"/) ?? text.match(/--task\s+'([^']+)'/);
+  // Prefer a fully-quoted task; but ADO can TRUNCATE a long Description (dropping the
+  // closing quote), so fall back to "everything after --task" (strip a leading/trailing
+  // quote). This keeps a too-long ticket working instead of failing with an empty task.
+  const task =
+    text.match(/--task\s+"([^"]+)"/)?.[1] ??
+    text.match(/--task\s+'([^']+)'/)?.[1] ??
+    text.match(/--task\s+["']?([\s\S]+?)["']?\s*$/)?.[1]?.trim();
   // dir: first token after the command that looks like a path (./x, x/y, or a bare dir)
   const after = text.slice(lower.indexOf(command) + command.length);
   const dir = after.match(/\s(\.?\/?[\w.-]+(?:\/[\w.-]+)*)/)?.[1] ?? '.';
-  return { command, dir, kind, only, task: taskMatch?.[1] };
+  return { command, dir, kind, only, task };
 }
 
 /** One-line outcome summary from a probevane run's stdout — prefer the final
