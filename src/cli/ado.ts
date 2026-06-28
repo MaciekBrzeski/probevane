@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { adoClient, triggerWiql, parseDirective, summarize, type AdoConfig, type AdoDirective } from '../integrations/ado.js';
 
 /** PAT from env, else a gitignored file (so secrets never land in shell history/chat). */
@@ -69,8 +69,37 @@ async function main() {
     return;
   }
 
+  if (sub === 'attach') {
+    // probevane ado attach <id> <file...> [--comment "label"]
+    const id = Number(args[1]);
+    const files = args.slice(2).filter((a) => !a.startsWith('--') && a !== String(id));
+    if (!id || !files.length) { console.error('usage: probevane ado attach <id> <file...>'); process.exit(2); }
+    for (const f of files) {
+      const { url } = await client.attach(basename(f), new Uint8Array(readFileSync(f)));
+      await client.linkAttachment(id, url, flag(args, '--comment') ?? basename(f));
+      console.log(`[ado] #${id}: attached ${basename(f)}`);
+    }
+    return;
+  }
+
+  if (sub === 'qa') {
+    // probevane ado qa <id> --text "<natural-language QA summary>" [--comment]
+    // Appends a human-readable QA section to the work item's Description (and optionally
+    // posts it as a comment) — so the board documents what the change actually does.
+    const id = Number(args[1]);
+    const text = flag(args, '--text') ?? '';
+    if (!id || !text) { console.error('usage: probevane ado qa <id> --text "<summary>"'); process.exit(2); }
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cur = await client.describe(id);
+    const html = `${cur}<hr/><p><b>🧪 QA summary</b></p><div>${esc(text).replace(/\n/g, '<br/>')}</div>`;
+    await client.update(id, { 'System.Description': html });
+    if (args.includes('--comment')) await client.comment(id, '🧪 QA: ' + text);
+    console.log(`[ado] #${id}: description enhanced with QA summary`);
+    return;
+  }
+
   if (sub !== 'run') {
-    console.error('usage: probevane ado <run|create> [--project P] [--tag probevane] [--once]');
+    console.error('usage: probevane ado <run|create|attach|qa> [--project P] [--tag probevane] [--once]');
     process.exit(2);
   }
 
