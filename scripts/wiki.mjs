@@ -73,7 +73,8 @@ async function navHtml(active) {
     return `<a href="/${slug}"${slug === active ? ' class="active"' : ''}>${label}</a>`;
   };
 
-  let html = `<div class="grp">probevane</div>` + core.map((f) => link(f, false)).join('');
+  const demo = `<a href="/demo/pipeline"${active === 'demo/pipeline' ? ' class="active"' : ''}>loop pipeline (demo)</a>`;
+  let html = `<div class="grp">probevane</div>` + core.map((f) => link(f, false)).join('') + demo;
   if (projects.length) html += `<div class="grp">Projects</div>` + projects.map((f) => link(f, true)).join('');
   return html;
 }
@@ -86,6 +87,13 @@ const server = createServer(async (req, res) => {
       const file = join(ROOT, extname(name) ? name : name + '.md');
       const body = await readFile(file, 'utf8').catch(() => '# Not found\n');
       res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' });
+      return res.end(body);
+    }
+    if (url === '/demo/pipeline') {
+      // Interactive demo: a self-contained page (its own <script> runs — the markdown
+      // viewer uses innerHTML which wouldn't execute scripts).
+      const body = await readFile(join(ROOT, 'pipeline-demo.html'), 'utf8').catch(() => '<h1>demo not found</h1>');
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(body);
     }
     const slug = url === '/' ? 'Home' : url.slice(1);
