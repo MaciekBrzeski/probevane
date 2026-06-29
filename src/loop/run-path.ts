@@ -6,6 +6,7 @@ import { runLoop, type RunOutcome } from './engine.js';
 import { buildGraph } from '../mock/graph.js';
 import { focusDirective } from './scout.js';
 import { buildDepDigest } from './dep-digest.js';
+import { runInWorktree } from './worktree.js';
 
 // Generic single-task path runner — shared by refactor / feature / repair. (The
 // test-generation path keeps its richer probe-grounding in run-generation.ts.)
@@ -22,6 +23,8 @@ export interface RunPathOpts {
   mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
   forceStopAfter?: number; // barren-turn ceiling (raise for big-repo refactors that read/plan a lot before editing)
   only?: string; // focus path — narrows context + injects a repo-map so the model edits instead of crawling
+  worktree?: boolean; // run in an isolated git worktree (safe before/after; live tree untouched)
+  worktreeMerge?: boolean; // on accept, auto-merge the worktree branch back
   log?: (l: string) => void;
 }
 
@@ -52,8 +55,8 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
     log(`[probevane] focus: ${opts.only}${graph ? ' (repo-map injected)' : ''}${depBlock ? ' (+dep APIs)' : ''}`);
   }
 
-  return runLoop({
-    workdir: opts.dir,
+  const doRun = (workdir: string) => runLoop({
+    workdir,
     adapter: opts.adapter,
     brain,
     takeoverBrain,
@@ -65,4 +68,10 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
     budget: opts.budget,
     log,
   });
+
+  // --worktree: isolate the run in a throwaway git worktree (live tree untouched
+  // until an explicit merge). Otherwise edit the live workdir in place.
+  return opts.worktree
+    ? runInWorktree(opts.dir, opts.profileName, doRun, { merge: opts.worktreeMerge, log })
+    : doRun(opts.dir);
 }

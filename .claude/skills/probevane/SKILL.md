@@ -105,7 +105,7 @@ probevane generate ./my-app --kind unit --mock
 Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress).
 
 ```
-probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe]
+probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge]]
 # e.g.
 probevane refactor ./app --task "extract helpers into utils.ts" --quality
 ```
@@ -114,7 +114,7 @@ probevane refactor ./app --task "extract helpers into utils.ts" --quality
 TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.
 
 ```
-probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]
+probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge]]
 # e.g.
 probevane feature ./app --task "add a discount field to cartTotal"
 ```
@@ -123,7 +123,7 @@ probevane feature ./app --task "add a discount field to cartTotal"
 After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality.
 
 ```
-probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]
+probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge]]
 # e.g.
 probevane repair ./app --since HEAD~1
 ```
@@ -132,7 +132,7 @@ probevane repair ./app --since HEAD~1
 Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality.
 
 ```
-probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe]
+probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge]]
 # e.g.
 probevane fix ./app --task "handle the null case in parse()"
 ```
@@ -150,7 +150,7 @@ probevane migrate ./app --to react@19
 Add documentation only — JSDoc/TSDoc on exported APIs + comments on non-obvious logic; no behavior change (tests + typecheck stay green). --only focuses one area.
 
 ```
-probevane document <dir> [--only <path>] [--task "<focus>"] [--model …] [--force-stop-after N]
+probevane document <dir> [--only <path>] [--task "<focus>"] [--model …] [--force-stop-after N] [--worktree [--worktree-merge]]
 # e.g.
 probevane document ./app --only src/api.ts
 ```

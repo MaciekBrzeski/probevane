@@ -18,6 +18,33 @@ export async function isGitRepo(dir: string): Promise<boolean> {
   return (await git(dir, ['rev-parse', '--is-inside-work-tree'])).ok;
 }
 
+/** Absolute path of the repo root containing `dir` ('' if not a repo). */
+export async function repoRoot(dir: string): Promise<string> {
+  const r = await git(dir, ['rev-parse', '--show-toplevel']);
+  return r.ok ? r.out.trim() : '';
+}
+
+/** Create a worktree at `path` on a new `branch` (off HEAD). */
+export async function addWorktree(root: string, path: string, branch: string): Promise<boolean> {
+  return (await git(root, ['worktree', 'add', path, '-b', branch])).ok;
+}
+
+/** Remove a worktree (force) + delete its branch. Best-effort. */
+export async function removeWorktree(root: string, path: string, branch?: string): Promise<void> {
+  await git(root, ['worktree', 'remove', '--force', path]);
+  if (branch) await git(root, ['branch', '-D', branch]);
+}
+
+/** `git diff --stat` of the working tree at `dir` (what the run changed). */
+export async function diffStat(dir: string): Promise<string> {
+  return (await git(dir, ['diff', '--stat'])).out.trim();
+}
+
+/** Merge `branch` into the current branch at `root` (no-ff). */
+export async function mergeBranch(root: string, branch: string, message: string): Promise<boolean> {
+  return (await git(root, ['merge', '--no-ff', '-m', message, branch])).ok;
+}
+
 /** Current HEAD sha, or '' if not a repo / no commits. */
 export async function headSha(dir: string): Promise<string> {
   const r = await git(dir, ['rev-parse', 'HEAD']);

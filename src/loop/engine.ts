@@ -91,6 +91,8 @@ export interface RunOutcome {
   /** Suite signals captured by the gates (no extra run) — for `generate --report`. */
   tests?: number;
   coverage?: number;
+  /** Project-relative paths the run wrote/edited (for ship + worktree commit). */
+  editedFiles: string[];
 }
 
 const BASE_SYSTEM = `You are probevane, an agent that edits a codebase to satisfy a task.
@@ -452,5 +454,6 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     proposal: proposalText,
     tests: ctx.lastRunPassed,
     coverage: ctx.lastCoverage,
+    editedFiles: [...ctx.editedFiles],
   };
 }
