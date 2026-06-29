@@ -85,31 +85,44 @@ export default defineConfig({
 
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
+// Install the testing toolchain only when missing. --legacy-peer-deps: real apps
+// pin old peers (React 17 etc) that would otherwise abort the install on peer-conflict.
+async function installDeps(dir: string, all: Record<string, string>, info: ProjectInfo): Promise<void> {
+  const missing: string[] = [];
+  if (!all.vitest) missing.push(...unitDeps(info.reactMajor));
+  if (!all['@playwright/test']) missing.push('@playwright/test@^1.48.0');
+  if (!missing.length) return;
+  const r = await sh(`npm install -D --legacy-peer-deps ${missing.join(' ')}`, dir, 300_000);
+  if (!r.ok) throw new Error(`probevane: dep install failed\n${r.stderr.slice(-1500)}`);
+}
+
+// Wire the test scripts without clobbering a real existing one.
+function ensureScripts(pkg: any): void {
+  pkg.scripts = pkg.scripts || {};
+  if (!pkg.scripts.test || /no test specified/.test(pkg.scripts.test)) pkg.scripts.test = 'vitest run';
+  if (!pkg.scripts['test:e2e']) pkg.scripts['test:e2e'] = 'playwright test';
+}
+
+// Write the vitest config as .mts so it ALWAYS loads as ESM — vite-tsconfig-paths
+// is ESM-only and a plain .ts config is treated as CJS in a non-module project
+// (the esbuild "ESM file cannot be loaded by require" failure on real apps).
+// Never clobber existing config files.
+async function writeConfigs(dir: string, info: ProjectInfo): Promise<void> {
+  const haveVitestCfg = (await exists(join(dir, 'vitest.config.ts'))) || (await exists(join(dir, 'vitest.config.mts')));
+  if (!haveVitestCfg) await writeFile(join(dir, 'vitest.config.mts'), vitestConfig());
+  if (!(await exists(join(dir, 'vitest.setup.ts')))) await writeFile(join(dir, 'vitest.setup.ts'), VITEST_SETUP);
+  if (!(await exists(join(dir, 'playwright.config.ts')))) await writeFile(join(dir, 'playwright.config.ts'), pwConfig(info));
+}
+
 export async function installReact(dir: string): Promise<void> {
   const pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
   const all = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;
   const info = inspect(pkg);
 
-  const missing: string[] = [];
-  if (!all.vitest) missing.push(...unitDeps(info.reactMajor));
-  if (!all['@playwright/test']) missing.push('@playwright/test@^1.48.0');
-  if (missing.length) {
-    // --legacy-peer-deps: real apps pin old peers (React 17 etc) that would
-    // otherwise abort the install on peer-conflict.
-    const r = await sh(`npm install -D --legacy-peer-deps ${missing.join(' ')}`, dir, 300_000);
-    if (!r.ok) throw new Error(`probevane: dep install failed\n${r.stderr.slice(-1500)}`);
-  }
+  await installDeps(dir, all, info);
 
-  pkg.scripts = pkg.scripts || {};
-  if (!pkg.scripts.test || /no test specified/.test(pkg.scripts.test)) pkg.scripts.test = 'vitest run';
-  if (!pkg.scripts['test:e2e']) pkg.scripts['test:e2e'] = 'playwright test';
+  ensureScripts(pkg);
   await writeFile(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
 
-  // Write the vitest config as .mts so it ALWAYS loads as ESM — vite-tsconfig-paths
-  // is ESM-only and a plain .ts config is treated as CJS in a non-module project
-  // (the esbuild "ESM file cannot be loaded by require" failure on real apps).
-  const haveVitestCfg = (await exists(join(dir, 'vitest.config.ts'))) || (await exists(join(dir, 'vitest.config.mts')));
-  if (!haveVitestCfg) await writeFile(join(dir, 'vitest.config.mts'), vitestConfig());
-  if (!(await exists(join(dir, 'vitest.setup.ts')))) await writeFile(join(dir, 'vitest.setup.ts'), VITEST_SETUP);
-  if (!(await exists(join(dir, 'playwright.config.ts')))) await writeFile(join(dir, 'playwright.config.ts'), pwConfig(info));
+  await writeConfigs(dir, info);
 }

@@ -80,6 +80,80 @@ async function lastStop(stateDir: string): Promise<{ runs: RunRecord[]; stop: st
   return { runs, stop: runs.at(-1)?.stopReason ?? 'error' };
 }
 
+/** Run the child, retrying once on a transient failure (a crashed/errored child —
+ *  not a clean max_steps/difficulty/stuck, which won't change on a re-run). */
+async function runWithRetry(
+  opts: FactoryOpts,
+  dir: string,
+  repo: string,
+  stateDir: string,
+  reportPath: string,
+): Promise<{ code: number; runs: RunRecord[]; stop: string }> {
+  let code = await runChild(opts, dir, stateDir, reportPath);
+  let { runs, stop } = await lastStop(stateDir);
+  if (code !== 0 && opts.retry && stop === 'error') {
+    opts.log(`[${basename(repo)}] transient failure (${stop}) — retrying once`);
+    code = await runChild(opts, dir, stateDir, reportPath);
+    ({ runs, stop } = await lastStop(stateDir));
+  }
+  return { code, runs, stop };
+}
+
+/** Fill tests/coverage on an accepted result. Prefer the child's --report (the
+ *  gates already measured these — no second suite run in the parent). Fall back to
+ *  measuring only if the report is absent. */
+async function measureAccepted(
+  dir: string,
+  opts: FactoryOpts,
+  reportPath: string,
+  base: FactoryRepoResult,
+): Promise<void> {
+  const rep = await readFile(reportPath, 'utf8').then(JSON.parse).catch(() => null);
+  if (rep && typeof rep.tests === 'number') {
+    base.tests = rep.tests;
+    base.coverage = typeof rep.coverage === 'number' ? rep.coverage : null;
+    return;
+  }
+  try {
+    const adapter = await selectAdapterOrThrow(dir);
+    const specs = await adapter.specFiles(dir).catch(() => [] as string[]);
+    if (specs.length) base.tests = (await adapter.run(dir, opts.kind as RunScope, specs).catch(() => null))?.passed ?? 0;
+    base.coverage = (await adapter.coverage(dir).catch(() => null))?.lines ?? null;
+  } catch (e: any) {
+    base.error = `measure: ${e?.message ?? e}`;
+  }
+}
+
+/** Autonomous delivery: branch + commit + PR the accepted run. */
+async function shipAccepted(
+  dir: string,
+  opts: FactoryOpts,
+  repo: string,
+  base: FactoryRepoResult,
+): Promise<void> {
+  if (!opts.ship) return;
+  const diary = await latestDiary(dir);
+  if (!diary) return;
+  const r = await shipRun(dir, diary, { op: 'generate', repo, tests: base.tests, coverage: base.coverage, cost: base.cost }, opts.log).catch(() => null);
+  base.shipped = !!r?.shipped;
+  base.prUrl = r?.prUrl;
+}
+
+/** Errored run — undo whatever it half-wrote so the repo is left clean. */
+async function revertErrored(
+  dir: string,
+  opts: FactoryOpts,
+  before: string,
+  base: FactoryRepoResult,
+): Promise<void> {
+  if (!(opts.checkpoint && (await isGitRepo(dir)))) return;
+  const diary = await latestDiary(dir);
+  if (diary?.editedFiles?.length) {
+    await revertEdits(dir, diary.checkpointSha || before, diary.editedFiles).catch(() => {});
+    base.reverted = true;
+  }
+}
+
 async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepoResult> {
   const dir = resolve(repo);
   const stateDir = join(opts.stateRoot, slug(repo));
@@ -87,15 +161,7 @@ async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepo
   const before = opts.checkpoint ? await headSha(dir) : '';
   const reportPath = join(stateDir, 'result.json');
 
-  let code = await runChild(opts, dir, stateDir, reportPath);
-  let { runs, stop } = await lastStop(stateDir);
-  // Retry once on a transient failure (a crashed/errored child — not a clean
-  // max_steps/difficulty/stuck, which won't change on a re-run).
-  if (code !== 0 && opts.retry && stop === 'error') {
-    opts.log(`[${basename(repo)}] transient failure (${stop}) — retrying once`);
-    code = await runChild(opts, dir, stateDir, reportPath);
-    ({ runs, stop } = await lastStop(stateDir));
-  }
+  const { code, runs, stop } = await runWithRetry(opts, dir, repo, stateDir, reportPath);
 
   const sum = summarize(runs);
   const accepted = code === 0;
@@ -112,38 +178,10 @@ async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepo
   };
 
   if (accepted) {
-    // Prefer the child's --report (tests/coverage the gates already measured — no
-    // second suite run in the parent). Fall back to measuring only if it's absent.
-    const rep = await readFile(reportPath, 'utf8').then(JSON.parse).catch(() => null);
-    if (rep && typeof rep.tests === 'number') {
-      base.tests = rep.tests;
-      base.coverage = typeof rep.coverage === 'number' ? rep.coverage : null;
-    } else {
-      try {
-        const adapter = await selectAdapterOrThrow(dir);
-        const specs = await adapter.specFiles(dir).catch(() => [] as string[]);
-        if (specs.length) base.tests = (await adapter.run(dir, opts.kind as RunScope, specs).catch(() => null))?.passed ?? 0;
-        base.coverage = (await adapter.coverage(dir).catch(() => null))?.lines ?? null;
-      } catch (e: any) {
-        base.error = `measure: ${e?.message ?? e}`;
-      }
-    }
-    // Autonomous delivery: branch + commit + PR the accepted run.
-    if (opts.ship) {
-      const diary = await latestDiary(dir);
-      if (diary) {
-        const r = await shipRun(dir, diary, { op: 'generate', repo, tests: base.tests, coverage: base.coverage, cost: base.cost }, opts.log).catch(() => null);
-        base.shipped = !!r?.shipped;
-        base.prUrl = r?.prUrl;
-      }
-    }
-  } else if (opts.checkpoint && (await isGitRepo(dir))) {
-    // Errored run — undo whatever it half-wrote so the repo is left clean.
-    const diary = await latestDiary(dir);
-    if (diary?.editedFiles?.length) {
-      await revertEdits(dir, diary.checkpointSha || before, diary.editedFiles).catch(() => {});
-      base.reverted = true;
-    }
+    await measureAccepted(dir, opts, reportPath, base);
+    await shipAccepted(dir, opts, repo, base);
+  } else {
+    await revertErrored(dir, opts, before, base);
   }
   return base;
 }
