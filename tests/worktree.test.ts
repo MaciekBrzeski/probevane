@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInWorktree } from '../src/loop/worktree.js';
 import type { RunOutcome } from '../src/loop/engine.js';
+import type { Finding } from '../src/review/diff-review.js';
 
 const base = (over: Partial<RunOutcome>): RunOutcome => ({
   accepted: true, steps: 1, toolCalls: 1, gateBlocks: 0, stopReason: 'accepted',
@@ -65,6 +66,30 @@ describe('runInWorktree', () => {
     expect(out.accepted).toBe(true);
     // now ON the live tree after merge
     expect(existsSync(join(repo, 'merged.ts'))).toBe(true);
+  });
+
+  it('review gate blocks auto-merge on error findings (keeps branch, live tree clean)', async () => {
+    const review = async (diff: string): Promise<Finding[]> => {
+      expect(diff).toContain('risky.ts'); // the committed diff (incl. the new file) reaches the reviewer
+      return [{ file: 'risky.ts', line: 1, severity: 'error', issue: 'bad', fix: 'dont' }];
+    };
+    const out = await runInWorktree(repo, 'fix', async (wd) => {
+      writeFileSync(join(wd, 'risky.ts'), 'export const R = 1;\n');
+      return base({ accepted: true, editedFiles: ['risky.ts'] });
+    }, { merge: true, review });
+    expect(out.accepted).toBe(true);
+    expect(existsSync(join(repo, 'risky.ts'))).toBe(false); // merge BLOCKED by the review error
+    const branches = execFileSync('git', ['-C', repo, 'branch', '--list', 'probevane/*'], { encoding: 'utf8' });
+    expect(branches).toMatch(/probevane\/fix-/); // branch kept for a human
+  });
+
+  it('review with no error findings still merges (nits do not block)', async () => {
+    const review = async (): Promise<Finding[]> => [{ file: 'ok.ts', line: 1, severity: 'nit', issue: 'meh', fix: 'maybe' }];
+    await runInWorktree(repo, 'fix', async (wd) => {
+      writeFileSync(join(wd, 'ok.ts'), 'export const O = 1;\n');
+      return base({ accepted: true, editedFiles: ['ok.ts'] });
+    }, { merge: true, review });
+    expect(existsSync(join(repo, 'ok.ts'))).toBe(true); // merged despite a nit
   });
 
   it('throws on a non-git directory', async () => {

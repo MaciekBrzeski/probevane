@@ -32,7 +32,7 @@ async function main() {
 
   const fsaRaw = flag(args, '--force-stop-after');
   const forceStopAfter = fsaRaw ? parseInt(fsaRaw, 10) : undefined;
-  const outcome = await runPath({ dir, adapter, profileName: 'document', task: fullTask, model, maxSteps, budget, forceStopAfter, only, worktree: args.includes("--worktree"), worktreeMerge: args.includes("--worktree-merge"), log: (l) => console.error(l) });
+  const outcome = await runPath({ dir, adapter, profileName: 'document', task: fullTask, model, maxSteps, budget, forceStopAfter, only, worktree: args.includes("--worktree"), worktreeMerge: args.includes("--worktree-merge"), worktreeReview: args.includes("--worktree-review"), log: (l) => console.error(l) });
   console.log(
     `[probevane] ${outcome.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} (${outcome.stopReason}) steps=${outcome.steps} ` +
       `tokens=${outcome.tokensIn}/${outcome.tokensOut}${outcome.tookOver ? ' (took over)' : ''}`,

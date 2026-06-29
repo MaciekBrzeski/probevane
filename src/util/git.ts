@@ -35,9 +35,9 @@ export async function removeWorktree(root: string, path: string, branch?: string
   if (branch) await git(root, ['branch', '-D', branch]);
 }
 
-/** `git diff --stat` of the working tree at `dir` (what the run changed). */
-export async function diffStat(dir: string): Promise<string> {
-  return (await git(dir, ['diff', '--stat'])).out.trim();
+/** `git diff --stat` at `dir` — working tree by default, or against `base` (e.g. HEAD~1). */
+export async function diffStat(dir: string, base?: string): Promise<string> {
+  return (await git(dir, ['diff', '--stat', ...(base ? [base] : [])])).out.trim();
 }
 
 /** Merge `branch` into the current branch at `root` (no-ff). */
