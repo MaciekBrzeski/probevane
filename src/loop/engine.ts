@@ -123,7 +123,8 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   let brain = opts.brain; // mutable: the consult ladder can swap in a stronger brain
   let tookOver = false;
   let consulted = false;
-  let nudged = false;
+  let nudges = 0; // read-thrash nudges fired (escalates once before the never-edited stop)
+  const READ_BUDGET = 5; // pre-edit read_file/list_dir calls before we push to commit
 
   const ctx = new RunCtx(workdir, adapter, task);
 
@@ -316,19 +317,25 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
     // Read-thrash nudge: a run that keeps READING and never edits (the large-repo
     // refactor stall — distinct read_file calls never look "circular", so the
     // never-edited stop alone would let it churn to max_steps). Push it to commit
-    // ONCE, early, while it still has turns left. Reads/plans both grow `barren`
-    // until the first edit, so barren == non-edit turns here.
-    if (!started && !nudged && ctx.barren >= nudgeAfter) {
-      nudged = true;
+    // EARLY — fired when it has burned non-edit turns OR a read budget — and
+    // ESCALATE once (a harder second nudge) before the never-edited stop, so an
+    // over-reading model (e.g. a capable cloud model) gets a firmer shove than one
+    // line. Reads/plans both grow `barren` until the first edit.
+    if (!started && nudges < 2 && (ctx.barren >= nudgeAfter || ctx.reads >= READ_BUDGET)) {
+      nudges++;
+      const hard = nudges >= 2;
       messages.push({
         role: 'user',
-        text:
-          `You have taken ${ctx.step} turns reading without editing any file. You have enough ` +
-          `context now. STOP reading other files. Call \`plan\` (if you haven't), then make your ` +
-          `\`edit_file\`/\`write_file\` changes to the target. The test suite will verify correctness — ` +
-          `commit the edit; do not keep exploring.`,
+        text: hard
+          ? `STILL no edit after ${ctx.reads} reads. You have MORE than enough context. Do NOT call ` +
+            `read_file or list_dir again — your very next action must be \`write_file\`/\`edit_file\` on ` +
+            `the target (call \`plan\` first only if you haven't). If a path you wanted is outside the ` +
+            `project you don't need it; implement from what you already import.`
+          : `You've read ${ctx.reads} file(s) over ${ctx.step} turns without editing — you have enough ` +
+            `context now. STOP reading. Call \`plan\` (if you haven't), then make your \`write_file\`/` +
+            `\`edit_file\` change. The gates verify correctness — commit the edit; don't keep exploring.`,
       });
-      log(`[engine] read-thrash nudge: ${ctx.barren} non-edit turns — pushing to plan+edit`);
+      log(`[engine] read-thrash nudge #${nudges}: ${ctx.barren} non-edit turns / ${ctx.reads} reads — pushing to plan+edit`);
       continue;
     }
 

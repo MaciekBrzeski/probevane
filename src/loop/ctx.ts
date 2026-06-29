@@ -19,6 +19,9 @@ export class RunCtx {
   toolCalls = 0;
   gateBlocks = 0;
   barren = 0; // consecutive turns with no productive edit / a blocked stop
+  reads = 0; // cumulative read_file/list_dir calls (read-thrash detection)
+  /** Memoized workspace/repo root — reads are allowed anywhere under it (writes stay in workdir). */
+  workspaceRoot?: string;
 
   // Outcome, set by the engine before on_stop hooks run (for diary/harvest).
   accepted = false;
