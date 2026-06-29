@@ -108,6 +108,62 @@ export interface Segment {
   runes: Rune[];
 }
 
+/** Wrap a labelled run of Runes as a pipeline segment. */
+function seg(sub: SubroutineId, runes: Rune[]): Segment {
+  return { sub, runes };
+}
+
+function writeTestsSegments(opts: ProfileOpts, scope: RunScope): Segment[] {
+  return [
+    seg('preamble', preamble(opts.kind, { noRegression: true })),
+    seg('green-gates', greenGates(scope, {
+      acceptance: { scope, minTests: opts.minTests, minCoverage: opts.minCoverage, shellChecks: opts.shellChecks },
+    })),
+    // write_tests carries the full extras suite but NOT the mfe gate.
+    seg('opt-in', optInGates(opts, scope, { extras: true })),
+    seg('harvest', harvest({ full: true })),
+  ];
+}
+
+function featureSegments(opts: ProfileOpts): Segment[] {
+  // TDD red-first: failing spec → implement → green, existing tests protected.
+  return [
+    seg('preamble', preamble('unit', { redFirst: true, noRegression: true })),
+    seg('green-gates', greenGates('unit', { acceptance: { scope: 'unit', minTests: opts.minTests ?? 1 } })),
+    seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
+    seg('harvest', harvest({ full: true })),
+  ];
+}
+
+function repairSegments(opts: ProfileOpts): Segment[] {
+  // Get the whole suite green + clean again after a source change / review fix.
+  return [
+    seg('preamble', preamble('unit')),
+    seg('green-gates', greenGates('unit', { fullSuite: true })), // full suite must be green
+    seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
+    seg('harvest', harvest({ full: true })),
+  ];
+}
+
+function refactorSegments(opts: ProfileOpts): Segment[] {
+  // Characterization-first: tests are the contract, source is what changes.
+  return [
+    seg('preamble', preamble('unit')),
+    seg('safety-net', [behaviorLock()]),
+    seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
+    seg('harvest', harvest()),
+  ];
+}
+
+function documentSegments(opts: ProfileOpts): Segment[] {
+  // Add docs/JSDoc only — no behavior change: tests + typecheck stay green.
+  return [
+    seg('preamble', preamble('unit')),
+    seg('safety-net', [behaviorLock()]),
+    seg('harvest', harvest()),
+  ];
+}
+
 /**
  * The profile's pipeline as labelled subroutine segments — the single source of
  * truth. `profile()` is just this flattened; describe.ts reads each rune's
@@ -115,51 +171,19 @@ export interface Segment {
  */
 export function profileSegments(name: ProfileName, opts: ProfileOpts): Segment[] {
   const scope: RunScope = opts.kind === 'e2e' ? 'e2e' : 'unit';
-  const seg = (sub: SubroutineId, runes: Rune[]): Segment => ({ sub, runes });
   switch (name) {
     case 'write_tests':
-      return [
-        seg('preamble', preamble(opts.kind, { noRegression: true })),
-        seg('green-gates', greenGates(scope, {
-          acceptance: { scope, minTests: opts.minTests, minCoverage: opts.minCoverage, shellChecks: opts.shellChecks },
-        })),
-        // write_tests carries the full extras suite but NOT the mfe gate.
-        seg('opt-in', optInGates(opts, scope, { extras: true })),
-        seg('harvest', harvest({ full: true })),
-      ];
+      return writeTestsSegments(opts, scope);
     case 'feature':
-      // TDD red-first: failing spec → implement → green, existing tests protected.
-      return [
-        seg('preamble', preamble('unit', { redFirst: true, noRegression: true })),
-        seg('green-gates', greenGates('unit', { acceptance: { scope: 'unit', minTests: opts.minTests ?? 1 } })),
-        seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
-        seg('harvest', harvest({ full: true })),
-      ];
+      return featureSegments(opts);
     case 'repair':
     case 'fix':
-      // Get the whole suite green + clean again after a source change / review fix.
-      return [
-        seg('preamble', preamble('unit')),
-        seg('green-gates', greenGates('unit', { fullSuite: true })), // full suite must be green
-        seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
-        seg('harvest', harvest({ full: true })),
-      ];
+      return repairSegments(opts);
     case 'refactor':
     case 'migrate':
-      // Characterization-first: tests are the contract, source is what changes.
-      return [
-        seg('preamble', preamble('unit')),
-        seg('safety-net', [behaviorLock()]),
-        seg('opt-in', optInGates(opts, 'unit', { mfe: true })),
-        seg('harvest', harvest()),
-      ];
+      return refactorSegments(opts);
     case 'document':
-      // Add docs/JSDoc only — no behavior change: tests + typecheck stay green.
-      return [
-        seg('preamble', preamble('unit')),
-        seg('safety-net', [behaviorLock()]),
-        seg('harvest', harvest()),
-      ];
+      return documentSegments(opts);
     case 'bare':
       return [];
   }
