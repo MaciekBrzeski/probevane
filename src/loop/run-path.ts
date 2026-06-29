@@ -9,6 +9,8 @@ import { buildDepDigest } from './dep-digest.js';
 import { runInWorktree } from './worktree.js';
 import { reviewDiffText } from '../review/diff-review.js';
 
+type Brain = ReturnType<typeof brainFor>;
+
 // Generic single-task path runner — shared by refactor / feature / repair. (The
 // test-generation path keeps its richer probe-grounding in run-generation.ts.)
 // Resolves the model from complexity, then runs the chosen profile on a task.
@@ -30,32 +32,45 @@ export interface RunPathOpts {
   log?: (l: string) => void;
 }
 
-export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
-  const log = opts.log ?? (() => {});
-  // No specific targets here — route on the app's graph complexity. Refactor and
-  // feature work is generally harder than test-writing, so a mid app already
-  // tips to the stronger model.
+// Route on the app's graph complexity — no specific targets here. Refactor and
+// feature work is generally harder than test-writing, so a mid app already tips
+// to the stronger model. A local:/openai: model override skips the router.
+async function resolveBrains(
+  opts: RunPathOpts,
+  log: (l: string) => void,
+): Promise<{ brain: Brain; takeoverBrain: Brain }> {
   const cx = await assessComplexity(opts.dir, []);
   const route = routeModels(opts.model ?? 'auto', cx.complex);
   const brain = brainFor(opts.model?.startsWith('local:') || opts.model?.startsWith('openai:') ? opts.model : route.primary);
   const takeoverBrain = brainFor(route.takeover);
   log(`[probevane] model=${brain.model}${cx.complex ? ` (complex: ${cx.reasons.join(', ')})` : ''} takeover=${takeoverBrain.model}`);
+  return { brain, takeoverBrain };
+}
 
-  // --only: narrow the model's focus to one path + its importers, and hand it a
-  // repo-map up front so it edits instead of crawling the whole repo (the
-  // large-repo read-stall fix). buildGraph is best-effort.
-  let task = opts.task;
-  if (opts.only) {
-    const graph = await buildGraph(opts.dir).catch(() => null);
-    task += focusDirective(graph, opts.only);
-    // Inject the focus file's dependency APIs (workspace pkgs + relative modules
-    // it imports) so the model doesn't need to read them — removes the read-thrash
-    // + wrong-shape-guess failure mode (complements workspace-scoped reads).
-    let depBlock = '';
-    try { depBlock = buildDepDigest(opts.dir, opts.only); } catch { /* best-effort */ }
-    task += depBlock;
-    log(`[probevane] focus: ${opts.only}${graph ? ' (repo-map injected)' : ''}${depBlock ? ' (+dep APIs)' : ''}`);
-  }
+// --only: narrow the model's focus to one path + its importers, and hand it a
+// repo-map up front so it edits instead of crawling the whole repo (the
+// large-repo read-stall fix). buildGraph + dep digest are best-effort. Injecting
+// the focus file's dependency APIs removes the read-thrash + wrong-shape-guess
+// failure mode (complements workspace-scoped reads).
+async function applyFocus(
+  opts: RunPathOpts,
+  task: string,
+  log: (l: string) => void,
+): Promise<string> {
+  if (!opts.only) return task;
+  const graph = await buildGraph(opts.dir).catch(() => null);
+  task += focusDirective(graph, opts.only);
+  let depBlock = '';
+  try { depBlock = buildDepDigest(opts.dir, opts.only); } catch { /* best-effort */ }
+  task += depBlock;
+  log(`[probevane] focus: ${opts.only}${graph ? ' (repo-map injected)' : ''}${depBlock ? ' (+dep APIs)' : ''}`);
+  return task;
+}
+
+export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
+  const log = opts.log ?? (() => {});
+  const { brain, takeoverBrain } = await resolveBrains(opts, log);
+  const task = await applyFocus(opts, opts.task, log);
 
   const doRun = (workdir: string) => runLoop({
     workdir,
