@@ -2,6 +2,9 @@
 
 Short architecture decision records. Newest first.
 
+## ADR-012 — Isolate (self-)improvement in a worktree; review before merge
+**Decision:** `--worktree` runs a path loop in a throwaway git worktree on its own branch (live tree untouched until an explicit merge); it symlinks every `node_modules` (root + nested) in, commits only `outcome.editedFiles` on accept (never `git add -A`), and self-reviews the committed diff — `--worktree-merge` blocks the auto-merge on any review `error`. The $0 bridge servicer is a first-class agent (`probevane-brain`) whose discipline is to adapt to gate feedback. **Why:** refactoring probevane *in place* while the loop runs on it is self-modifying risk, and a green suite can't catch a dropped case — so isolation + a review gate make self-improvement safe and give a clean before/after. The `-A` ban is hard-won: an early hand-run committed the worktree's `node_modules` symlink and clobbered real deps on merge. A *deterministic* servicer can't react to gate feedback and stalls, so adaptiveness is the agent's core rule. See [Worktree mode](Worktree.md).
+
 ## ADR-011 — On a real app, validate only the tests we wrote
 **Decision:** `validation_gate`/`acceptance_gate` run scoped to the new spec files (`run(dir, scope, files)`), and `validation_gate` relaxes typecheck if the project didn't typecheck cleanly at baseline. `discover` ranks targets by testability; the MSW setup patch preserves the jest-dom import. **Why:** real apps ship their own (often jest-era, env-incompatible) tests and may not typecheck under our config — none of that is ours to fix when *adding* tests. Whole-suite-green would make acceptance impossible; scoping to our specs makes "did we add good tests?" the real question. Proven: 22 passing tests generated on a production app's redux slices.
 
