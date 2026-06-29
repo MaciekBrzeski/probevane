@@ -116,104 +116,136 @@ export function summarize(out: string): string {
 
 // ---- fetch client -----------------------------------------------------------
 
+interface AdoCtx {
+  base: string;
+  headers: Record<string, string>;
+  doFetch: typeof fetch;
+}
+
+/** Base headers with the json-patch content-type (used by create/patch calls). */
+function patchHeaders(ctx: AdoCtx): Record<string, string> {
+  return { ...ctx.headers, 'content-type': 'application/json-patch+json' };
+}
+
+async function adoJson(res: Response): Promise<any> {
+  if (!res.ok) throw new Error(`ADO ${res.status}: ${await res.text().catch(() => '')}`);
+  return res.json();
+}
+
+/** Run a WIQL query → the matching work item ids. */
+async function adoQuery(ctx: AdoCtx, wiql: string): Promise<number[]> {
+  const res = await ctx.doFetch(`${ctx.base}/wiql?api-version=7.1`, {
+    method: 'POST', headers: ctx.headers, body: JSON.stringify({ query: wiql }),
+  });
+  const data = await adoJson(res);
+  return (data.workItems ?? []).map((w: any) => w.id);
+}
+
+/** Fetch fields for a set of work items. */
+async function adoGetMany(ctx: AdoCtx, ids: number[]): Promise<AdoWorkItem[]> {
+  if (!ids.length) return [];
+  const fields = 'System.Title,System.State,System.Description,System.Tags';
+  const res = await ctx.doFetch(`${ctx.base}/workitems?ids=${ids.join(',')}&fields=${fields}&api-version=7.1`, { headers: ctx.headers });
+  const data = await adoJson(res);
+  return (data.value ?? []).map((w: any) => ({
+    id: w.id,
+    title: w.fields?.['System.Title'] ?? '',
+    state: w.fields?.['System.State'] ?? '',
+    description: w.fields?.['System.Description'] ?? '',
+    tags: String(w.fields?.['System.Tags'] ?? '').split(';').map((t: string) => t.trim()).filter(Boolean),
+  }));
+}
+
+/** Create a work item of `type` with the given fields. Returns its id. */
+async function adoCreate(ctx: AdoCtx, type: string, fields: Record<string, string>): Promise<number> {
+  const res = await ctx.doFetch(`${ctx.base}/workitems/$${encodeURIComponent(type)}?api-version=7.1`, {
+    method: 'POST',
+    headers: patchHeaders(ctx),
+    body: JSON.stringify(fieldPatch(fields)),
+  });
+  return (await adoJson(res)).id;
+}
+
+/** Move a work item to a new board state (e.g. "Doing", "Done"). */
+async function adoSetState(ctx: AdoCtx, id: number, state: string): Promise<void> {
+  const res = await ctx.doFetch(`${ctx.base}/workitems/${id}?api-version=7.1`, {
+    method: 'PATCH',
+    headers: patchHeaders(ctx),
+    body: JSON.stringify(fieldPatch({ 'System.State': state })),
+  });
+  await adoJson(res);
+}
+
+/** Post a progress comment (visible on the card). */
+async function adoComment(ctx: AdoCtx, id: number, text: string): Promise<void> {
+  const res = await ctx.doFetch(`${ctx.base}/workItems/${id}/comments?api-version=7.1-preview.3`, {
+    method: 'POST', headers: ctx.headers, body: JSON.stringify({ text }),
+  });
+  await adoJson(res);
+}
+
+/** Patch arbitrary System.* fields (e.g. System.Description). */
+async function adoUpdate(ctx: AdoCtx, id: number, fields: Record<string, string>): Promise<void> {
+  const res = await ctx.doFetch(`${ctx.base}/workitems/${id}?api-version=7.1`, {
+    method: 'PATCH',
+    headers: patchHeaders(ctx),
+    body: JSON.stringify(fieldPatch(fields)),
+  });
+  await adoJson(res);
+}
+
+/** Current HTML description of a work item. */
+async function adoDescribe(ctx: AdoCtx, id: number): Promise<string> {
+  const res = await ctx.doFetch(`${ctx.base}/workitems/${id}?fields=System.Description&api-version=7.1`, { headers: ctx.headers });
+  return (await adoJson(res)).fields?.['System.Description'] ?? '';
+}
+
+/** Upload a file to the attachment store → { id, url } (not yet linked to any item). */
+async function adoAttach(ctx: AdoCtx, fileName: string, data: Uint8Array): Promise<{ id: string; url: string }> {
+  const res = await ctx.doFetch(`${ctx.base}/attachments?fileName=${encodeURIComponent(fileName)}&api-version=7.1`, {
+    method: 'POST',
+    headers: { authorization: ctx.headers.authorization, 'content-type': 'application/octet-stream' },
+    body: data as unknown as BodyInit,
+  });
+  const d = await adoJson(res);
+  return { id: d.id, url: d.url };
+}
+
+/** Link an uploaded attachment (its url) to a work item as an AttachedFile relation. */
+async function adoLinkAttachment(ctx: AdoCtx, id: number, url: string, comment = ''): Promise<void> {
+  const patch = [{ op: 'add', path: '/relations/-', value: { rel: 'AttachedFile', url, attributes: { comment } } }];
+  const res = await ctx.doFetch(`${ctx.base}/workitems/${id}?api-version=7.1`, {
+    method: 'PATCH',
+    headers: patchHeaders(ctx),
+    body: JSON.stringify(patch),
+  });
+  await adoJson(res);
+}
+
 export function adoClient(cfg: AdoConfig, doFetch: typeof fetch = fetch) {
-  const base = witBase(cfg.org, cfg.project);
-  const headers = { authorization: authHeader(cfg.pat), 'content-type': 'application/json' };
-
-  async function json(res: Response): Promise<any> {
-    if (!res.ok) throw new Error(`ADO ${res.status}: ${await res.text().catch(() => '')}`);
-    return res.json();
-  }
-
+  const ctx: AdoCtx = {
+    base: witBase(cfg.org, cfg.project),
+    headers: { authorization: authHeader(cfg.pat), 'content-type': 'application/json' },
+    doFetch,
+  };
   return {
     /** Run a WIQL query → the matching work item ids. */
-    async query(wiql: string): Promise<number[]> {
-      const res = await doFetch(`${base}/wiql?api-version=7.1`, {
-        method: 'POST', headers, body: JSON.stringify({ query: wiql }),
-      });
-      const data = await json(res);
-      return (data.workItems ?? []).map((w: any) => w.id);
-    },
-
+    query: (wiql: string): Promise<number[]> => adoQuery(ctx, wiql),
     /** Fetch fields for a set of work items. */
-    async getMany(ids: number[]): Promise<AdoWorkItem[]> {
-      if (!ids.length) return [];
-      const fields = 'System.Title,System.State,System.Description,System.Tags';
-      const res = await doFetch(`${base}/workitems?ids=${ids.join(',')}&fields=${fields}&api-version=7.1`, { headers });
-      const data = await json(res);
-      return (data.value ?? []).map((w: any) => ({
-        id: w.id,
-        title: w.fields?.['System.Title'] ?? '',
-        state: w.fields?.['System.State'] ?? '',
-        description: w.fields?.['System.Description'] ?? '',
-        tags: String(w.fields?.['System.Tags'] ?? '').split(';').map((t: string) => t.trim()).filter(Boolean),
-      }));
-    },
-
+    getMany: (ids: number[]): Promise<AdoWorkItem[]> => adoGetMany(ctx, ids),
     /** Create a work item of `type` with the given fields. Returns its id. */
-    async create(type: string, fields: Record<string, string>): Promise<number> {
-      const res = await doFetch(`${base}/workitems/$${encodeURIComponent(type)}?api-version=7.1`, {
-        method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json-patch+json' },
-        body: JSON.stringify(fieldPatch(fields)),
-      });
-      return (await json(res)).id;
-    },
-
+    create: (type: string, fields: Record<string, string>): Promise<number> => adoCreate(ctx, type, fields),
     /** Move a work item to a new board state (e.g. "Doing", "Done"). */
-    async setState(id: number, state: string): Promise<void> {
-      const res = await doFetch(`${base}/workitems/${id}?api-version=7.1`, {
-        method: 'PATCH',
-        headers: { ...headers, 'content-type': 'application/json-patch+json' },
-        body: JSON.stringify(fieldPatch({ 'System.State': state })),
-      });
-      await json(res);
-    },
-
+    setState: (id: number, state: string): Promise<void> => adoSetState(ctx, id, state),
     /** Post a progress comment (visible on the card). */
-    async comment(id: number, text: string): Promise<void> {
-      const res = await doFetch(`${base}/workItems/${id}/comments?api-version=7.1-preview.3`, {
-        method: 'POST', headers, body: JSON.stringify({ text }),
-      });
-      await json(res);
-    },
-
+    comment: (id: number, text: string): Promise<void> => adoComment(ctx, id, text),
     /** Patch arbitrary System.* fields (e.g. System.Description). */
-    async update(id: number, fields: Record<string, string>): Promise<void> {
-      const res = await doFetch(`${base}/workitems/${id}?api-version=7.1`, {
-        method: 'PATCH',
-        headers: { ...headers, 'content-type': 'application/json-patch+json' },
-        body: JSON.stringify(fieldPatch(fields)),
-      });
-      await json(res);
-    },
-
+    update: (id: number, fields: Record<string, string>): Promise<void> => adoUpdate(ctx, id, fields),
     /** Current HTML description of a work item. */
-    async describe(id: number): Promise<string> {
-      const res = await doFetch(`${base}/workitems/${id}?fields=System.Description&api-version=7.1`, { headers });
-      return (await json(res)).fields?.['System.Description'] ?? '';
-    },
-
+    describe: (id: number): Promise<string> => adoDescribe(ctx, id),
     /** Upload a file to the attachment store → { id, url } (not yet linked to any item). */
-    async attach(fileName: string, data: Uint8Array): Promise<{ id: string; url: string }> {
-      const res = await doFetch(`${base}/attachments?fileName=${encodeURIComponent(fileName)}&api-version=7.1`, {
-        method: 'POST',
-        headers: { authorization: headers.authorization, 'content-type': 'application/octet-stream' },
-        body: data as unknown as BodyInit,
-      });
-      const d = await json(res);
-      return { id: d.id, url: d.url };
-    },
-
+    attach: (fileName: string, data: Uint8Array): Promise<{ id: string; url: string }> => adoAttach(ctx, fileName, data),
     /** Link an uploaded attachment (its url) to a work item as an AttachedFile relation. */
-    async linkAttachment(id: number, url: string, comment = ''): Promise<void> {
-      const patch = [{ op: 'add', path: '/relations/-', value: { rel: 'AttachedFile', url, attributes: { comment } } }];
-      const res = await doFetch(`${base}/workitems/${id}?api-version=7.1`, {
-        method: 'PATCH',
-        headers: { ...headers, 'content-type': 'application/json-patch+json' },
-        body: JSON.stringify(patch),
-      });
-      await json(res);
-    },
+    linkAttachment: (id: number, url: string, comment = ''): Promise<void> => adoLinkAttachment(ctx, id, url, comment),
   };
 }
