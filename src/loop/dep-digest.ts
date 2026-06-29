@@ -14,37 +14,49 @@ const MAX_MODULES = 8;
 const MAX_SYMBOLS = 25;
 const MAX_CHARS = 3500;
 
-/** Map workspace package name -> entry source file (abs), from the root manifest. */
-function workspacePackages(root: string): Map<string, string> {
-  const out = new Map<string, string>();
-  const rootPkgPath = join(root, 'package.json');
-  if (!existsSync(rootPkgPath)) return out;
-  let globs: string[] = [];
+/** The `workspaces` globs from the root manifest ([] on missing/parse error). */
+function readWorkspaceGlobs(rootPkgPath: string): string[] {
   try {
     const j = JSON.parse(readFileSync(rootPkgPath, 'utf8'));
-    globs = Array.isArray(j.workspaces) ? j.workspaces : j.workspaces?.packages ?? [];
-  } catch { return out; }
-  const memberDirs: string[] = [];
+    return Array.isArray(j.workspaces) ? j.workspaces : j.workspaces?.packages ?? [];
+  } catch { return []; }
+}
+
+/** Expand workspace globs to concrete member directories (abs). */
+function memberDirsOf(root: string, globs: string[]): string[] {
+  const dirs: string[] = [];
   for (const g of globs) {
     if (g.includes('*')) {
       const prefix = g.slice(0, g.indexOf('*')).replace(/\/$/, '');
       const base = join(root, prefix);
       try {
-        for (const e of readdirSync(base, { withFileTypes: true })) if (e.isDirectory()) memberDirs.push(join(base, e.name));
+        for (const e of readdirSync(base, { withFileTypes: true })) if (e.isDirectory()) dirs.push(join(base, e.name));
       } catch { /* missing glob dir */ }
-    } else memberDirs.push(join(root, g));
+    } else dirs.push(join(root, g));
   }
-  for (const dir of memberDirs) {
-    const pkgPath = join(dir, 'package.json');
-    if (!existsSync(pkgPath)) continue;
-    try {
-      const j = JSON.parse(readFileSync(pkgPath, 'utf8'));
-      if (!j.name) continue;
-      const entry = entryOf(j);
-      const abs = resolveModule(join(dir, entry));
-      if (abs) out.set(j.name, abs);
-    } catch { /* skip */ }
-  }
+  return dirs;
+}
+
+/** Read one member package.json and register name -> entry source file. */
+function addPackage(out: Map<string, string>, dir: string): void {
+  const pkgPath = join(dir, 'package.json');
+  if (!existsSync(pkgPath)) return;
+  try {
+    const j = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    if (!j.name) return;
+    const entry = entryOf(j);
+    const abs = resolveModule(join(dir, entry));
+    if (abs) out.set(j.name, abs);
+  } catch { /* skip */ }
+}
+
+/** Map workspace package name -> entry source file (abs), from the root manifest. */
+function workspacePackages(root: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const rootPkgPath = join(root, 'package.json');
+  if (!existsSync(rootPkgPath)) return out;
+  const globs = readWorkspaceGlobs(rootPkgPath);
+  for (const dir of memberDirsOf(root, globs)) addPackage(out, dir);
   return out;
 }
 
@@ -87,6 +99,15 @@ function moduleApi(src: string): string[] {
   return [...out.entries()].slice(0, MAX_SYMBOLS).map(([name, sig]) => (sig ? sig : name));
 }
 
+/** Resolve an import specifier (relative OR workspace package) to a source file. */
+function resolveImportToFile(spec: string, abs: string, pkgs: Map<string, string>): string | null {
+  if (spec.startsWith('.')) return resolveModule(resolve(dirname(abs), spec));
+  // workspace package: exact name or name + subpath
+  const name = pkgs.has(spec) ? spec : [...pkgs.keys()].find((n) => spec === n || spec.startsWith(n + '/'));
+  if (!name) return null;
+  return spec === name ? pkgs.get(name)! : resolveModule(join(dirname(pkgs.get(name)!), spec.slice(name.length + 1)));
+}
+
 /** Build the dependency-API context block for a focus file (empty if nothing useful). */
 export function buildDepDigest(dir: string, onlyPath: string): string {
   const abs = resolveModule(resolve(dir, onlyPath));
@@ -101,16 +122,7 @@ export function buildDepDigest(dir: string, onlyPath: string): string {
 
   for (const spec of importSpecs(src)) {
     if (lines.length >= MAX_MODULES) break;
-    let modAbs: string | null = null;
-    if (spec.startsWith('.')) {
-      modAbs = resolveModule(resolve(dirname(abs), spec));
-    } else {
-      // workspace package: exact name or name + subpath
-      const name = pkgs.has(spec) ? spec : [...pkgs.keys()].find((n) => spec === n || spec.startsWith(n + '/'));
-      if (name) {
-        modAbs = spec === name ? pkgs.get(name)! : resolveModule(join(dirname(pkgs.get(name)!), spec.slice(name.length + 1)));
-      }
-    }
+    const modAbs = resolveImportToFile(spec, abs, pkgs);
     if (!modAbs || seen.has(modAbs)) continue;
     seen.add(modAbs);
     let api: string[];

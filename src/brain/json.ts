@@ -5,18 +5,16 @@
 // throwing or half-parsing. Replaces the ad-hoc slice+JSON.parse scattered across
 // the claude-code / bridge / review parsers.
 
-/** Slice the first balanced `{…}` or `[…]` (string-aware) from `text`, or null. */
-function sliceBalanced(text: string): string | null {
-  let start = -1;
-  let open = '{';
+/** Index + char of the first opening `{`/`[` in `text`, or null. */
+function findOpen(text: string): { start: number; open: string } | null {
   for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{' || text[i] === '[') {
-      start = i;
-      open = text[i];
-      break;
-    }
+    if (text[i] === '{' || text[i] === '[') return { start: i, open: text[i] };
   }
-  if (start < 0) return null;
+  return null;
+}
+
+/** From `start`, return the string-aware balanced slice for `open`, or null. */
+function matchClose(text: string, start: number, open: string): string | null {
   const close = open === '{' ? '}' : ']';
   let depth = 0;
   let inStr = false;
@@ -32,6 +30,12 @@ function sliceBalanced(text: string): string | null {
     else if (ch === close && --depth === 0) return text.slice(start, i + 1);
   }
   return null;
+}
+
+/** Slice the first balanced `{…}` or `[…]` (string-aware) from `text`, or null. */
+function sliceBalanced(text: string): string | null {
+  const o = findOpen(text);
+  return o ? matchClose(text, o.start, o.open) : null;
 }
 
 /** The first JSON value in `text` (```json fence preferred, else balanced slice). */
