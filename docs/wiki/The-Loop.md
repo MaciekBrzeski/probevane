@@ -43,7 +43,17 @@ Deliberately small — the model writes tests, it does **not** get a "run tests"
 | `write_file` | create/overwrite a test file |
 | `edit_file` | unique-match string replace |
 
-All paths are confined to the project dir (no absolute paths, no `..` escapes).
+**Writes** are confined to the run's dir (no absolute paths, no `..` escapes — `path_guard`).
+**Reads** (`read_file`/`list_dir`) may reach anywhere under the **workspace/repo root** (the
+nearest ancestor with `pnpm-workspace.yaml` / a `package.json` `workspaces` / `.git`, else the
+workdir) — so a focused run inside a monorepo package can read the sibling packages it imports,
+instead of guessing their shapes. A per-run read budget nudges the model to edit rather than
+crawl.
+
+**Focused runs (`--only <path>`)** inject a **repo-map** (the target's importers + imports) and a
+**dependency-API digest** (the export signatures of the workspace packages + relative modules the
+focus file imports) into the task up front — so the model edits instead of crawling, and need not
+read those modules at all (the "remove the need" complement to workspace-scoped reads).
 
 ## Why tests aren't a tool
 
