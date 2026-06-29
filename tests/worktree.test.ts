@@ -20,7 +20,9 @@ describe('runInWorktree', () => {
     g('config', 'user.email', 't@t.t'); g('config', 'user.name', 'T');
     g('config', 'commit.gpgsign', 'false');
     writeFileSync(join(repo, 'README.md'), '# repo\n');
-    mkdirSync(join(repo, 'node_modules', 'pkg'), { recursive: true }); // gitignored-style dep dir
+    mkdirSync(join(repo, 'node_modules', 'pkg'), { recursive: true }); // root dep dir
+    mkdirSync(join(repo, 'fixtures', 'app', 'node_modules', 'dep'), { recursive: true }); // nested (non-hoisted)
+    writeFileSync(join(repo, 'fixtures', 'app', 'index.ts'), 'export const x = 1;\n');
     writeFileSync(join(repo, '.gitignore'), 'node_modules\n');
     g('add', '-A'); g('commit', '-qm', 'init');
   });
@@ -28,8 +30,9 @@ describe('runInWorktree', () => {
 
   it('accepts: commits edited files on a branch, removes the worktree, leaves the live tree untouched', async () => {
     const out = await runInWorktree(repo, 'feature', async (wd) => {
-      // node_modules must be symlinked into the worktree (the gotcha)
+      // node_modules must be symlinked into the worktree (the gotcha) — root AND nested
       expect(lstatSync(join(wd, 'node_modules')).isSymbolicLink()).toBe(true);
+      expect(lstatSync(join(wd, 'fixtures', 'app', 'node_modules')).isSymbolicLink()).toBe(true);
       writeFileSync(join(wd, 'newfile.ts'), 'export const X = 1;\n');
       return base({ accepted: true, editedFiles: ['newfile.ts'] });
     });

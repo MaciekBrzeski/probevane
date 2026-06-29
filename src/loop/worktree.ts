@@ -1,6 +1,6 @@
-import { existsSync, symlinkSync } from 'node:fs';
+import { existsSync, symlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import {
   repoRoot, headSha, addWorktree, removeWorktree, diffStat, commitFiles, mergeBranch, currentBranch,
 } from '../util/git.js';
@@ -13,6 +13,21 @@ import type { RunOutcome } from './engine.js';
 // merged with --worktree-merge); on reject the worktree + branch are discarded.
 
 let seq = 0;
+
+/** Every node_modules dir under `root` (repo-relative), without descending into them. */
+function findNodeModules(root: string, sub = '', depth = 0): string[] {
+  if (depth > 6) return [];
+  const out: string[] = [];
+  let entries;
+  try { entries = readdirSync(join(root, sub), { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    if (!e.isDirectory() || e.name === '.git' || e.name === 'dist') continue;
+    const rel = sub ? `${sub}/${e.name}` : e.name;
+    if (e.name === 'node_modules') { out.push(rel); continue; } // symlink it; don't descend
+    out.push(...findNodeModules(root, rel, depth + 1));
+  }
+  return out;
+}
 
 export interface WorktreeOpts {
   merge?: boolean; // auto-merge the branch into the original branch on accept
@@ -39,11 +54,15 @@ export async function runInWorktree(
   log(`[probevane] worktree ${wt} (branch ${branch}) — live tree untouched`);
 
   try {
-    // A fresh worktree has no node_modules (gitignored) → symlink the repo root's
-    // so tsc/vitest resolve. Root-hoisted only; per-package node_modules unhandled.
-    const rootNM = join(root, 'node_modules');
-    const wtNM = join(wt, 'node_modules');
-    if (existsSync(rootNM) && !existsSync(wtNM)) { try { symlinkSync(rootNM, wtNM, 'dir'); } catch { /* best-effort */ } }
+    // A fresh worktree has no node_modules (gitignored) → symlink EVERY node_modules
+    // dir from the source tree (root + nested, e.g. fixtures/*/node_modules) so
+    // tsc/vitest resolve everywhere — not just hoisted root deps.
+    for (const rel of findNodeModules(root)) {
+      const src = join(root, rel);
+      const dst = join(wt, rel);
+      if (existsSync(dst)) continue;
+      try { mkdirSync(dirname(dst), { recursive: true }); symlinkSync(src, dst, 'dir'); } catch { /* best-effort */ }
+    }
 
     const outcome = await run(join(wt, rel));
 
