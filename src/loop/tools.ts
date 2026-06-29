@@ -1,5 +1,6 @@
 import { readFile, writeFile, mkdir, readdir, stat, rm } from 'node:fs/promises';
-import { join, resolve, relative, dirname, isAbsolute } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve, relative, dirname, isAbsolute, parse as parsePath } from 'node:path';
 import type { RunCtx } from './ctx.js';
 import type { ToolCall, ToolSpec } from './types.js';
 
@@ -81,7 +82,7 @@ export const TOOL_SPECS: ToolSpec[] = [
 
 export const WRITE_TOOLS = new Set(['write_file', 'edit_file']);
 
-/** Resolve a project-relative path, refusing escapes outside workdir. */
+/** Resolve a project-relative WRITE path, refusing escapes outside the workdir. */
 function safePath(ctx: RunCtx, p: string): string {
   if (isAbsolute(p)) throw new Error(`absolute paths are not allowed: ${p}`);
   const abs = resolve(ctx.workdir, p);
@@ -90,16 +91,58 @@ function safePath(ctx: RunCtx, p: string): string {
   return abs;
 }
 
+/** The workspace/repo root containing `workdir` — first ancestor with a
+ *  pnpm-workspace.yaml, a package.json with `"workspaces"`, or `.git`. Falls
+ *  back to `workdir` itself (no widening for a non-workspace/non-repo dir).
+ *  Memoized on ctx. Reads are allowed anywhere under this root; writes are not. */
+function workspaceRoot(ctx: RunCtx): string {
+  if (ctx.workspaceRoot) return ctx.workspaceRoot;
+  let dir = ctx.workdir;
+  const fsRoot = parsePath(dir).root;
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml')) || existsSync(join(dir, '.git'))) break;
+    const pkg = join(dir, 'package.json');
+    if (existsSync(pkg)) {
+      try {
+        if ('workspaces' in JSON.parse(readFileSync(pkg, 'utf8'))) break;
+      } catch { /* unparseable — keep walking */ }
+    }
+    const parent = dirname(dir);
+    if (parent === dir || dir === fsRoot) { dir = ctx.workdir; break; } // no marker → fall back to workdir
+    dir = parent;
+  }
+  ctx.workspaceRoot = dir;
+  return dir;
+}
+
+/** Resolve a READ path. Allowed under the workdir (always) or anywhere under the
+ *  workspace/repo root (excluding `.git`) — so a sandboxed run can read sibling
+ *  workspace packages' source/types. Never permits absolute paths. */
+function safeReadPath(ctx: RunCtx, p: string): string {
+  if (isAbsolute(p)) throw new Error(`absolute paths are not allowed: ${p}`);
+  const abs = resolve(ctx.workdir, p);
+  if (!relative(ctx.workdir, abs).startsWith('..')) return abs; // inside workdir
+  const root = workspaceRoot(ctx);
+  const relRoot = relative(root, abs);
+  if (!relRoot.startsWith('..') && !relRoot.split(/[/\\]/).includes('.git')) return abs; // inside workspace
+  throw new Error(
+    `${p} is outside the workspace — you don't need it. Use the modules you already import, ` +
+      `or read a path within the project/workspace.`,
+  );
+}
+
 export async function execTool(call: ToolCall, ctx: RunCtx): Promise<string> {
   const input = call.input as any;
   switch (call.name) {
     case 'read_file': {
-      const abs = safePath(ctx, input.path);
+      ctx.reads++;
+      const abs = safeReadPath(ctx, input.path);
       const txt = await readFile(abs, 'utf8');
       return txt.length > 20_000 ? txt.slice(0, 20_000) + '\n…[truncated]' : txt;
     }
     case 'list_dir': {
-      const abs = safePath(ctx, input.path ?? '.');
+      ctx.reads++;
+      const abs = safeReadPath(ctx, input.path ?? '.');
       const entries = await readdir(abs, { withFileTypes: true });
       return entries.map((e) => (e.isDirectory() ? e.name + '/' : e.name)).join('\n');
     }
