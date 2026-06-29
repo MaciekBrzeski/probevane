@@ -31,7 +31,33 @@ function skipString(raw: string, i: number, quote: string): number {
   return i + 1;
 }
 
-/** Strip strings + comments from a single line, advancing block-comment state. */
+const REGEX_PREV = '([{,;=:!&|?';
+const REGEX_KW = /\b(return|typeof|instanceof|in|of|new|delete|void|do|else|yield|await|case)$/;
+
+/** True if a `/` here begins a regex literal (vs division), judged from the code
+ *  emitted so far on the line. */
+function regexContext(s: string): boolean {
+  const t = s.replace(/\s+$/, '');
+  if (t === '') return true;
+  return REGEX_PREV.includes(t[t.length - 1]!) || REGEX_KW.test(t);
+}
+
+/** Skip a regex literal from just after its opening `/`; returns the index past the
+ *  closing UNESCAPED `/` (a `/` inside a `[...]` char class does not close it). */
+function skipRegex(raw: string, j: number): number {
+  let inClass = false;
+  while (j < raw.length) {
+    const c = raw[j];
+    if (c === '\\') { j += 2; continue; }
+    if (c === '[') inClass = true;
+    else if (c === ']') inClass = false;
+    else if (c === '/' && !inClass) return j + 1;
+    j++;
+  }
+  return j; // unterminated on this line
+}
+
+/** Strip strings, comments + regex literals from a single line, advancing block state. */
 function stripLine(raw: string, st: StripState): string {
   let s = '';
   let i = 0;
@@ -50,6 +76,11 @@ function stripLine(raw: string, st: StripState): string {
     if (ch === '"' || ch === "'" || ch === '`') {
       i = skipString(raw, i + 1, ch);
       s += '""'; // collapse the literal
+      continue;
+    }
+    if (ch === '/' && regexContext(s)) {
+      i = skipRegex(raw, i + 1);
+      s += 'RE'; // collapse the regex literal (no braces/quotes leak)
       continue;
     }
     s += ch;
