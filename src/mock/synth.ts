@@ -95,6 +95,11 @@ export function sampleSchema(schema: any, comps: Record<string, any>, depth = 0)
   }
   if (schema.example !== undefined) return schema.example;
   if (schema.enum) return schema.enum[0];
+  return sampleByType(schema, comps, depth);
+}
+
+/** Sample a schema by its declared `type` (the scalar/array/object dispatch). */
+function sampleByType(schema: any, comps: Record<string, any>, depth: number): unknown {
   switch (schema.type) {
     case 'array': {
       const item = sampleSchema(schema.items, comps, depth + 1);
@@ -108,13 +113,17 @@ export function sampleSchema(schema: any, comps: Record<string, any>, depth = 0)
     case 'string':
       return schema.format === 'date-time' ? '2020-01-01T00:00:00Z' : 'sample';
     case 'object':
-    default: {
-      const props = schema.properties ?? {};
-      const o: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(props)) o[k] = sampleSchema(v, comps, depth + 1);
-      return o;
-    }
+    default:
+      return sampleObject(schema, comps, depth);
   }
+}
+
+/** Sample each property of an object schema. */
+function sampleObject(schema: any, comps: Record<string, any>, depth: number): Record<string, unknown> {
+  const props = schema.properties ?? {};
+  const o: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props)) o[k] = sampleSchema(v, comps, depth + 1);
+  return o;
 }
 
 function bump(v: unknown, i: number): unknown {
