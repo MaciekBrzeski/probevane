@@ -69,7 +69,7 @@ export async function runInWorktree(
     const outcome = await run(join(wt, rel));
 
     if (!outcome.accepted) {
-      log(`[probevane] worktree: not accepted (${outcome.stopReason}) — discarding worktree + branch (live tree clean)`);
+      log(`[probevane] worktree: not accepted (${outcome.stopReason}) — discarding (live tree clean)`);
       await removeWorktree(root, wt, branch);
       return outcome;
     }
@@ -87,9 +87,8 @@ export async function runInWorktree(
     if (opts.review) {
       const findings = await opts.review(await getDiff(wt, 'HEAD~1')).catch(() => [] as Finding[]);
       const errs = findings.filter((f) => f.severity === 'error');
-      log(findings.length
-        ? `[probevane] worktree review — ${findings.length} finding(s), ${errs.length} error:\n${findingsMarkdown(findings)}`
-        : '[probevane] worktree review: clean');
+      const head = `[probevane] worktree review — ${findings.length} finding(s), ${errs.length} error`;
+      log(findings.length ? `${head}:\n${findingsMarkdown(findings)}` : '[probevane] worktree review: clean');
       if (doMerge && errs.length) {
         doMerge = false; // don't auto-merge over review errors — keep the branch for a human
         log(`[probevane] worktree: ${errs.length} review error(s) — auto-merge BLOCKED; keeping branch ${branch}`);
