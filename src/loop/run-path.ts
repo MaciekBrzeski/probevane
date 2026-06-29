@@ -5,6 +5,7 @@ import { profile, type ProfileName, type ProfileOpts } from './profiles.js';
 import { runLoop, type RunOutcome } from './engine.js';
 import { buildGraph } from '../mock/graph.js';
 import { focusDirective } from './scout.js';
+import { buildDepDigest } from './dep-digest.js';
 
 // Generic single-task path runner — shared by refactor / feature / repair. (The
 // test-generation path keeps its richer probe-grounding in run-generation.ts.)
@@ -42,7 +43,13 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
   if (opts.only) {
     const graph = await buildGraph(opts.dir).catch(() => null);
     task += focusDirective(graph, opts.only);
-    log(`[probevane] focus: ${opts.only}${graph ? ' (repo-map injected)' : ''}`);
+    // Inject the focus file's dependency APIs (workspace pkgs + relative modules
+    // it imports) so the model doesn't need to read them — removes the read-thrash
+    // + wrong-shape-guess failure mode (complements workspace-scoped reads).
+    let depBlock = '';
+    try { depBlock = buildDepDigest(opts.dir, opts.only); } catch { /* best-effort */ }
+    task += depBlock;
+    log(`[probevane] focus: ${opts.only}${graph ? ' (repo-map injected)' : ''}${depBlock ? ' (+dep APIs)' : ''}`);
   }
 
   return runLoop({
