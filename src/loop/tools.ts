@@ -134,55 +134,75 @@ function safeReadPath(ctx: RunCtx, p: string): string {
   );
 }
 
+// --- per-tool handlers (1:1 with the dispatch cases in execTool) ---
+
+async function readFileTool(ctx: RunCtx, input: any): Promise<string> {
+  ctx.reads++;
+  const abs = safeReadPath(ctx, input.path);
+  const txt = await readFile(abs, 'utf8');
+  return txt.length > 20_000 ? txt.slice(0, 20_000) + '\n…[truncated]' : txt;
+}
+
+async function listDirTool(ctx: RunCtx, input: any): Promise<string> {
+  ctx.reads++;
+  const abs = safeReadPath(ctx, input.path ?? '.');
+  const entries = await readdir(abs, { withFileTypes: true });
+  return entries.map((e) => (e.isDirectory() ? e.name + '/' : e.name)).join('\n');
+}
+
+async function writeFileTool(ctx: RunCtx, input: any): Promise<string> {
+  const abs = safePath(ctx, input.path);
+  await mkdir(dirname(abs), { recursive: true });
+  await writeFile(abs, String(input.contents));
+  ctx.editedFiles.add(input.path);
+  ctx.lastEditPath = input.path;
+  ctx.validatedSinceEdit = false;
+  return `wrote ${input.path} (${String(input.contents).length} bytes)`;
+}
+
+async function editFileTool(ctx: RunCtx, input: any): Promise<string> {
+  const abs = safePath(ctx, input.path);
+  const cur = await readFile(abs, 'utf8');
+  const idx = cur.indexOf(input.old_string);
+  if (idx === -1) throw new Error(`old_string not found in ${input.path}`);
+  if (cur.indexOf(input.old_string, idx + 1) !== -1)
+    throw new Error(`old_string is not unique in ${input.path} — add more context`);
+  const next = cur.slice(0, idx) + input.new_string + cur.slice(idx + input.old_string.length);
+  await writeFile(abs, next);
+  ctx.editedFiles.add(input.path);
+  ctx.lastEditPath = input.path;
+  ctx.validatedSinceEdit = false;
+  return `edited ${input.path}`;
+}
+
+async function deleteFileTool(ctx: RunCtx, input: any): Promise<string> {
+  const abs = safePath(ctx, input.path);
+  await rm(abs);
+  ctx.editedFiles.delete(input.path);
+  if (ctx.lastEditPath === input.path) ctx.lastEditPath = null;
+  return `deleted ${input.path}`;
+}
+
+function planTool(ctx: RunCtx, input: any): string {
+  ctx.plan = { text: String(input.plan), at: ctx.step };
+  return 'plan recorded';
+}
+
 export async function execTool(call: ToolCall, ctx: RunCtx): Promise<string> {
   const input = call.input as any;
   switch (call.name) {
-    case 'read_file': {
-      ctx.reads++;
-      const abs = safeReadPath(ctx, input.path);
-      const txt = await readFile(abs, 'utf8');
-      return txt.length > 20_000 ? txt.slice(0, 20_000) + '\n…[truncated]' : txt;
-    }
-    case 'list_dir': {
-      ctx.reads++;
-      const abs = safeReadPath(ctx, input.path ?? '.');
-      const entries = await readdir(abs, { withFileTypes: true });
-      return entries.map((e) => (e.isDirectory() ? e.name + '/' : e.name)).join('\n');
-    }
-    case 'write_file': {
-      const abs = safePath(ctx, input.path);
-      await mkdir(dirname(abs), { recursive: true });
-      await writeFile(abs, String(input.contents));
-      ctx.editedFiles.add(input.path);
-      ctx.lastEditPath = input.path;
-      ctx.validatedSinceEdit = false;
-      return `wrote ${input.path} (${String(input.contents).length} bytes)`;
-    }
-    case 'edit_file': {
-      const abs = safePath(ctx, input.path);
-      const cur = await readFile(abs, 'utf8');
-      const idx = cur.indexOf(input.old_string);
-      if (idx === -1) throw new Error(`old_string not found in ${input.path}`);
-      if (cur.indexOf(input.old_string, idx + 1) !== -1)
-        throw new Error(`old_string is not unique in ${input.path} — add more context`);
-      const next = cur.slice(0, idx) + input.new_string + cur.slice(idx + input.old_string.length);
-      await writeFile(abs, next);
-      ctx.editedFiles.add(input.path);
-      ctx.lastEditPath = input.path;
-      ctx.validatedSinceEdit = false;
-      return `edited ${input.path}`;
-    }
-    case 'delete_file': {
-      const abs = safePath(ctx, input.path);
-      await rm(abs);
-      ctx.editedFiles.delete(input.path);
-      if (ctx.lastEditPath === input.path) ctx.lastEditPath = null;
-      return `deleted ${input.path}`;
-    }
-    case 'plan': {
-      ctx.plan = { text: String(input.plan), at: ctx.step };
-      return 'plan recorded';
-    }
+    case 'read_file':
+      return readFileTool(ctx, input);
+    case 'list_dir':
+      return listDirTool(ctx, input);
+    case 'write_file':
+      return writeFileTool(ctx, input);
+    case 'edit_file':
+      return editFileTool(ctx, input);
+    case 'delete_file':
+      return deleteFileTool(ctx, input);
+    case 'plan':
+      return planTool(ctx, input);
     default:
       throw new Error(`unknown tool: ${call.name}`);
   }
