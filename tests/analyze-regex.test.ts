@@ -21,3 +21,19 @@ describe('analyzer — regex literals do not break function boundaries', () => {
     expect(fns.map((f) => f.name)).toContain('half');
   });
 });
+
+describe('analyzer — long lines measure CODE width, not string/comment width', () => {
+  it('a line long only due to a string literal is NOT flagged; long code IS', () => {
+    const longStr = 'x'.repeat(200);
+    const longCode = `const a = ${'b + '.repeat(40)}c;`; // ~160 chars of real code
+    const src = `const msg = "${longStr}";\n${longCode}\n`;
+    const r = analyzeFile('t.ts', src, DEFAULT_QUALITY);
+    expect(r.longLineNos).not.toContain(1); // string literal — collapsed, not a code smell
+    expect(r.longLineNos).toContain(2); // genuinely long code
+  });
+
+  it('a long trailing comment is NOT flagged', () => {
+    const src = `const x = 1; // ${'note '.repeat(40)}\n`;
+    expect(analyzeFile('t.ts', src, DEFAULT_QUALITY).longLineNos).toEqual([]);
+  });
+});
