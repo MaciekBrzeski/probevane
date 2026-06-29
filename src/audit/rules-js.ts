@@ -8,6 +8,12 @@ import type { AuditRule } from '../adapters/adapter.js';
 // silences that rule. Handled in core.ts; rules here just detect.
 
 export function jsAuditRules(): AuditRule[] {
+  return [...importHygieneRules(), ...assertionPresenceRules(), ...assertionQualityRules()];
+}
+
+// Import / runner-config hygiene: catch imports and harness toggles that silently
+// disable tests (wrong Playwright package, brittle waits, leftover `.only`).
+function importHygieneRules(): AuditRule[] {
   return [
     {
       // The Playwright runner package is `@playwright/test`; a bare `playwright/test`
@@ -35,6 +41,12 @@ export function jsAuditRules(): AuditRule[] {
           ? '.only left in spec — would silently skip the rest of the suite'
           : null,
     },
+  ];
+}
+
+// Assertion presence: a test/render/mutation that never asserts is coverage theatre.
+function assertionPresenceRules(): AuditRule[] {
+  return [
     {
       id: 'render-without-assertion',
       severity: 'warn',
@@ -62,17 +74,6 @@ export function jsAuditRules(): AuditRule[] {
       },
     },
     {
-      id: 'conditional-expect',
-      severity: 'error',
-      // An assertion guarded by a condition may silently never run — a classic
-      // way a test "passes" without testing anything.
-      check: (line) =>
-        /\bif\s*\([^)]*\)\s*(\{)?\s*(await\s+)?expect\s*\(/.test(line) ||
-        /[?&|]{1,2}\s*(await\s+)?expect\s*\(/.test(line)
-          ? 'assertion is conditional — it may never execute; assert unconditionally'
-          : null,
-    },
-    {
       id: 'assertion-free-block',
       severity: 'error',
       // A test case with no assertion in its body (coverage theatre).
@@ -84,6 +85,24 @@ export function jsAuditRules(): AuditRule[] {
           ? null
           : 'test case has no assertion — every test must assert observable behavior';
       },
+    },
+  ];
+}
+
+// Assertion quality: assertions that exist but are weak/conditional, plus unused
+// imports used to inflate module coverage.
+function assertionQualityRules(): AuditRule[] {
+  return [
+    {
+      id: 'conditional-expect',
+      severity: 'error',
+      // An assertion guarded by a condition may silently never run — a classic
+      // way a test "passes" without testing anything.
+      check: (line) =>
+        /\bif\s*\([^)]*\)\s*(\x7b)?\s*(await\s+)?expect\s*\(/.test(line) ||
+        /[?&|]{1,2}\s*(await\s+)?expect\s*\(/.test(line)
+          ? 'assertion is conditional — it may never execute; assert unconditionally'
+          : null,
     },
     {
       id: 'snapshot-only',
@@ -106,7 +125,7 @@ export function jsAuditRules(): AuditRule[] {
       severity: 'warn',
       // An imported symbol never used can be a trick to inflate module coverage.
       check: (line, _lineNo, _file, full) => {
-        const m = line.match(/^\s*import\s+\{([^}]+)\}\s+from/);
+        const m = line.match(/^\s*import\s+\x7b([^\x7d]+)\x7d\s+from/);
         if (!m) return null;
         const names = m[1]
           .split(',')
