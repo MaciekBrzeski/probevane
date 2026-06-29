@@ -94,25 +94,28 @@ function safePath(ctx: RunCtx, p: string): string {
 /** The workspace/repo root containing `workdir` — first ancestor with a
  *  pnpm-workspace.yaml, a package.json with `"workspaces"`, or `.git`. Falls
  *  back to `workdir` itself (no widening for a non-workspace/non-repo dir).
- *  Memoized on ctx. Reads are allowed anywhere under this root; writes are not. */
-function workspaceRoot(ctx: RunCtx): string {
-  if (ctx.workspaceRoot) return ctx.workspaceRoot;
-  let dir = ctx.workdir;
+ *  Pure (path in → path out); reused by the dependency-API digest. */
+export function workspaceRootOf(workdir: string): string {
+  let dir = workdir;
   const fsRoot = parsePath(dir).root;
   for (let i = 0; i < 12; i++) {
-    if (existsSync(join(dir, 'pnpm-workspace.yaml')) || existsSync(join(dir, '.git'))) break;
+    if (existsSync(join(dir, 'pnpm-workspace.yaml')) || existsSync(join(dir, '.git'))) return dir;
     const pkg = join(dir, 'package.json');
     if (existsSync(pkg)) {
       try {
-        if ('workspaces' in JSON.parse(readFileSync(pkg, 'utf8'))) break;
+        if ('workspaces' in JSON.parse(readFileSync(pkg, 'utf8'))) return dir;
       } catch { /* unparseable — keep walking */ }
     }
     const parent = dirname(dir);
-    if (parent === dir || dir === fsRoot) { dir = ctx.workdir; break; } // no marker → fall back to workdir
+    if (parent === dir || dir === fsRoot) break; // no marker → fall back to workdir
     dir = parent;
   }
-  ctx.workspaceRoot = dir;
-  return dir;
+  return workdir;
+}
+
+/** Memoized-on-ctx workspace root. Reads are allowed anywhere under it; writes are not. */
+function workspaceRoot(ctx: RunCtx): string {
+  return (ctx.workspaceRoot ??= workspaceRootOf(ctx.workdir));
 }
 
 /** Resolve a READ path. Allowed under the workdir (always) or anywhere under the
