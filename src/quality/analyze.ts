@@ -103,7 +103,11 @@ export function analyzeFile(file: string, source: string, cfg: QualityConfig): F
   const longLineNos: number[] = [];
   const debtLineNos: number[] = [];
   lines.forEach((l, i) => {
-    if (l.length > cfg.maxLineWidth) longLineNos.push(i + 1);
+    // Measure the CODE width (strings collapsed, comments removed) — a line that's
+    // long only because of a string literal / data row / comment / URL is not a
+    // code-complexity smell, so it shouldn't trip the long-line rule (was a misfire
+    // on the command table, config templates, and trailing-comment lines).
+    if (code[i].length > cfg.maxLineWidth) longLineNos.push(i + 1);
     // Debt only counts inside a COMMENT — not in a string literal or identifier.
     if (cfg.debt && DEBT.test(commentText(l))) debtLineNos.push(i + 1);
   });
