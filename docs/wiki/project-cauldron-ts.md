@@ -48,3 +48,13 @@ by the probevane $0 bridge factory.
 - Refinement: the `refine-creature-part` skill drives the `?part=` isolate-and-fix loop.
 - $0 builds: `probevane.config.json` pins `model: bridge`.
 - Bench screenshots go to `cauldron-ts/.bench-shots/` (gitignored), not the cwd.
+
+## Module graph
+
+This page is hand-curated (the auto `spec` finds 0 modules — source lives under
+`packages/*/src` in this npm-workspaces monorepo, which the TS-import grapher
+doesn't walk). The dependency shape, leaf-first: `packages/engine` (pure sim +
+appearance) → `packages/render` (WebGL/Canvas2D renderer + animation) →
+`games/cauldron` (content as data) → `apps/web` (React + canvas + the feature
+showcase). See `cauldron-ts/docs/ANALYSIS.md` + each package's `package.json`
+for the authoritative module list.
