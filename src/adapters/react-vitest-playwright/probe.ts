@@ -106,44 +106,62 @@ interface ExportInfo {
   signature?: string;
 }
 
-function extractExports(src: string): ExportInfo[] {
-  const out: ExportInfo[] = [];
-  const seen = new Set<string>();
-  // export [default] [async] function NAME(args)
+type AddExport = (name: string, signature?: string) => void;
+
+// export [default] [async] function NAME(args)
+function collectFunctionExports(src: string, add: AddExport): void {
   for (const m of src.matchAll(/export\s+(?:default\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(([^)]*)\)/g)) {
     add(m[1], `${m[1]}(${m[2].trim()})`);
   }
-  // export const NAME = (args) =>  /  export const NAME = function
+}
+
+// export const NAME = (args) =>  /  export const NAME = function
+// and export const NAME = <non-arrow value> (thunks, constants, configured fns)
+function collectConstExports(src: string, add: AddExport): void {
   for (const m of src.matchAll(/export\s+const\s+([A-Za-z0-9_]+)\s*=\s*(?:\(([^)]*)\)|[A-Za-z0-9_]+)\s*=>/g)) {
     add(m[1], `${m[1]}(${(m[2] ?? '').trim()})`);
   }
-  // export const NAME = <non-arrow value>  (covers thunks, constants, configured fns)
   for (const m of src.matchAll(/export\s+const\s+([A-Za-z0-9_]+)\s*[:=]/g)) add(m[1]);
-  // export const { a, b } = X.actions  (redux slice action creators, destructured re-exports)
+}
+
+// export const { a, b } = X.actions  (redux slice action creators, destructured re-exports)
+// export { a, b }  (re-export)
+function collectBraceExports(src: string, add: AddExport): void {
   for (const m of src.matchAll(/export\s+const\s*\{([^}]+)\}\s*=/g)) {
     for (const part of m[1].split(',')) {
       const name = part.trim().split(/\s*:\s*/)[0].trim();
       if (name) add(name);
     }
   }
-  // export { a, b }  (re-export)
   for (const m of src.matchAll(/export\s*\{([^}]+)\}\s*(?:from|;|$)/gm)) {
     for (const part of m[1].split(',')) {
       const name = part.trim().split(/\s+as\s+/)[0].trim();
       if (name) add(name);
     }
   }
-  // export default <expr>  (e.g. `export default slice.reducer`)
+}
+
+// export default <expr>  (e.g. `export default slice.reducer`)
+function collectDefaultExport(src: string, add: AddExport): void {
   if (/export\s+default\s/.test(src)) {
     const d = src.match(/export\s+default\s+([A-Za-z0-9_.]+)/);
     add('default', d ? `default (= ${d[1]})` : 'default');
   }
-  function add(name: string, signature?: string) {
+}
+
+function extractExports(src: string): ExportInfo[] {
+  const out: ExportInfo[] = [];
+  const seen = new Set<string>();
+  const add: AddExport = (name, signature) => {
     if (!name || seen.has(name)) return;
     seen.add(name);
     const isComponent = /^[A-Z]/.test(name);
     out.push({ name, isComponent, signature });
-  }
+  };
+  collectFunctionExports(src, add);
+  collectConstExports(src, add);
+  collectBraceExports(src, add);
+  collectDefaultExport(src, add);
   return out;
 }
 
