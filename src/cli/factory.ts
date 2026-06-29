@@ -31,12 +31,17 @@ const OWN: Record<string, 0 | 1> = {
   '--ship': 0,
 };
 
-async function main() {
-  const argv = process.argv.slice(2);
-  const positionals: string[] = [];
-  const own: Record<string, string | boolean> = {};
-  const passThrough: string[] = [];
+type Own = Record<string, string | boolean>;
+interface ParsedArgs {
+  positionals: string[];
+  own: Own;
+  passThrough: string[];
+}
 
+function parseArgs(argv: string[]): ParsedArgs {
+  const positionals: string[] = [];
+  const own: Own = {};
+  const passThrough: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--')) {
@@ -54,37 +59,69 @@ async function main() {
       positionals.push(a);
     }
   }
+  return { positionals, own, passThrough };
+}
 
-  // Resolve the repo list: --repos <file>, a single positional file, or positional dirs.
-  let repos: string[] = [];
+/** Resolve the repo list: --repos <file>, a single positional file, or positional dirs. */
+async function resolveRepos(own: Own, positionals: string[]): Promise<string[]> {
   const listFile = (own['--repos'] as string) ?? (await onlyFile(positionals));
-  if (listFile) {
-    repos = parseRepoList(await readFile(listFile, 'utf8'));
+  if (listFile) return parseRepoList(await readFile(listFile, 'utf8'));
+  return positionals;
+}
+
+// --emit-matrix: don't run anything — emit the GH Actions matrix the reusable
+// workflow (docs/factory-matrix.yml) fans the fleet out on. Cheapest substrate.
+async function emitMatrix(own: Own, repos: string[]): Promise<void> {
+  const matrix = buildMatrix(repos);
+  const json = JSON.stringify(matrix, null, 2);
+  const out = own['--out'] as string | undefined;
+  if (out) {
+    await writeFile(resolve(out), json);
+    console.error(`[factory] wrote matrix (${matrix.include.length} repo(s)) → ${resolve(out)}`);
   } else {
-    repos = positionals;
+    console.log(json);
   }
-  if (!repos.length) {
-    console.error(
-      'usage: probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--emit-matrix] [...generate flags]',
-    );
-    process.exit(2);
-  }
+}
 
-  // --emit-matrix: don't run anything — emit the GH Actions matrix the reusable
-  // workflow (docs/factory-matrix.yml) fans the fleet out on. Cheapest substrate.
-  if (own['--emit-matrix'] === true) {
-    const matrix = buildMatrix(repos);
-    const json = JSON.stringify(matrix, null, 2);
-    const out = own['--out'] as string | undefined;
-    if (out) {
-      await writeFile(resolve(out), json);
-      console.error(`[factory] wrote matrix (${matrix.include.length} repo(s)) → ${resolve(out)}`);
-    } else {
-      console.log(json);
-    }
-    return;
-  }
+// --resume: load the prior report (at reportPath) and skip its accepted repos.
+async function loadResume(own: Own, reportPath: string): Promise<{ prior: FactoryReport | null; skip: Set<string> }> {
+  if (own['--resume'] !== true) return { prior: null, skip: new Set<string>() };
+  const prior = await readFile(reportPath, 'utf8').then((s) => JSON.parse(s) as FactoryReport).catch(() => null);
+  const skip = acceptedRepos(prior);
+  if (skip.size) console.error(`[factory] resume: skipping ${skip.size} already-accepted repo(s)`);
+  return { prior, skip };
+}
 
+function printRollup(report: FactoryReport, reportPath: string): void {
+  console.log('');
+  for (const r of report.results) console.log('  ' + rowLine(r));
+  const modes = Object.entries(report.byStopReason)
+    .filter(([k]) => k !== 'accepted')
+    .map(([k, n]) => `${k}:${n}`)
+    .join(' ');
+  console.log(
+    `\n[factory] ${report.accepted}/${report.repos} accepted (${(report.acceptRate * 100).toFixed(0)}%), ` +
+      `${report.totalTests} tests, $${report.totalCost.toFixed(4)}` +
+      (modes ? ` · failures: ${modes}` : '') +
+      ` → ${reportPath}`,
+  );
+  if (report.mfeVersionAlign?.length) {
+    console.log('\n[factory] MFE cross-repo shared-version misalignment:');
+    for (const v of report.mfeVersionAlign) console.log('  ' + v.message);
+  }
+}
+
+interface RunConfig {
+  kind: TestKind;
+  concurrency: number;
+  stateRoot: string;
+  checkpoint: boolean;
+  retry: boolean;
+  reportPath: string;
+  binPath: string;
+}
+
+function buildRunConfig(own: Own): RunConfig {
   const kind = ((own['--kind'] as string) ?? 'unit') as TestKind;
   const concurrency = parseInt((own['--concurrency'] as string) ?? '4', 10);
   const stateRoot = resolve(
@@ -94,15 +131,23 @@ async function main() {
   const retry = own['--no-retry'] !== true;
   const reportPath = resolve((own['--report'] as string) ?? join(stateRoot, 'report.json'));
   const binPath = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'bin', 'probevane');
+  return { kind, concurrency, stateRoot, checkpoint, retry, reportPath, binPath };
+}
 
-  // --resume: load the prior report (at reportPath) and skip its accepted repos.
-  let prior: FactoryReport | null = null;
-  let skip = new Set<string>();
-  if (own['--resume'] === true) {
-    prior = await readFile(reportPath, 'utf8').then((s) => JSON.parse(s) as FactoryReport).catch(() => null);
-    skip = acceptedRepos(prior);
-    if (skip.size) console.error(`[factory] resume: skipping ${skip.size} already-accepted repo(s)`);
+async function main() {
+  const argv = process.argv.slice(2);
+  const { positionals, own, passThrough } = parseArgs(argv);
+  const repos = await resolveRepos(own, positionals);
+  if (!repos.length) {
+    console.error(
+      'usage: probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--emit-matrix] [...generate flags]',
+    );
+    process.exit(2);
   }
+  if (own['--emit-matrix'] === true) return emitMatrix(own, repos);
+
+  const { kind, concurrency, stateRoot, checkpoint, retry, reportPath, binPath } = buildRunConfig(own);
+  const { prior, skip } = await loadResume(own, reportPath);
 
   // Surface any per-repo generate config defaults the user wouldn't otherwise see
   // (factory forwards flags but each child also reads its own probevane.config).
@@ -130,24 +175,7 @@ async function main() {
   });
 
   await writeFile(reportPath, JSON.stringify(report, null, 2));
-
-  // Rollup.
-  console.log('');
-  for (const r of report.results) console.log('  ' + rowLine(r));
-  const modes = Object.entries(report.byStopReason)
-    .filter(([k]) => k !== 'accepted')
-    .map(([k, n]) => `${k}:${n}`)
-    .join(' ');
-  console.log(
-    `\n[factory] ${report.accepted}/${report.repos} accepted (${(report.acceptRate * 100).toFixed(0)}%), ` +
-      `${report.totalTests} tests, $${report.totalCost.toFixed(4)}` +
-      (modes ? ` · failures: ${modes}` : '') +
-      ` → ${reportPath}`,
-  );
-  if (report.mfeVersionAlign?.length) {
-    console.log('\n[factory] MFE cross-repo shared-version misalignment:');
-    for (const v of report.mfeVersionAlign) console.log('  ' + v.message);
-  }
+  printRollup(report, reportPath);
 
   if (report.accepted < report.repos) process.exit(1);
 }
