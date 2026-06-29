@@ -38,58 +38,65 @@ export const DEFAULT_ALERT_OPTS: AlertOpts = {
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
 
+/** Cost spike — latest day vs trailing average (needs prior spend to compare to). */
+function costSpikeAlert(latest: DailyBucket, trailing: DailyBucket[], o: AlertOpts): Alert | null {
+  if (!trailing.length) return null;
+  const avg = trailing.reduce((a, b) => a + b.cost, 0) / trailing.length;
+  if (!(avg > 0 && latest.cost > o.spikeFactor * avg)) return null;
+  return {
+    kind: 'cost_spike',
+    severity: 'warn',
+    message: `cost on ${latest.date} ($${round(latest.cost)}) is ${round(latest.cost / avg)}× the ${trailing.length}-day avg ($${round(avg)})`,
+    value: round(latest.cost),
+    threshold: round(o.spikeFactor * avg),
+  };
+}
+
+/** Acceptance drop — latest rate vs trailing rate (both need enough runs to mean anything). */
+function acceptanceDropAlert(latest: DailyBucket, trailing: DailyBucket[], o: AlertOpts): Alert | null {
+  if (!trailing.length) return null;
+  const tRuns = trailing.reduce((a, b) => a + b.runs, 0);
+  const tAcc = trailing.reduce((a, b) => a + b.accepted, 0);
+  if (!(latest.runs >= o.minRuns && tRuns >= o.minRuns)) return null;
+  const trailingRate = tAcc / tRuns;
+  if (!(latest.acceptRate < trailingRate - o.dropDelta)) return null;
+  return {
+    kind: 'acceptance_drop',
+    severity: 'error',
+    message: `acceptance on ${latest.date} (${round(latest.acceptRate)}) dropped from the ${trailing.length}-day rate (${round(trailingRate)})`,
+    value: round(latest.acceptRate),
+    threshold: round(trailingRate - o.dropDelta),
+  };
+}
+
+/** Error burst — error stops in the latest day. */
+function errorBurstAlert(latest: DailyBucket, o: AlertOpts): Alert | null {
+  if (!(latest.errors >= o.errorBurst)) return null;
+  return {
+    kind: 'error_burst',
+    severity: 'error',
+    message: `${latest.errors} error stop(s) on ${latest.date} (threshold ${o.errorBurst})`,
+    value: latest.errors,
+    threshold: o.errorBurst,
+  };
+}
+
 /** Compute alerts from the ascending daily series. Empty/insufficient → []. */
 export function computeAlerts(daily: DailyBucket[], opts: Partial<AlertOpts> = {}): Alert[] {
   const o = { ...DEFAULT_ALERT_OPTS, ...opts };
-  const alerts: Alert[] = [];
-  if (daily.length === 0) return alerts;
+  if (daily.length === 0) return [];
 
   const latest = daily[daily.length - 1];
   const trailing = daily.slice(Math.max(0, daily.length - 1 - o.window), daily.length - 1);
 
-  // Cost spike — latest day vs trailing average (needs prior spend to compare to).
-  if (trailing.length) {
-    const avg = trailing.reduce((a, b) => a + b.cost, 0) / trailing.length;
-    if (avg > 0 && latest.cost > o.spikeFactor * avg) {
-      alerts.push({
-        kind: 'cost_spike',
-        severity: 'warn',
-        message: `cost on ${latest.date} ($${round(latest.cost)}) is ${round(latest.cost / avg)}× the ${trailing.length}-day avg ($${round(avg)})`,
-        value: round(latest.cost),
-        threshold: round(o.spikeFactor * avg),
-      });
-    }
+  const alerts: Alert[] = [];
+  for (const a of [
+    costSpikeAlert(latest, trailing, o),
+    acceptanceDropAlert(latest, trailing, o),
+    errorBurstAlert(latest, o),
+  ]) {
+    if (a) alerts.push(a);
   }
-
-  // Acceptance drop — latest rate vs trailing rate (both need enough runs to mean anything).
-  if (trailing.length) {
-    const tRuns = trailing.reduce((a, b) => a + b.runs, 0);
-    const tAcc = trailing.reduce((a, b) => a + b.accepted, 0);
-    if (latest.runs >= o.minRuns && tRuns >= o.minRuns) {
-      const trailingRate = tAcc / tRuns;
-      if (latest.acceptRate < trailingRate - o.dropDelta) {
-        alerts.push({
-          kind: 'acceptance_drop',
-          severity: 'error',
-          message: `acceptance on ${latest.date} (${round(latest.acceptRate)}) dropped from the ${trailing.length}-day rate (${round(trailingRate)})`,
-          value: round(latest.acceptRate),
-          threshold: round(trailingRate - o.dropDelta),
-        });
-      }
-    }
-  }
-
-  // Error burst — error stops in the latest day.
-  if (latest.errors >= o.errorBurst) {
-    alerts.push({
-      kind: 'error_burst',
-      severity: 'error',
-      message: `${latest.errors} error stop(s) on ${latest.date} (threshold ${o.errorBurst})`,
-      value: latest.errors,
-      threshold: o.errorBurst,
-    });
-  }
-
   return alerts;
 }
 

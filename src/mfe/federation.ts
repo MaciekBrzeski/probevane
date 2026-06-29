@@ -51,7 +51,7 @@ function blockFor(text: string, key: string): string {
 function objectKeys(block: string): string[] {
   const inner = block.slice(1, -1);
   const keys: string[] = [];
-  for (const m of inner.matchAll(/(?:^|[,{])\s*['"]?([A-Za-z0-9_./@-]+)['"]?\s*:/g)) keys.push(m[1]);
+  for (const m of inner.matchAll(/(?:^|[,\x7b])\s*['"]?([A-Za-z0-9_./@-]+)['"]?\s*:/g)) keys.push(m[1]);
   return keys;
 }
 
@@ -77,7 +77,7 @@ function parseShared(block: string): Record<string, SharedDep> {
   }
   // Object form: `react: { singleton: true, requiredVersion: '^18' }` or `react: '^18'`.
   const inner = block.slice(1, -1);
-  for (const m of inner.matchAll(/['"]?([A-Za-z0-9_./@-]+)['"]?\s*:\s*(\{[^}]*\}|['"][^'"]*['"])/g)) {
+  for (const m of inner.matchAll(/['"]?([A-Za-z0-9_./@-]+)['"]?\s*:\s*(\x7b[^\x7d]*\x7d|['"][^'"]*['"])/g)) {
     const dep = m[1];
     const val = m[2];
     if (val.startsWith('{')) {
