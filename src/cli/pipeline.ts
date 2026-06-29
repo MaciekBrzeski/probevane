@@ -23,6 +23,34 @@ function num(v: string | undefined): number | undefined {
   return v === undefined ? undefined : Number(v);
 }
 
+function buildOpts(args: string[]): ProfileOpts {
+  return {
+    kind: flag(args, '--kind') === 'e2e' ? 'e2e' : 'unit',
+    minTests: num(flag(args, '--min-tests')),
+    minCoverage: num(flag(args, '--min-coverage')),
+    assertMin: num(flag(args, '--assert-min')),
+    mutation: has(args, '--mutation'),
+    flakeGuard: has(args, '--flake'),
+    a11y: has(args, '--a11y'),
+    visual: has(args, '--visual'),
+    quality: has(args, '--quality'),
+    mfe: has(args, '--mfe'),
+  };
+}
+
+// Default: human-readable phase-grouped listing + the Mermaid block.
+function printDefault(name: ProfileName, opts: ProfileOpts, desc: ReturnType<typeof describePipeline>): void {
+  console.log(`pipeline: ${name} (kind=${opts.kind}) — ${desc.runes.length} rune(s)`);
+  for (const { id, label } of PHASES) {
+    const rs = desc.runes.filter((r) => r.phase === (id as Phase));
+    if (!rs.length) continue;
+    console.log(`  ${label}:`);
+    for (const r of rs) console.log(`    - ${r.name}  [${r.hooks.join(', ')}]`);
+  }
+  console.log('');
+  console.log(pipelineMermaid(desc.runes));
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -39,19 +67,7 @@ function main() {
     console.error(`[pipeline] unknown profile '${name}' (one of: ${PROFILES.join(', ')})`);
     process.exit(2);
   }
-  const opts: ProfileOpts = {
-    kind: flag(args, '--kind') === 'e2e' ? 'e2e' : 'unit',
-    minTests: num(flag(args, '--min-tests')),
-    minCoverage: num(flag(args, '--min-coverage')),
-    assertMin: num(flag(args, '--assert-min')),
-    mutation: has(args, '--mutation'),
-    flakeGuard: has(args, '--flake'),
-    a11y: has(args, '--a11y'),
-    visual: has(args, '--visual'),
-    quality: has(args, '--quality'),
-    mfe: has(args, '--mfe'),
-  };
-
+  const opts = buildOpts(args);
   const desc = describePipeline(name, opts);
 
   if (has(args, '--json')) {
@@ -66,16 +82,7 @@ function main() {
     return;
   }
 
-  // Default: human-readable phase-grouped listing + the Mermaid block.
-  console.log(`pipeline: ${name} (kind=${opts.kind}) — ${desc.runes.length} rune(s)`);
-  for (const { id, label } of PHASES) {
-    const rs = desc.runes.filter((r) => r.phase === (id as Phase));
-    if (!rs.length) continue;
-    console.log(`  ${label}:`);
-    for (const r of rs) console.log(`    - ${r.name}  [${r.hooks.join(', ')}]`);
-  }
-  console.log('');
-  console.log(pipelineMermaid(desc.runes));
+  printDefault(name, opts, desc);
 }
 
 main();
