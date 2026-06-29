@@ -5,6 +5,7 @@ import {
   repoRoot, headSha, addWorktree, removeWorktree, diffStat, commitFiles, mergeBranch, currentBranch,
 } from '../util/git.js';
 import type { RunOutcome } from './engine.js';
+import { getDiff, findingsMarkdown, type Finding } from '../review/diff-review.js';
 
 // `--worktree` isolation: run a path loop in a throwaway git worktree on its own
 // branch, so the live working tree is never touched until an explicit review +
@@ -31,6 +32,7 @@ function findNodeModules(root: string, sub = '', depth = 0): string[] {
 
 export interface WorktreeOpts {
   merge?: boolean; // auto-merge the branch into the original branch on accept
+  review?: (diff: string) => Promise<Finding[]>; // self-review the accepted diff before keep/merge
   log?: (l: string) => void;
 }
 
@@ -74,11 +76,27 @@ export async function runInWorktree(
 
     // ACCEPTED. Commit ONLY the loop's edited files (prefixed by the run subdir) —
     // never `git add -A`, which would capture the node_modules symlink / fixtures.
-    const stat = await diffStat(wt);
     const files = outcome.editedFiles.map((f) => (rel ? join(rel, f) : f));
     await commitFiles(wt, files, `probevane ${label}: ${files.length} file(s) (gates green)`);
+    const stat = await diffStat(wt, 'HEAD~1'); // the committed change (incl. new files)
 
-    if (opts.merge) {
+    // Self-review the committed diff before keep-vs-merge (the gates prove the suite
+    // is green; this catches behavior/quality smells a green suite misses). Reviewing
+    // the COMMIT (vs HEAD~1) — not the working tree — so new files are included.
+    let doMerge = opts.merge;
+    if (opts.review) {
+      const findings = await opts.review(await getDiff(wt, 'HEAD~1')).catch(() => [] as Finding[]);
+      const errs = findings.filter((f) => f.severity === 'error');
+      log(findings.length
+        ? `[probevane] worktree review — ${findings.length} finding(s), ${errs.length} error:\n${findingsMarkdown(findings)}`
+        : '[probevane] worktree review: clean');
+      if (doMerge && errs.length) {
+        doMerge = false; // don't auto-merge over review errors — keep the branch for a human
+        log(`[probevane] worktree: ${errs.length} review error(s) — auto-merge BLOCKED; keeping branch ${branch}`);
+      }
+    }
+
+    if (doMerge) {
       const ok = await mergeBranch(root, branch, `merge ${branch} (probevane ${label}, gates green)`);
       await removeWorktree(root, wt, branch);
       log(ok
