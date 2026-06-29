@@ -8,7 +8,7 @@ dist/
 # stray in-place compiled JS (src/eval are .ts only — guards a mis-built tsc)
 src/**/*.js
 eval/**/*.js
-coverage/
+/coverage/
 fixtures/**/coverage/
 fixtures/**/test-fixtures/
 fixtures/**/src/mocks/
