@@ -87,7 +87,15 @@ import { stripToCode, detectFunctions } from './analyze-detect.js';
 export { stripToCode, detectFunctions };
 import { mkViolation, fileLevelViolations, fnLevelViolations } from './analyze-violations.js';
 
-const DEBT = /\b(TODO|FIXME|HACK|XXX)\b/;
+// A real debt annotation leads its comment (the marker is the first word) or is
+// colon-suffixed; a prose mention or a slash-separated documentation list is not.
+// That distinction stops the analyzer flagging its own debt-marker docs as debt
+// (and keeps this very comment from tripping the rule).
+const DEBT_LEAD = /^\s*(TODO|FIXME|HACK|XXX)\b/;
+const DEBT_COLON = /\b(TODO|FIXME|HACK|XXX):/;
+function isDebt(comment: string): boolean {
+  return DEBT_LEAD.test(comment) || DEBT_COLON.test(comment);
+}
 
 /** The comment portion of a line (after `//`, or inside a block comment), or ''. */
 function commentText(line: string): string {
@@ -110,7 +118,7 @@ export function analyzeFile(file: string, source: string, cfg: QualityConfig): F
     // on the command table, config templates, and trailing-comment lines).
     if (code[i].length > cfg.maxLineWidth) longLineNos.push(i + 1);
     // Debt only counts inside a COMMENT — not in a string literal or identifier.
-    if (cfg.debt && DEBT.test(commentText(l))) debtLineNos.push(i + 1);
+    if (cfg.debt && isDebt(commentText(l))) debtLineNos.push(i + 1);
   });
   return {
     file,
@@ -204,7 +212,10 @@ export function analyzeProject(
   }
 
   const { dups: duplication, capped: duplicationCapped } = findDuplication(
-    inputs.map((x) => ({ file: x.file, code: stripToCode(x.source.split('\n')) })),
+    // keepStrings: dedupe on code with literal CONTENT preserved, so distinct data
+    // rows (e.g. a command table whose strings differ) aren't flattened into
+    // identical `{ name: "", ... }` lines and mis-flagged as duplication.
+    inputs.map((x) => ({ file: x.file, code: stripToCode(x.source.split('\n'), true) })),
     cfg.dupMinLines,
   );
   for (const d of duplication) {
