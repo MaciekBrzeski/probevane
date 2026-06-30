@@ -24,23 +24,21 @@ describe('stripToCode', () => {
 
 describe('detectFunctions', () => {
   it('finds named functions, arrow-block, and methods; skips expression arrows', () => {
-    const code = stripToCode(
-      [
-        'function foo(a, b) {',
-        '  return a + b;',
-        '}',
-        'const bar = (x) => {',
-        '  if (x) return 1;',
-        '  return 0;',
-        '};',
-        'const oneLine = (n) => n * 2;', // expression arrow — skipped
-        'class C {',
-        '  method(p, q, r) {',
-        '    return p;',
-        '  }',
-        '}',
-      ],
-    );
+    const code = [
+      'function foo(a, b) {',
+      '  return a + b;',
+      '}',
+      'const bar = (x) => {',
+      '  if (x) return 1;',
+      '  return 0;',
+      '};',
+      'const oneLine = (n) => n * 2;', // expression arrow — skipped
+      'class C {',
+      '  method(p, q, r) {',
+      '    return p;',
+      '  }',
+      '}',
+    ].join('\n');
     const fns = detectFunctions(code);
     const names = fns.map((f) => f.name).sort();
     expect(names).toEqual(['bar', 'foo', 'method']);
@@ -48,9 +46,7 @@ describe('detectFunctions', () => {
   });
 
   it('measures params and complexity', () => {
-    const code = stripToCode(
-      ['function f(a, b, c) {', '  if (a && b) return 1;', '  for (;;) {}', '  return c;', '}'],
-    );
+    const code = ['function f(a, b, c) {', '  if (a && b) return 1;', '  for (;;) {}', '  return c;', '}'].join('\n');
     const f = detectFunctions(code)[0];
     expect(f.params).toBe(3);
     // base 1 + if + && + for = 4
@@ -58,24 +54,20 @@ describe('detectFunctions', () => {
   });
 
   it('counts destructured/defaulted params at top level only', () => {
-    const code = stripToCode(['function g({ a, b }, c = [1, 2]) {', '  return c;', '}']);
+    const code = ['function g({ a, b }, c = [1, 2]) {', '  return c;', '}'].join('\n');
     expect(detectFunctions(code)[0].params).toBe(2);
   });
 
   it('does not run an expression arrow away into the next function', () => {
     // regression: a one-liner arrow followed by a real function must not absorb it.
-    const code = stripToCode(
-      ['const round = (n) => Math.round(n);', 'function big() {', '  return 1;', '}'],
-    );
+    const code = ['const round = (n) => Math.round(n);', 'function big() {', '  return 1;', '}'].join('\n');
     const fns = detectFunctions(code);
     expect(fns.map((f) => f.name)).toEqual(['big']);
     expect(fns[0].loc).toBe(3); // big is 3 lines, not absorbing round
   });
 
   it('tracks nesting depth', () => {
-    const code = stripToCode(
-      ['function n() {', '  if (a) {', '    if (b) {', '      x();', '    }', '  }', '}'],
-    );
+    const code = ['function n() {', '  if (a) {', '    if (b) {', '      x();', '    }', '  }', '}'].join('\n');
     expect(detectFunctions(code)[0].nesting).toBe(2);
   });
 });
@@ -165,8 +157,8 @@ describe('cognitive complexity', () => {
   it('weights nested branches more than flat ones', () => {
     const flat = ['function f(a, b, c) {', '  if (a) x();', '  if (b) y();', '  if (c) z();', '}'].join('\n');
     const nested = ['function g(a, b, c) {', '  if (a) {', '    if (b) {', '      if (c) z();', '    }', '  }', '}'].join('\n');
-    const cf = detectFunctions(stripToCode(flat.split('\n')))[0];
-    const cg = detectFunctions(stripToCode(nested.split('\n')))[0];
+    const cf = detectFunctions(flat)[0];
+    const cg = detectFunctions(nested)[0];
     // same 3 ifs ≈ same cyclomatic, but nested cognitive is higher
     expect(cf.cognitive).toBe(3); // 1+1+1 at depth 0
     expect(cg.cognitive).toBeGreaterThan(cf.cognitive); // 1 + 2 + 3 = 6
