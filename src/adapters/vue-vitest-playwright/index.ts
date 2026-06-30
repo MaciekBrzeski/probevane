@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readPackageDeps } from '../pkg-deps.js';
 import type {
   StackAdapter,
   TestKind,
@@ -22,13 +21,7 @@ export const vueAdapter: StackAdapter = {
   id: 'vue-vitest-playwright',
 
   async detect(dir: string): Promise<number> {
-    let pkg: any;
-    try {
-      pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
-    } catch {
-      return 0;
-    }
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;
+    const deps = await readPackageDeps(dir);
     let score = 0;
     if (deps.vue) score += 0.6;
     if (deps['@vitejs/plugin-vue'] || deps['vue-tsc']) score += 0.3;
