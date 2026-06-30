@@ -32,6 +32,17 @@ jobs:
         run: npm run build
       - name: skill + wiki in sync (drift gate)
         run: ./bin/probevane skill --check
+      - name: source-quality gate (dogfood — probevane grades its own source)
+        run: ./bin/probevane quality . --strict
+      - name: quality SARIF → code scanning (inline annotations)
+        if: always()
+        run: ./bin/probevane quality . --sarif > quality.sarif || true
+      - name: upload quality SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: quality.sarif
       - name: regenerate probevane's own wiki spec (dogfood, keeps it fresh)
         run: ./bin/probevane spec . --wiki && test -f docs/wiki/project-probevane.md
       - name: dashboard e2e (real browser + visual regression)
