@@ -1,4 +1,4 @@
-import { readFile, readdir, access } from 'node:fs/promises';
+import { readFile, access } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type {
   StackAdapter, TestKind, TestTarget, ProbeResult, RunScope, RunResult, CoverageResult, AdapterCommands, AuditRule,
@@ -7,6 +7,8 @@ import { sh } from '../../util/exec.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { astExtract } from '../ast-probe.js';
 import { loadPrompt } from '../../library/prompt.js';
+import { readCoverageSummary } from '../coverage-summary.js';
+import { walkFiles } from '../walk.js';
 
 // angular — Angular stack via jest-preset-angular (no browser, CI-friendly).
 // Tests use TestBed + jest. Same StackAdapter contract as the others.
@@ -49,7 +51,7 @@ export const angularAdapter: StackAdapter = {
   },
 
   async discover(dir: string, _kind: TestKind): Promise<TestTarget[]> {
-    const files = (await walk(join(dir, 'src')).catch(() => [])) as string[];
+    const files = (await walkFiles(join(dir, 'src')).catch(() => [])) as string[];
     return files
       .filter((f) => /\.ts$/.test(f) && !/\.(spec|module|d)\.ts$/.test(f) && !/(^|\/)(main|polyfills)\.ts$/.test(f))
       .map((f) => ({ kind: 'unit', sourcePath: relative(dir, f), name: f.split('/').pop()!.replace(/\.ts$/, '') }));
@@ -96,21 +98,11 @@ export const angularAdapter: StackAdapter = {
 
   async coverage(dir: string): Promise<CoverageResult> {
     await sh('npx jest --coverage --coverageReporters=json-summary', dir, 300_000).catch(() => null);
-    try {
-      const j = JSON.parse(await readFile(join(dir, 'coverage', 'coverage-summary.json'), 'utf8'));
-      const t = j.total;
-      return {
-        statements: t.statements.pct,
-        branches: t.branches.pct,
-        functions: t.functions.pct,
-        lines: t.lines.pct,
-        ok: true,
-      };
-    } catch { return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false }; }
+    return readCoverageSummary(dir);
   },
 
   async specFiles(dir: string): Promise<string[]> {
-    const files = (await walk(join(dir, 'src')).catch(() => [])) as string[];
+    const files = (await walkFiles(join(dir, 'src')).catch(() => [])) as string[];
     return files.filter((f) => /\.spec\.ts$/.test(f)).map((f) => relative(dir, f));
   },
 
@@ -129,15 +121,3 @@ export const angularAdapter: StackAdapter = {
     };
   },
 };
-
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (['node_modules', 'dist', 'coverage'].includes(e.name)) continue;
-      out.push(...(await walk(join(dir, e.name))));
-    }
-    else out.push(join(dir, e.name));
-  }
-  return out;
-}

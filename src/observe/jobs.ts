@@ -3,6 +3,11 @@
 // so a restart keeps history; these decide how to reduce the log on load and which
 // jobs to evict to keep the in-memory map bounded. No I/O — the daemon does that.
 
+import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+import { newItem, type QueueItem } from './queue.js';
+import type { LaunchPlan } from './launch.js';
+
 export interface PersistedJob {
   id: string;
   op: string;
@@ -38,4 +43,10 @@ export function jobsToEvict(jobs: PersistedJob[], max: number): string[] {
     .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
     .slice(0, need)
     .map((j) => j.id);
+}
+
+/** Build a fresh queued item from a validated launch plan — shared by the daemon's
+ *  /enqueue endpoint and the `enqueue` CLI (same id/op/dir/flags/timestamp shape). */
+export function itemFromPlan(plan: LaunchPlan): QueueItem {
+  return newItem(randomUUID().slice(0, 8), plan.op, resolve(plan.dir), plan.flags, new Date().toISOString());
 }
