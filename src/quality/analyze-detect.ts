@@ -72,29 +72,32 @@ function skipRegex(raw: string, j: number): number {
 }
 
 /** Handle a string/template/comment construct starting at raw[i] (not `//` or a
- *  regex); returns {next index, text to emit} or null for an ordinary character. */
-function stripConstruct(raw: string, i: number, st: StripState): { i: number; emit: string } | null {
-  if (st.inTemplate) return { i: skipTemplate(raw, i, st), emit: '""' }; // multi-line template → collapse
+ *  regex); returns {next index, text to emit} or null for an ordinary character.
+ *  Comments are always dropped. With `keep`, string/template literals are emitted
+ *  verbatim (so distinct data isn't equated); otherwise they collapse to "". */
+function stripConstruct(raw: string, i: number, st: StripState, keep: boolean): { i: number; emit: string } | null {
+  if (st.inTemplate) { const n = skipTemplate(raw, i, st); return { i: n, emit: keep ? raw.slice(i, n) : '""' }; }
   if (st.inBlock) return { i: skipBlockComment(raw, i, st), emit: '' };
   if (raw.startsWith('/*', i)) { st.inBlock = true; return { i: i + 2, emit: '' }; }
   const ch = raw[i];
-  if (ch === '"' || ch === "'") return { i: skipString(raw, i + 1, ch), emit: '""' };
-  if (ch === '`') return { i: skipTemplate(raw, i + 1, st), emit: '""' }; // template literal — may span lines
+  if (ch === '"' || ch === "'") { const n = skipString(raw, i + 1, ch); return { i: n, emit: keep ? raw.slice(i, n) : '""' }; }
+  if (ch === '`') { const n = skipTemplate(raw, i + 1, st); return { i: n, emit: keep ? raw.slice(i, n) : '""' }; }
   return null;
 }
 
-/** Strip strings, comments + regex literals from a single line, advancing block state. */
-function stripLine(raw: string, st: StripState): string {
+/** Strip comments (+ collapse strings/regex unless `keep`) from a single line. */
+function stripLine(raw: string, st: StripState, keep: boolean): string {
   let s = '';
   let i = 0;
   while (i < raw.length) {
-    const step = stripConstruct(raw, i, st);
+    const step = stripConstruct(raw, i, st, keep);
     if (step) { i = step.i; s += step.emit; continue; }
     if (raw.startsWith('//', i)) break;
     const ch = raw[i];
     if (ch === '/' && regexContext(s)) {
-      i = skipRegex(raw, i + 1);
-      s += 'RE'; // collapse the regex literal (no braces/quotes leak)
+      const n = skipRegex(raw, i + 1);
+      s += keep ? raw.slice(i, n) : 'RE'; // collapse the regex literal (no braces/quotes leak)
+      i = n;
       continue;
     }
     s += ch;
@@ -103,11 +106,13 @@ function stripLine(raw: string, st: StripState): string {
   return s;
 }
 
-/** Strip strings (incl. multi-line templates), comments + regex literals to
- *  code-only lines, so brace/control-flow counting isn't fooled by literal text. */
-export function stripToCode(lines: string[]): string[] {
+/** Strip comments + (by default) collapse string/template/regex literals to
+ *  code-only lines, so brace/control-flow counting isn't fooled by literal text.
+ *  `keepStrings` preserves literal CONTENT (for duplication, so distinct data rows
+ *  — e.g. a command table — aren't flattened into identical "" lines). */
+export function stripToCode(lines: string[], keepStrings = false): string[] {
   const st: StripState = { inBlock: false, inTemplate: false };
-  return lines.map((raw) => stripLine(raw, st));
+  return lines.map((raw) => stripLine(raw, st, keepStrings));
 }
 
 // --- function detection (AST-based, ts-morph) -----------------------------

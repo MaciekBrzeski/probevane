@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeFile, DEFAULT_QUALITY } from '../src/quality/analyze.js';
+import { analyzeFile, DEFAULT_QUALITY, findDuplication, stripToCode } from '../src/quality/analyze.js';
 
 // Regression: regex literals containing braces must NOT corrupt function-boundary
 // detection. Before the stripLine regex fix, the `{` in `/[{,]/` was counted as a
@@ -58,5 +58,41 @@ describe('analyzer — multi-line template literals do not leak as control flow'
     const gen = fns.find((f) => f.name === 'gen')!;
     expect(gen.cognitive).toBeLessThan(5); // the template's fake for/if/while don't count
     expect(gen.nesting).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('analyzer — duplication ignores distinct data rows (keepStrings)', () => {
+  // 8 rows, same SHAPE but different string content (a command-table-like array).
+  const rows = Array.from({ length: 8 }, (_, i) => `  { name: 'cmd${i}', summary: 'does thing ${i}', usage: 'run ${i}' },`);
+
+  it('does not flag a data table as duplication (strings preserved)', () => {
+    const code = stripToCode(rows, true); // keepStrings — production dup path
+    expect(findDuplication([{ file: 'catalog.ts', code }], 6).dups).toEqual([]);
+  });
+
+  it('the old string-collapsing path WOULD have mis-flagged it (regression guard)', () => {
+    const collapsed = stripToCode(rows); // default collapse → every row becomes identical
+    expect(findDuplication([{ file: 'catalog.ts', code: collapsed }], 6).dups.length).toBeGreaterThan(0);
+  });
+
+  it('still catches genuine copy-pasted code (identical incl. strings)', () => {
+    const block = ['  const a = load("x");', '  const b = parse(a);', '  const c = render(b);', '  const d = c + 1;', '  const e = d * 2;', '  return e;'];
+    const fileA = stripToCode(['function one() {', ...block, '}'], true);
+    const fileB = stripToCode(['function two() {', ...block, '}'], true);
+    expect(findDuplication([{ file: 'a.ts', code: fileA }, { file: 'b.ts', code: fileB }], 6).dups.length).toBeGreaterThan(0);
+  });
+});
+
+describe('analyzer — debt markers: annotations not prose/docs', () => {
+  const debtOf = (src: string) => analyzeFile('t.ts', src, DEFAULT_QUALITY).debt;
+
+  it('flags a real marker (comment-leading or colon-suffixed)', () => {
+    expect(debtOf('// TODO: fix this\nconst x = 1;\n')).toBe(1);
+    expect(debtOf('const y = 2; // FIXME later\n')).toBe(1);
+  });
+
+  it('does NOT flag a slash-list / prose mention (the analyzer documenting its own markers)', () => {
+    expect(debtOf('// flag TODO/FIXME/HACK/XXX markers\n')).toBe(0);
+    expect(debtOf('// debt markers (TODO/FIXME) are comment-scoped\n')).toBe(0);
   });
 });
