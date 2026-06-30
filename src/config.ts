@@ -36,15 +36,22 @@ const SCHEMA: Record<keyof ProbevaneConfig, 'string' | 'number' | 'boolean'> = {
   mfe: 'boolean', takeover: 'string', budget: 'number',
 };
 
+/** Validate a single config entry; returns an error string or null. */
+function checkEntry(k: string, v: unknown): string | null {
+  const expected = SCHEMA[k as keyof ProbevaneConfig];
+  if (!expected) return `unknown key "${k}"`;
+  if (typeof v !== expected) return `"${k}" must be ${expected} (got ${typeof v})`;
+  if (k === 'kind' && v !== 'unit' && v !== 'e2e') return `"kind" must be "unit" or "e2e"`;
+  return null;
+}
+
 /** Validate a loaded config — unknown keys + wrong types. Returns error strings. */
 export function validateConfig(cfg: unknown): string[] {
   if (!cfg || typeof cfg !== 'object') return ['config must be an object'];
   const errs: string[] = [];
   for (const [k, v] of Object.entries(cfg as Record<string, unknown>)) {
-    const expected = SCHEMA[k as keyof ProbevaneConfig];
-    if (!expected) errs.push(`unknown key "${k}"`);
-    else if (typeof v !== expected) errs.push(`"${k}" must be ${expected} (got ${typeof v})`);
-    else if (k === 'kind' && v !== 'unit' && v !== 'e2e') errs.push(`"kind" must be "unit" or "e2e"`);
+    const err = checkEntry(k, v);
+    if (err) errs.push(err);
   }
   return errs;
 }

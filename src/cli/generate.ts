@@ -99,7 +99,17 @@ async function runTriage(args: string[], dir: string, kind: TestKind, adapter: A
 }
 
 // Hybrid: local model drafts the easy/pure band ($0), bridge/paid handles the rest.
-async function runHybrid(args: string[], dir: string, kind: TestKind, adapter: Adapter, model: string, genOpts: (d: string) => GenOpts): Promise<void> {
+interface HybridOpts {
+  args: string[];
+  dir: string;
+  kind: TestKind;
+  adapter: Adapter;
+  model: string;
+  genOpts: (d: string) => GenOpts;
+}
+
+async function runHybrid(o: HybridOpts): Promise<void> {
+  const { args, dir, kind, adapter, model, genOpts } = o;
   const localBrain = brainFor(flag(args, '--local-model') ?? 'local:qwen2.5-coder:7b');
   let targets = await adapter.discover(dir, kind);
   const only = flag(args, '--only');
@@ -136,7 +146,17 @@ async function runDelegate(args: string[], dir: string, kind: TestKind, adapter:
 }
 
 // pass@k: sample K candidate suites, keep the best-scoring one.
-async function runPassk(args: string[], dir: string, kind: TestKind, adapter: Adapter, passk: number, genOpts: (d: string) => GenOpts): Promise<void> {
+interface PasskOpts {
+  args: string[];
+  dir: string;
+  kind: TestKind;
+  adapter: Adapter;
+  passk: number;
+  genOpts: (d: string) => GenOpts;
+}
+
+async function runPassk(o: PasskOpts): Promise<void> {
+  const { args, dir, kind, adapter, passk, genOpts } = o;
   const { passKGenerate } = await import('../loop/passk.js');
   const { best } = await passKGenerate({
     dir, kind, adapter, k: passk,
@@ -205,10 +225,10 @@ async function main() {
   const genOpts = buildGenOpts(args, cfg, adapter, kind, model);
 
   if (args.includes('--triage')) return runTriage(args, dir, kind, adapter);
-  if (args.includes('--hybrid')) return runHybrid(args, dir, kind, adapter, model, genOpts);
+  if (args.includes('--hybrid')) return runHybrid({ args, dir, kind, adapter, model, genOpts });
   if (args.includes('--delegate')) return runDelegate(args, dir, kind, adapter, model);
   const passk = parseInt(flag(args, '--passk') ?? '1', 10);
-  if (passk > 1) return runPassk(args, dir, kind, adapter, passk, genOpts);
+  if (passk > 1) return runPassk({ args, dir, kind, adapter, passk, genOpts });
 
   const outcome = await generateTests(genOpts(dir));
 

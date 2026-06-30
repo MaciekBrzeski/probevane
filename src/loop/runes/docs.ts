@@ -94,22 +94,33 @@ export function docStructureGate(outPath: string, sections: string[]): Rune {
   };
 }
 
+/** A markdown-link target reduced to a repo path, or null (external/anchor). */
+function linkRef(target: string): string | null {
+  if (/^(https?:|mailto:|#|\/\/)/.test(target) || target.includes('://')) return null;
+  const t = target.replace(/[#?].*$/, '').replace(/^\.\//, '');
+  return t || null;
+}
+
+/** A backticked token reduced to a path-like ref (slash + extension), or null. */
+function backtickRef(token: string): string | null {
+  const t = token.trim();
+  if (/\s/.test(t) || t.includes('*') || t.includes('://')) return null;
+  const cleaned = t.replace(/:\d+(:\d+)?$/, '').replace(/\/$/, ''); // strip line:col, trailing slash
+  return /\//.test(cleaned) && /\.[a-zA-Z0-9]{1,6}$/.test(cleaned) ? cleaned : null;
+}
+
 /** Extract repo-path-shaped references from the markdown (links + path-like backticks). */
 export function extractRefs(md: string): string[] {
   const refs = new Set<string>();
   // markdown links [text](target)
   for (const m of md.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
-    let t = m[1];
-    if (/^(https?:|mailto:|#|\/\/)/.test(t) || t.includes('://')) continue;
-    t = t.replace(/[#?].*$/, '').replace(/^\.\//, '');
-    if (t) refs.add(t);
+    const r = linkRef(m[1]);
+    if (r) refs.add(r);
   }
   // backticked path-like tokens: contain a slash AND end in an extension
   for (const m of md.matchAll(/`([^`]+)`/g)) {
-    const t = m[1].trim();
-    if (/\s/.test(t) || t.includes('*') || t.includes('://')) continue;
-    const cleaned = t.replace(/:\d+(:\d+)?$/, '').replace(/\/$/, ''); // strip line:col, trailing slash
-    if (/\//.test(cleaned) && /\.[a-zA-Z0-9]{1,6}$/.test(cleaned)) refs.add(cleaned);
+    const r = backtickRef(m[1]);
+    if (r) refs.add(r);
   }
   return [...refs];
 }

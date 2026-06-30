@@ -29,9 +29,9 @@ function balanced(s: string, start: number): string {
       ({ inStr, esc } = nextStrState(c, inStr, esc));
       continue;
     }
-    if (isQuote(c)) inStr = c;
-    else if (c === open) depth++;
-    else if (c === close && --depth === 0) return s.slice(start, i + 1);
+    if (isQuote(c)) { inStr = c; continue; }
+    if (c === open) { depth++; continue; }
+    if (c === close && --depth === 0) return s.slice(start, i + 1);
   }
   return s.slice(start);
 }

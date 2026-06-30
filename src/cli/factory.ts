@@ -38,26 +38,26 @@ interface ParsedArgs {
   passThrough: string[];
 }
 
+/** Consume one `--flag` (known or pass-through) at argv[i]; returns extra args consumed. */
+function classifyFlag(argv: string[], i: number, own: Own, passThrough: string[]): number {
+  const a = argv[i];
+  const arity = OWN[a];
+  if (arity === 1) { own[a] = argv[i + 1]; return 1; }
+  if (arity === 0) { own[a] = true; return 0; }
+  // Unknown flag → forward to generate (with its value if it has one).
+  passThrough.push(a);
+  if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) { passThrough.push(argv[i + 1]); return 1; }
+  return 0;
+}
+
 function parseArgs(argv: string[]): ParsedArgs {
   const positionals: string[] = [];
   const own: Own = {};
   const passThrough: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a.startsWith('--')) {
-      const arity = OWN[a];
-      if (arity === 1) {
-        own[a] = argv[++i];
-      } else if (arity === 0) {
-        own[a] = true;
-      } else {
-        // Unknown flag → forward to generate (with its value if it has one).
-        passThrough.push(a);
-        if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) passThrough.push(argv[++i]);
-      }
-    } else {
-      positionals.push(a);
-    }
+    if (a.startsWith('--')) i += classifyFlag(argv, i, own, passThrough);
+    else positionals.push(a);
   }
   return { positionals, own, passThrough };
 }

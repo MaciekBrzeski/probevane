@@ -19,6 +19,17 @@ import { loadPrompt } from '../../library/prompt.js';
 // the same StackAdapter contract; reuses the loop/audit/eval unchanged.
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
+/** Tally one `go test -json` line into pass/fail/skip counts (ignores non-JSON / parse errors). */
+function tallyGoEvent(line: string, counts: { passed: number; failed: number; skipped: number }): void {
+  if (!line.startsWith('{')) return;
+  let e: { Test?: unknown; Action?: string };
+  try { e = JSON.parse(line); } catch { return; }
+  if (!e.Test) return;
+  if (e.Action === 'pass') counts.passed++;
+  else if (e.Action === 'fail') counts.failed++;
+  else if (e.Action === 'skip') counts.skipped++;
+}
+
 export const goAdapter: StackAdapter = {
   id: 'go-test',
 
@@ -59,19 +70,9 @@ export const goAdapter: StackAdapter = {
 
   async run(dir: string, _scope: RunScope, _files?: string[]): Promise<RunResult> {
     const r = await sh('go test -json -count=1 ./...', dir, 120_000);
-    let passed = 0, failed = 0, skipped = 0;
-    for (const line of r.stdout.split('\n')) {
-      if (!line.startsWith('{')) continue;
-      try {
-        const e = JSON.parse(line);
-        if (!e.Test) continue;
-        if (e.Action === 'pass') passed++;
-        else if (e.Action === 'fail') failed++;
-        else if (e.Action === 'skip') skipped++;
-      } catch {
-        /* ignore */
-      }
-    }
+    const counts = { passed: 0, failed: 0, skipped: 0 };
+    for (const line of r.stdout.split('\n')) tallyGoEvent(line, counts);
+    const { passed, failed, skipped } = counts;
     const total = passed + failed + skipped;
     return { passed, failed, skipped, green: r.ok && failed === 0 && total > 0 && passed > 0, raw: (r.stdout + r.stderr).slice(-4000) };
   },

@@ -13,21 +13,26 @@ function findOpen(text: string): { start: number; open: string } | null {
   return null;
 }
 
+interface StrState { inStr: boolean; esc: boolean }
+
+/** Advance string-literal scan state by one char (inside a JSON string). */
+function stepString(st: StrState, ch: string): void {
+  if (st.esc) st.esc = false;
+  else if (ch === '\\') st.esc = true;
+  else if (ch === '"') st.inStr = false;
+}
+
 /** From `start`, return the string-aware balanced slice for `open`, or null. */
 function matchClose(text: string, start: number, open: string): string | null {
   const close = open === '{' ? '}' : ']';
+  const st: StrState = { inStr: false, esc: false };
   let depth = 0;
-  let inStr = false;
-  let esc = false;
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === '\\') esc = true;
-      else if (ch === '"') inStr = false;
-    } else if (ch === '"') inStr = true;
-    else if (ch === open) depth++;
-    else if (ch === close && --depth === 0) return text.slice(start, i + 1);
+    if (st.inStr) { stepString(st, ch); continue; }
+    if (ch === '"') { st.inStr = true; continue; }
+    if (ch === open) { depth++; continue; }
+    if (ch === close && --depth === 0) return text.slice(start, i + 1);
   }
   return null;
 }

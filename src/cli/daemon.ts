@@ -1,6 +1,6 @@
 import { createServer, type ServerResponse } from 'node:http';
 import { readdir, readFile, stat, rename } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, type Dirent } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stateRoot } from '../util/state.js';
@@ -73,6 +73,11 @@ async function log(level: string, event: string, data: Record<string, unknown> =
   await appendJsonl(LOG_PATH, line).catch(() => {});
 }
 
+/** A directory worth descending during the ledger walk (not node_modules, depth left). */
+function isWalkableDir(e: Dirent, d: number): boolean {
+  return e.isDirectory() && d > 0 && e.name !== 'node_modules';
+}
+
 /** Find every runs.jsonl under `root` (global + factory/<run>/<slug>/), bounded depth. */
 async function findLedgers(root: string, depth = 4): Promise<string[]> {
   const out: string[] = [];
@@ -80,8 +85,8 @@ async function findLedgers(root: string, depth = 4): Promise<string[]> {
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const e of entries) {
       const p = join(dir, e.name);
-      if (e.isFile() && e.name === 'runs.jsonl') out.push(p);
-      else if (e.isDirectory() && d > 0 && e.name !== 'node_modules') await walk(p, d - 1);
+      if (e.isFile() && e.name === 'runs.jsonl') { out.push(p); continue; }
+      if (isWalkableDir(e, d)) await walk(p, d - 1);
     }
   }
   await walk(root, depth);

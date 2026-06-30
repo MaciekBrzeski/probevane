@@ -25,27 +25,36 @@ export interface Extracted {
   code: string;
 }
 
+interface FenceBest { info: string; code: string; start: number }
+
+/** The largest test-like CLOSED fenced block in `text`, or null. */
+function bestClosedFence(text: string): FenceBest | null {
+  const fence = /```([^\n`]*)\n([\s\S]*?)```/g;
+  let m: RegExpExecArray | null;
+  let best: FenceBest | null = null;
+  while ((m = fence.exec(text))) {
+    const code = m[2];
+    if (!TESTY.test(code)) continue;
+    if (!best || code.length > best.code.length) best = { info: m[1].trim(), code, start: m.index };
+  }
+  return best;
+}
+
+/** Truncation fallback: a model whose output budget ran out leaves an OPEN fence
+ *  (no closing ```). Take the last opening test-like fence to end-of-text, or null. */
+function openFence(text: string): FenceBest | null {
+  const open = text.match(/```([^\n`]*)\n([\s\S]*)$/);
+  if (open && TESTY.test(open[2])) return { info: open[1].trim(), code: open[2], start: open.index ?? 0 };
+  return null;
+}
+
 /**
  * Pull the largest test-like fenced code block out of a model's prose answer.
  * Returns null when there's no fenced block or it isn't test-like.
  */
 export function extractTestBlock(text: string): Extracted | null {
   if (!text) return null;
-  const fence = /```([^\n`]*)\n([\s\S]*?)```/g;
-  let m: RegExpExecArray | null;
-  let best: { info: string; code: string; start: number } | null = null;
-  while ((m = fence.exec(text))) {
-    const code = m[2];
-    if (!TESTY.test(code)) continue;
-    if (!best || code.length > best.code.length) best = { info: m[1].trim(), code, start: m.index };
-  }
-  // Truncation-robust: a small model whose output budget ran out leaves an OPEN
-  // fence (no closing ```). If no closed fence is test-like, take the last opening
-  // fence to end-of-text.
-  if (!best) {
-    const open = text.match(/```([^\n`]*)\n([\s\S]*)$/);
-    if (open && TESTY.test(open[2])) best = { info: open[1].trim(), code: open[2], start: open.index ?? 0 };
-  }
+  const best = bestClosedFence(text) ?? openFence(text);
   if (!best) return null;
   const pre = text.slice(Math.max(0, best.start - 200), best.start);
   const path = findPath(best.info, best.code, pre);
