@@ -186,7 +186,10 @@ async function runPassk(o: PasskOpts): Promise<void> {
     generate: async (cand) => (await generateTests(genOpts(cand))).accepted,
     log: (l) => console.error(l),
   });
-  console.log(`[probevane] pass@${passk}: ${best ? `selected ${best.label} (value=${best.score.value}, tests=${best.score.tests}, cov=${best.score.coverage}%)` : 'no acceptable candidate'}`);
+  const verdict = best
+    ? `selected ${best.label} (value=${best.score.value}, tests=${best.score.tests}, cov=${best.score.coverage}%)`
+    : 'no acceptable candidate';
+  console.log(`[probevane] pass@${passk}: ${verdict}`);
   if (!best) process.exit(1);
 }
 
