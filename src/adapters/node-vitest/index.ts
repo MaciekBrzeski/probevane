@@ -15,6 +15,7 @@ import { findSpecFiles } from '../../util/specfiles.js';
 import { loadPrompt } from '../../library/prompt.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { astExtract } from '../ast-probe.js';
+import { readPackageDeps } from '../pkg-deps.js';
 
 // node-vitest — generic TS/JS library stack (vitest, no UI framework). Lets
 // probevane test plain Node libraries — including ITSELF. Detect scores below
@@ -25,13 +26,7 @@ export const nodeAdapter: StackAdapter = {
   id: 'node-vitest',
 
   async detect(dir: string): Promise<number> {
-    let pkg: any;
-    try {
-      pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
-    } catch {
-      return 0;
-    }
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;
+    const deps = await readPackageDeps(dir);
     if (deps.react || deps.vue || deps.svelte || deps['@angular/core']) return 0; // a framework adapter owns it
     let score = 0;
     if (deps.vitest) score += 0.4;

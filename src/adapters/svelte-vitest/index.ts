@@ -15,6 +15,7 @@ import { findSpecFiles } from '../../util/specfiles.js';
 import { loadPrompt } from '../../library/prompt.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { astExtract } from '../ast-probe.js';
+import { readPackageDeps } from '../pkg-deps.js';
 
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 const DEPS = [
@@ -37,13 +38,7 @@ export const svelteAdapter: StackAdapter = {
   id: 'svelte-vitest',
 
   async detect(dir: string): Promise<number> {
-    let pkg: any;
-    try {
-      pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
-    } catch {
-      return 0;
-    }
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const deps = await readPackageDeps(dir);
     let score = 0;
     if (deps.svelte) score += 0.6;
     if (deps['@sveltejs/vite-plugin-svelte'] || deps['@sveltejs/kit']) score += 0.3;

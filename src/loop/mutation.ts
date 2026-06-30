@@ -43,6 +43,14 @@ interface MutantCtx {
   sourcePath: string;
 }
 
+/** Build the per-target mutation context; null when the source can't be read. */
+async function targetCtx(dir: string, adapter: StackAdapter, sourcePath: string): Promise<MutantCtx | null> {
+  const abs = join(dir, sourcePath);
+  const original = await readFile(abs, 'utf8').catch(() => '');
+  if (!original) return null;
+  return { dir, adapter, abs, original, sourcePath };
+}
+
 /** Apply one mutation; return the surviving mutant (suite stayed GREEN) or null. */
 async function trySurvivor(c: MutantCtx, re: RegExp, repl: string): Promise<SurvivingMutant | null> {
   re.lastIndex = 0;
@@ -67,10 +75,8 @@ export async function survivingMutants(dir: string, adapter: StackAdapter, maxMu
   const out: SurvivingMutant[] = [];
   const targets = (await adapter.discover(dir, 'unit')).slice(0, maxTargets);
   for (const t of targets) {
-    const abs = join(dir, t.sourcePath);
-    const original = await readFile(abs, 'utf8').catch(() => '');
-    if (!original) continue;
-    const ctx: MutantCtx = { dir, adapter, abs, original, sourcePath: t.sourcePath };
+    const ctx = await targetCtx(dir, adapter, t.sourcePath);
+    if (!ctx) continue;
     for (const [re, repl] of MUTATIONS) {
       if (out.length >= maxMutants) break;
       const s = await trySurvivor(ctx, re, repl);
@@ -108,10 +114,8 @@ export async function mutationScore(dir: string, adapter: StackAdapter, maxMutan
   let total = 0;
   let killed = 0;
   for (const t of targets) {
-    const abs = join(dir, t.sourcePath);
-    const original = await readFile(abs, 'utf8').catch(() => '');
-    if (!original) continue;
-    const ctx: MutantCtx = { dir, adapter, abs, original, sourcePath: t.sourcePath };
+    const ctx = await targetCtx(dir, adapter, t.sourcePath);
+    if (!ctx) continue;
     for (const [re, repl] of MUTATIONS) {
       if (total >= maxMutants) break;
       const result = await scoreMutant(ctx, re, repl);
