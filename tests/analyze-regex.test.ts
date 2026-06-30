@@ -37,3 +37,26 @@ describe('analyzer — long lines measure CODE width, not string/comment width',
     expect(analyzeFile('t.ts', src, DEFAULT_QUALITY).longLineNos).toEqual([]);
   });
 });
+
+describe('analyzer — multi-line template literals do not leak as control flow', () => {
+  it('control-flow text inside a multi-line template is not counted; the next function stays separate', () => {
+    const src = [
+      'function gen() {',
+      '  return `',
+      '  for (const x of y) {',
+      '    if (x) { if (y) { while (z) { run(); } } }',
+      '  }',
+      '  `;',
+      '}',
+      'function other() { return 1; }',
+      '',
+    ].join('\n');
+    const fns = analyzeFile('t.ts', src, DEFAULT_QUALITY).functions;
+    const names = fns.map((f) => f.name);
+    expect(names).toContain('gen');
+    expect(names).toContain('other'); // gen must NOT absorb other through the template
+    const gen = fns.find((f) => f.name === 'gen')!;
+    expect(gen.cognitive).toBeLessThan(5); // the template's fake for/if/while don't count
+    expect(gen.nesting).toBeLessThanOrEqual(1);
+  });
+});

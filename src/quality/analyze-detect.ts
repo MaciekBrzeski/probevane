@@ -11,6 +11,7 @@ const BRANCH = /\b(if|for|while|case|catch)\b|&&|\|\|/g;
 
 interface StripState {
   inBlock: boolean;
+  inTemplate: boolean;
 }
 
 /** Advance past a block comment from index `i`; clears state when it closes. */
@@ -29,6 +30,20 @@ function skipString(raw: string, i: number, quote: string): number {
     i++;
   }
   return i + 1;
+}
+
+/** Skip template-literal content from index `i` to past the closing unescaped
+ *  backtick; sets st.inTemplate when it runs off the line (a multi-line template),
+ *  so later lines collapse too. Interpolations are collapsed as well — consistent
+ *  with how single-line backtick strings are already handled. */
+function skipTemplate(raw: string, i: number, st: StripState): number {
+  while (i < raw.length) {
+    if (raw[i] === '\\') { i += 2; continue; }
+    if (raw[i] === '`') { st.inTemplate = false; return i + 1; }
+    i++;
+  }
+  st.inTemplate = true;
+  return raw.length;
 }
 
 const REGEX_PREV = '([{,;=:!&|?';
@@ -62,6 +77,11 @@ function stripLine(raw: string, st: StripState): string {
   let s = '';
   let i = 0;
   while (i < raw.length) {
+    if (st.inTemplate) { // inside a multi-line template literal — collapse to its close
+      i = skipTemplate(raw, i, st);
+      s += '""';
+      continue;
+    }
     if (st.inBlock) {
       i = skipBlockComment(raw, i, st);
       continue;
@@ -73,9 +93,14 @@ function stripLine(raw: string, st: StripState): string {
       continue;
     }
     const ch = raw[i];
-    if (ch === '"' || ch === "'" || ch === '`') {
+    if (ch === '"' || ch === "'") {
       i = skipString(raw, i + 1, ch);
       s += '""'; // collapse the literal
+      continue;
+    }
+    if (ch === '`') { // template literal — may span lines
+      i = skipTemplate(raw, i + 1, st);
+      s += '""';
       continue;
     }
     if (ch === '/' && regexContext(s)) {
@@ -89,9 +114,10 @@ function stripLine(raw: string, st: StripState): string {
   return s;
 }
 
-/** Strip strings + comments to code-only lines (heuristic; multi-line templates may leak). */
+/** Strip strings (incl. multi-line templates), comments + regex literals to
+ *  code-only lines, so brace/control-flow counting isn't fooled by literal text. */
 export function stripToCode(lines: string[]): string[] {
-  const st: StripState = { inBlock: false };
+  const st: StripState = { inBlock: false, inTemplate: false };
   return lines.map((raw) => stripLine(raw, st));
 }
 
