@@ -420,7 +420,7 @@ probevane factory repos.txt --concurrency 4 --model auto
 Project source-quality gate — file size, function length/cyclomatic+cognitive complexity/nesting/params, long lines, debt markers (TODO/FIXME, comment-scoped), import fan-out, and (maximal-block) duplication → a 0–100 health grade. --strict exits 1 on error-severity violations (CI). Complements audit (test specs), assert-score (assertions), bench (mutation).
 
 ```
-probevane quality <dir> [--strict] [--json] [--max-file N] [--max-fn N] [--max-complexity N] [--max-cognitive N] [--max-nesting N] [--max-params N] [--max-width N] [--max-imports N] [--no-debt]
+probevane quality <dir> [--strict] [--json] [--sarif] [--write-baseline] [--no-baseline] [--since <ref>] [--max-file N] [--max-fn N] [--max-complexity N] [--max-cognitive N] [--max-nesting N] [--max-params N] [--max-width N] [--max-imports N] [--no-debt]
 # e.g.
 probevane quality ./app --strict
 ```
