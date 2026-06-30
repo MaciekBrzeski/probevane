@@ -4,7 +4,6 @@
 // BACKFIRED (length choke). This is the targeted middle: the data tables + the
 // shapes, compact. Pure + testable.
 
-/** From an opening { or [ at `start`, return the balanced literal (string-aware). */
 /** Advance the in-string scanner state by one char while inside a string literal. */
 function nextStrState(c: string, inStr: string, esc: boolean): { inStr: string | false; esc: boolean } {
   if (esc) return { inStr, esc: false };
