@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, existsSync, type Dirent } from 'node:fs';
 import { join, extname, relative, basename } from 'node:path';
 
 // Stack-agnostic project digest for the narrative docs loop. Unlike spec/build.ts
@@ -20,27 +20,39 @@ const SOURCE_EXT = new Set(Object.keys(LANG));
 
 interface FileRec { rel: string; loc: number; ext: string }
 
+function readEntries(abs: string): Dirent[] {
+  try {
+    return readdirSync(abs, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
+function fileRec(root: string, p: string, name: string): FileRec {
+  const ext = extname(name);
+  let loc = 0;
+  try { loc = readFileSync(p, 'utf8').split('\n').length; } catch { /* binary/unreadable */ }
+  return { rel: relative(root, p), loc, ext };
+}
+
+function visitEntry(root: string, abs: string, depth: number, e: Dirent, out: FileRec[]): void {
+  if (e.name.startsWith('.') && e.name !== '.github') return;
+  const p = join(abs, e.name);
+  if (e.isDirectory()) {
+    if (!SKIP.has(e.name)) visitDir(root, p, depth + 1, out);
+  } else if (e.isFile()) {
+    out.push(fileRec(root, p, e.name));
+  }
+}
+
+function visitDir(root: string, abs: string, depth: number, out: FileRec[]): void {
+  if (depth > 8) return;
+  for (const e of readEntries(abs)) visitEntry(root, abs, depth, e, out);
+}
+
 function walk(root: string): FileRec[] {
   const out: FileRec[] = [];
-  const visit = (abs: string, depth: number) => {
-    if (depth > 8) return;
-    let entries;
-    try { entries = readdirSync(abs, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (e.name.startsWith('.') && e.name !== '.github') continue;
-      const p = join(abs, e.name);
-      if (e.isDirectory()) {
-        if (SKIP.has(e.name)) continue;
-        visit(p, depth + 1);
-      } else if (e.isFile()) {
-        const ext = extname(e.name);
-        let loc = 0;
-        try { loc = readFileSync(p, 'utf8').split('\n').length; } catch { /* binary/unreadable */ }
-        out.push({ rel: relative(root, p), loc, ext });
-      }
-    }
-  };
-  visit(root, 0);
+  visitDir(root, root, 0, out);
   return out;
 }
 
