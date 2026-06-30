@@ -31,14 +31,51 @@ function skipString(raw: string, i: number, quote: string): number {
   return i + 1;
 }
 
+/** Skip a `${ … }` interpolation from just after the `{`; balances braces and
+ *  steps over strings + nested templates inside it (so a `}` or backtick within a
+ *  string/nested-template doesn't end it early). Returns the index past the `}`. */
+const isQuote = (c: string): boolean => c === '"' || c === "'";
+
+function skipInterp(raw: string, i: number): number {
+  let depth = 1;
+  while (i < raw.length) {
+    const c = raw[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '{') { depth++; i++; continue; }
+    if (c === '}') { if (--depth === 0) return i + 1; i++; continue; }
+    if (isQuote(c)) { i = skipString(raw, i + 1, c); continue; }
+    if (c === '`') { i = skipNestedTemplate(raw, i + 1); continue; }
+    i++;
+  }
+  return i; // interpolation runs past the line (rare) — stop here
+}
+
+/** Skip a NESTED template (inside an interpolation), line-local; handles its own
+ *  `${ … }` so an inner backtick doesn't mis-close the outer template. */
+function skipNestedTemplate(raw: string, i: number): number {
+  while (i < raw.length) {
+    const c = raw[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') return i + 1;
+    if (c === '$' && raw[i + 1] === '{') { i = skipInterp(raw, i + 2); continue; }
+    i++;
+  }
+  return i;
+}
+
 /** Skip template-literal content from index `i` to past the closing unescaped
  *  backtick; sets st.inTemplate when it runs off the line (a multi-line template),
- *  so later lines collapse too. Interpolations are collapsed as well — consistent
- *  with how single-line backtick strings are already handled. */
+ *  so later lines collapse too. `${ … }` interpolations (incl. nested templates,
+ *  e.g. a `${cond ? `inner` : x}` className/styled builder) are stepped over so an
+ *  inner backtick can't mis-close the literal. The whole span is collapsed/kept by
+ *  the caller — interpolation expressions count as literal text, like single-line
+ *  backtick strings already do. */
 function skipTemplate(raw: string, i: number, st: StripState): number {
   while (i < raw.length) {
-    if (raw[i] === '\\') { i += 2; continue; }
-    if (raw[i] === '`') { st.inTemplate = false; return i + 1; }
+    const c = raw[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') { st.inTemplate = false; return i + 1; }
+    if (c === '$' && raw[i + 1] === '{') { i = skipInterp(raw, i + 2); continue; }
     i++;
   }
   st.inTemplate = true;

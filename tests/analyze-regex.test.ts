@@ -113,3 +113,20 @@ describe('analyzer — duplication skips import blocks (structural, not logic du
     expect(findDuplication([{ file: 'a.ts', code: a }, { file: 'b.ts', code: b }], 6).dups).toEqual([]);
   });
 });
+
+describe('analyzer — nested templates (styled-components / className builders)', () => {
+  it('a nested template in a ${} interpolation is fully collapsed (no leaked code)', () => {
+    // a className-builder line with a nested template + control-flow-looking words
+    const src = [
+      'function cls(active: boolean, color: string) {',
+      '  return `btn ${active ? `btn-${color} if for while switch` : ``} done`;',
+      '}',
+      'function other() { return 1; }',
+    ].join('\n');
+    const r = analyzeFile('t.ts', src, DEFAULT_QUALITY);
+    expect(r.functions.map((f) => f.name)).toContain('other'); // cls must not absorb other
+    const c = r.functions.find((f) => f.name === 'cls')!;
+    expect(c.cognitive).toBeLessThan(3); // the template's fake if/for/while/switch don't count
+    expect(r.longLineNos).toEqual([]); // line is template content, not long code
+  });
+});
