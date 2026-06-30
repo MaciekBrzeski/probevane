@@ -50,16 +50,22 @@ function isDeepRemoteImport(spec: string, remotes: string[]): boolean {
 }
 
 // R1 — boundaries: no deep cross-remote imports; design-system not deep-imported.
+/** The boundary violation a single import spec triggers, or null. */
+function boundaryViolation(i: MfeRepoInput, file: string, spec: string): MfeViolation | null {
+  if (isDeepRemoteImport(spec, i.config.remotes))
+    return { rule: 'boundary', severity: 'error', file, message: `deep import past a remote's public API: ${spec}` };
+  if (i.designSystem && spec.startsWith(i.designSystem + '/') && INTERNAL.test(spec))
+    return { rule: 'boundary', severity: 'warn', file, message: `deep import into the design system: ${spec}` };
+  return null;
+}
+
 function ruleBoundaries(i: MfeRepoInput): MfeViolation[] {
   const v: MfeViolation[] = [];
-  for (const { file, source } of i.sources) {
+  for (const { file, source } of i.sources)
     for (const spec of importSpecs(source)) {
-      if (isDeepRemoteImport(spec, i.config.remotes))
-        v.push({ rule: 'boundary', severity: 'error', file, message: `deep import past a remote's public API: ${spec}` });
-      else if (i.designSystem && spec.startsWith(i.designSystem + '/') && INTERNAL.test(spec))
-        v.push({ rule: 'boundary', severity: 'warn', file, message: `deep import into the design system: ${spec}` });
+      const viol = boundaryViolation(i, file, spec);
+      if (viol) v.push(viol);
     }
-  }
   return v;
 }
 

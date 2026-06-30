@@ -34,6 +34,33 @@ export function lineOf(src: string, idx: number): number {
   return src.slice(0, idx).split('\n').length;
 }
 
+/** Shared context for evaluating one mutation against one target file. */
+interface MutantCtx {
+  dir: string;
+  adapter: StackAdapter;
+  abs: string;
+  original: string;
+  sourcePath: string;
+}
+
+/** Apply one mutation; return the surviving mutant (suite stayed GREEN) or null. */
+async function trySurvivor(c: MutantCtx, re: RegExp, repl: string): Promise<SurvivingMutant | null> {
+  re.lastIndex = 0;
+  const m = re.exec(c.original);
+  if (!m) return null;
+  const mutated = c.original.slice(0, m.index) + repl + c.original.slice(m.index + m[0].length);
+  if (mutated === c.original) return null;
+  try {
+    await writeFile(c.abs, mutated);
+    const run = await c.adapter.run(c.dir, 'unit');
+    if (!run.green) return null;
+    const line = lineOf(c.original, m.index);
+    return { sourcePath: c.sourcePath, line, mutation: `${m[0]} → ${repl}`, snippet: (c.original.split('\n')[line - 1] ?? '').trim().slice(0, 90) };
+  } finally {
+    await writeFile(c.abs, c.original);
+  }
+}
+
 /** Mutation-driven steering: apply one mutation at a time; a mutant that leaves
  *  the suite GREEN survived — collect it with its location. */
 export async function survivingMutants(dir: string, adapter: StackAdapter, maxMutants = 6, maxTargets = 3): Promise<SurvivingMutant[]> {
@@ -43,23 +70,11 @@ export async function survivingMutants(dir: string, adapter: StackAdapter, maxMu
     const abs = join(dir, t.sourcePath);
     const original = await readFile(abs, 'utf8').catch(() => '');
     if (!original) continue;
+    const ctx: MutantCtx = { dir, adapter, abs, original, sourcePath: t.sourcePath };
     for (const [re, repl] of MUTATIONS) {
       if (out.length >= maxMutants) break;
-      re.lastIndex = 0;
-      const m = re.exec(original);
-      if (!m) continue;
-      const mutated = original.slice(0, m.index) + repl + original.slice(m.index + m[0].length);
-      if (mutated === original) continue;
-      try {
-        await writeFile(abs, mutated);
-        const run = await adapter.run(dir, 'unit');
-        if (run.green) {
-          const line = lineOf(original, m.index);
-          out.push({ sourcePath: t.sourcePath, line, mutation: `${m[0]} → ${repl}`, snippet: (original.split('\n')[line - 1] ?? '').trim().slice(0, 90) });
-        }
-      } finally {
-        await writeFile(abs, original);
-      }
+      const s = await trySurvivor(ctx, re, repl);
+      if (s) out.push(s);
     }
   }
   return out;
@@ -74,6 +89,20 @@ export function mutantDigest(survivors: SurvivingMutant[]): string {
   );
 }
 
+/** Apply one mutation; null = not applicable, true = killed (suite went red), false = survived. */
+async function scoreMutant(c: MutantCtx, re: RegExp, repl: string): Promise<boolean | null> {
+  if (!re.test(c.original)) return null;
+  const mutated = c.original.replace(re, repl);
+  if (mutated === c.original) return null;
+  try {
+    await writeFile(c.abs, mutated);
+    const run = await c.adapter.run(c.dir, 'unit');
+    return !run.green; // killed if the suite went red
+  } finally {
+    await writeFile(c.abs, c.original);
+  }
+}
+
 export async function mutationScore(dir: string, adapter: StackAdapter, maxMutants = 5, maxTargets = 3): Promise<MutationResult> {
   const targets = (await adapter.discover(dir, 'unit')).slice(0, maxTargets);
   let total = 0;
@@ -82,19 +111,13 @@ export async function mutationScore(dir: string, adapter: StackAdapter, maxMutan
     const abs = join(dir, t.sourcePath);
     const original = await readFile(abs, 'utf8').catch(() => '');
     if (!original) continue;
+    const ctx: MutantCtx = { dir, adapter, abs, original, sourcePath: t.sourcePath };
     for (const [re, repl] of MUTATIONS) {
       if (total >= maxMutants) break;
-      if (!re.test(original)) continue;
-      const mutated = original.replace(re, repl);
-      if (mutated === original) continue;
+      const result = await scoreMutant(ctx, re, repl);
+      if (result === null) continue;
       total++;
-      try {
-        await writeFile(abs, mutated);
-        const run = await adapter.run(dir, 'unit');
-        if (!run.green) killed++;
-      } finally {
-        await writeFile(abs, original);
-      }
+      if (result) killed++;
     }
   }
   return { total, killed, score: total ? killed / total : 1 };

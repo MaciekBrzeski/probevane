@@ -28,6 +28,23 @@ export function dayOf(ts: string): string {
   return (ts || '').slice(0, 10);
 }
 
+/** A fresh zeroed bucket for one calendar day. */
+function emptyBucket(date: string): DailyBucket {
+  return { date, runs: 0, cost: 0, accepted: 0, acceptRate: 0, tokensIn: 0, tokensOut: 0, errors: 0 };
+}
+
+/** Fold one record into its day bucket (creating it on first sight). */
+function accumulate(byDay: Map<string, DailyBucket>, r: RunRecord): void {
+  const date = dayOf(r.ts);
+  const b = byDay.get(date) ?? byDay.set(date, emptyBucket(date)).get(date)!;
+  b.runs++;
+  b.cost += r.cost;
+  b.tokensIn += r.tokensIn;
+  b.tokensOut += r.tokensOut;
+  if (r.accepted) b.accepted++;
+  if (r.stopReason === 'error') b.errors++;
+}
+
 /** Roll records into totals + an ascending per-day time series. */
 export function aggregateOverTime(records: RunRecord[]): OverTime {
   const byDay = new Map<string, DailyBucket>();
@@ -37,25 +54,7 @@ export function aggregateOverTime(records: RunRecord[]): OverTime {
   for (const r of records) {
     if (!firstTs || r.ts < firstTs) firstTs = r.ts;
     if (!lastTs || r.ts > lastTs) lastTs = r.ts;
-    const date = dayOf(r.ts);
-    const b =
-      byDay.get(date) ??
-      byDay.set(date, {
-        date,
-        runs: 0,
-        cost: 0,
-        accepted: 0,
-        acceptRate: 0,
-        tokensIn: 0,
-        tokensOut: 0,
-        errors: 0,
-      }).get(date)!;
-    b.runs++;
-    b.cost += r.cost;
-    b.tokensIn += r.tokensIn;
-    b.tokensOut += r.tokensOut;
-    if (r.accepted) b.accepted++;
-    if (r.stopReason === 'error') b.errors++;
+    accumulate(byDay, r);
   }
 
   const daily = [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));

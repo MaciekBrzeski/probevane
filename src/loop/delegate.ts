@@ -63,9 +63,17 @@ function buildPrompt(base: string, round: number, feedback: string): string {
 
 /** One delegation round: spawn `claude -p`, then run the suite + audit on the
  *  changed test files and derive green/auditErrors and the next-round feedback. */
-async function delegateRound(
-  opts: DelegateOpts, dir: string, scope: RunScope, base: string, round: number, feedback: string,
-): Promise<RoundResult> {
+interface RoundCtx {
+  opts: DelegateOpts;
+  dir: string;
+  scope: RunScope;
+  base: string;
+  round: number;
+  feedback: string;
+}
+
+async function delegateRound(c: RoundCtx): Promise<RoundResult> {
+  const { opts, dir, scope, base, round, feedback } = c;
   const { adapter } = opts;
   const log = opts.log ?? (() => {});
   const prompt = buildPrompt(base, round, feedback);
@@ -109,7 +117,7 @@ export async function runDelegated(opts: DelegateOpts): Promise<DelegateOutcome>
   let feedback = '';
 
   for (round = 1; round <= maxRounds; round++) {
-    const r = await delegateRound(opts, dir, scope, base, round, feedback);
+    const r = await delegateRound({ opts, dir, scope, base, round, feedback });
     costUsd += r.cost;
     changed = r.changed;
     green = r.green;

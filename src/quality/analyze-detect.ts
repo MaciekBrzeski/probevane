@@ -63,12 +63,24 @@ function skipRegex(raw: string, j: number): number {
   while (j < raw.length) {
     const c = raw[j];
     if (c === '\\') { j += 2; continue; }
-    if (c === '[') inClass = true;
-    else if (c === ']') inClass = false;
-    else if (c === '/' && !inClass) return j + 1;
+    if (c === '[') { inClass = true; j++; continue; }
+    if (c === ']') { inClass = false; j++; continue; }
+    if (c === '/' && !inClass) return j + 1;
     j++;
   }
   return j; // unterminated on this line
+}
+
+/** Handle a string/template/comment construct starting at raw[i] (not `//` or a
+ *  regex); returns {next index, text to emit} or null for an ordinary character. */
+function stripConstruct(raw: string, i: number, st: StripState): { i: number; emit: string } | null {
+  if (st.inTemplate) return { i: skipTemplate(raw, i, st), emit: '""' }; // multi-line template → collapse
+  if (st.inBlock) return { i: skipBlockComment(raw, i, st), emit: '' };
+  if (raw.startsWith('/*', i)) { st.inBlock = true; return { i: i + 2, emit: '' }; }
+  const ch = raw[i];
+  if (ch === '"' || ch === "'") return { i: skipString(raw, i + 1, ch), emit: '""' };
+  if (ch === '`') return { i: skipTemplate(raw, i + 1, st), emit: '""' }; // template literal — may span lines
+  return null;
 }
 
 /** Strip strings, comments + regex literals from a single line, advancing block state. */
@@ -76,32 +88,10 @@ function stripLine(raw: string, st: StripState): string {
   let s = '';
   let i = 0;
   while (i < raw.length) {
-    if (st.inTemplate) { // inside a multi-line template literal — collapse to its close
-      i = skipTemplate(raw, i, st);
-      s += '""';
-      continue;
-    }
-    if (st.inBlock) {
-      i = skipBlockComment(raw, i, st);
-      continue;
-    }
+    const step = stripConstruct(raw, i, st);
+    if (step) { i = step.i; s += step.emit; continue; }
     if (raw.startsWith('//', i)) break;
-    if (raw.startsWith('/*', i)) {
-      st.inBlock = true;
-      i += 2;
-      continue;
-    }
     const ch = raw[i];
-    if (ch === '"' || ch === "'") {
-      i = skipString(raw, i + 1, ch);
-      s += '""'; // collapse the literal
-      continue;
-    }
-    if (ch === '`') { // template literal — may span lines
-      i = skipTemplate(raw, i + 1, st);
-      s += '""';
-      continue;
-    }
     if (ch === '/' && regexContext(s)) {
       i = skipRegex(raw, i + 1);
       s += 'RE'; // collapse the regex literal (no braces/quotes leak)

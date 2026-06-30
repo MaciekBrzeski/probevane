@@ -95,17 +95,31 @@ function safePath(ctx: RunCtx, p: string): string {
  *  pnpm-workspace.yaml, a package.json with `"workspaces"`, or `.git`. Falls
  *  back to `workdir` itself (no widening for a non-workspace/non-repo dir).
  *  Pure (path in → path out); reused by the dependency-API digest. */
+/** True if `pkg` (a package.json path) declares a `workspaces` field. */
+function hasWorkspacesField(pkg: string): boolean {
+  if (!existsSync(pkg)) return false;
+  try {
+    return 'workspaces' in JSON.parse(readFileSync(pkg, 'utf8'));
+  } catch {
+    return false; // unparseable — not a workspace root
+  }
+}
+
+/** A directory is a workspace/repo root if it has a pnpm-workspace, a .git, or a
+ *  package.json with a `workspaces` field. */
+function isRepoRoot(dir: string): boolean {
+  return (
+    existsSync(join(dir, 'pnpm-workspace.yaml')) ||
+    existsSync(join(dir, '.git')) ||
+    hasWorkspacesField(join(dir, 'package.json'))
+  );
+}
+
 export function workspaceRootOf(workdir: string): string {
   let dir = workdir;
   const fsRoot = parsePath(dir).root;
   for (let i = 0; i < 12; i++) {
-    if (existsSync(join(dir, 'pnpm-workspace.yaml')) || existsSync(join(dir, '.git'))) return dir;
-    const pkg = join(dir, 'package.json');
-    if (existsSync(pkg)) {
-      try {
-        if ('workspaces' in JSON.parse(readFileSync(pkg, 'utf8'))) return dir;
-      } catch { /* unparseable — keep walking */ }
-    }
+    if (isRepoRoot(dir)) return dir;
     const parent = dirname(dir);
     if (parent === dir || dir === fsRoot) break; // no marker → fall back to workdir
     dir = parent;

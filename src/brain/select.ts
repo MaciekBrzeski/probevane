@@ -16,16 +16,19 @@ const ALIAS: Record<string, string> = {
   opus: 'claude-opus-4-8',
 };
 
-export function brainFor(model?: string): Brain {
-  let brain: Brain;
-  if (model?.startsWith('replay:')) return replayBrain(model.slice('replay:'.length));
-  else if (model === 'bridge') brain = bridgeBrain();
-  else if (model === 'claude-code') brain = claudeCodeBrain();
-  else if (model?.startsWith('cc:')) brain = claudeCodeBrain(model.slice('cc:'.length));
-  else if (model?.startsWith('local:')) brain = openaiCompatBrain(model.slice('local:'.length));
-  else if (model?.startsWith('openai:')) brain = openaiCompatBrain(model.slice('openai:'.length));
-  else brain = anthropicBrain(model && model !== 'auto' ? (ALIAS[model] ?? model) : undefined);
+/** Resolve a model id (non-replay) to its base brain. */
+function resolveBrain(model?: string): Brain {
+  if (model === 'bridge') return bridgeBrain();
+  if (model === 'claude-code') return claudeCodeBrain();
+  if (model?.startsWith('cc:')) return claudeCodeBrain(model.slice('cc:'.length));
+  if (model?.startsWith('local:')) return openaiCompatBrain(model.slice('local:'.length));
+  if (model?.startsWith('openai:')) return openaiCompatBrain(model.slice('openai:'.length));
+  return anthropicBrain(model && model !== 'auto' ? (ALIAS[model] ?? model) : undefined);
+}
 
+export function brainFor(model?: string): Brain {
+  if (model?.startsWith('replay:')) return replayBrain(model.slice('replay:'.length));
+  const brain = resolveBrain(model);
   const rec = process.env.PROBEVANE_RECORD;
   return rec ? recordingBrain(brain, rec) : brain;
 }
