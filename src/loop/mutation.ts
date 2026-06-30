@@ -107,7 +107,8 @@ export function mutantDigest(survivors: SurvivingMutant[]): string {
 
 /** Apply one mutation; null = not applicable, true = killed (suite went red), false = survived. */
 async function scoreMutant(c: MutantCtx, re: RegExp, repl: string): Promise<boolean | null> {
-  if (!re.test(c.original)) return null;
+  re.lastIndex = 0; // MUTATIONS are shared module-level /g regexes — reset before
+  if (!re.test(c.original)) return null; // .test() (it honors a stale lastIndex)
   const mutated = c.original.replace(re, repl);
   if (mutated === c.original) return null;
   try {
