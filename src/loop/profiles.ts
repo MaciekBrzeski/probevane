@@ -1,28 +1,13 @@
 import type { Rune } from './rune.js';
 import type { TestKind, RunScope } from '../adapters/adapter.js';
 import type { AcceptanceOpts } from './runes/acceptance_gate.js';
-import { contextInject } from './runes/context_inject.js';
-import { pathGuard } from './runes/path_guard.js';
-import { planFirst } from './runes/plan_first.js';
-import { noRegression } from './runes/no_regression.js';
-import { validationGate } from './runes/validation_gate.js';
-import { auditGate } from './runes/audit_gate.js';
-import { acceptanceGate } from './runes/acceptance_gate.js';
-import { hermeticGate } from './runes/hermetic_gate.js';
-import { mutationGate } from './runes/mutation_gate.js';
-import { a11yGate } from './runes/a11y_gate.js';
-import { visualGate } from './runes/visual_gate.js';
-import { flakeGate } from './runes/flake_gate.js';
-import { behaviorLock } from './runes/behavior_lock.js';
-import { redFirst } from './runes/red_first.js';
-import { qualityGate } from './runes/quality_gate.js';
-import { mfeGate } from './runes/mfe_gate.js';
-import { assertionGate } from './runes/assertion_gate.js';
+import {
+  contextInject, pathGuard, planFirst, noRegression, validationGate, auditGate,
+  acceptanceGate, hermeticGate, mutationGate, a11yGate, visualGate, flakeGate,
+  behaviorLock, redFirst, qualityGate, mfeGate, assertionGate,
+  sessionDiary, caveatHarvest, distillTrace, libraryPromote,
+} from './runes/index.js';
 import type { QualityConfig } from '../quality/analyze.js';
-import { sessionDiary } from './runes/session_diary.js';
-import { caveatHarvest } from './runes/caveat_harvest.js';
-import { distillTrace } from './runes/distill_trace.js';
-import { libraryPromote } from './runes/library_promote.js';
 
 // Profiles — ordered Rune pipelines per task type (ported from runestone
 // profiles.rs). beforeToolCall order: plan_first → no_regression. shouldStop
@@ -169,24 +154,20 @@ function documentSegments(opts: ProfileOpts): Segment[] {
  * truth. `profile()` is just this flattened; describe.ts reads each rune's
  * subroutine off the segment it came from (no second mapping to drift).
  */
+const SEGMENT_BUILDERS: Record<ProfileName, (opts: ProfileOpts, scope: RunScope) => Segment[]> = {
+  write_tests: writeTestsSegments,
+  feature: featureSegments,
+  repair: repairSegments,
+  fix: repairSegments,
+  refactor: refactorSegments,
+  migrate: refactorSegments,
+  document: documentSegments,
+  bare: () => [],
+};
+
 export function profileSegments(name: ProfileName, opts: ProfileOpts): Segment[] {
   const scope: RunScope = opts.kind === 'e2e' ? 'e2e' : 'unit';
-  switch (name) {
-    case 'write_tests':
-      return writeTestsSegments(opts, scope);
-    case 'feature':
-      return featureSegments(opts);
-    case 'repair':
-    case 'fix':
-      return repairSegments(opts);
-    case 'refactor':
-    case 'migrate':
-      return refactorSegments(opts);
-    case 'document':
-      return documentSegments(opts);
-    case 'bare':
-      return [];
-  }
+  return SEGMENT_BUILDERS[name](opts, scope);
 }
 
 export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {

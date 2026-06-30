@@ -139,22 +139,25 @@ function assertionQualityRules(): AuditRule[] {
   ];
 }
 
+interface BraceState { depth: number; started: boolean }
+
+/** Update brace depth / started flag across one line's characters. */
+function scanBraces(line: string, st: BraceState): void {
+  for (const ch of line) {
+    if (ch === '{') { st.depth++; st.started = true; }
+    else if (ch === '}') st.depth--;
+  }
+}
+
 // Body of an it()/test() block: lines from the opening to the matching brace depth 0.
 function blockBody(full: string, fromLine1: number): string {
   const lines = full.split('\n');
-  let depth = 0;
-  let started = false;
+  const st: BraceState = { depth: 0, started: false };
   const out: string[] = [];
   for (let i = fromLine1 - 1; i < lines.length; i++) {
-    const l = lines[i];
-    out.push(l);
-    for (const ch of l) {
-      if (ch === '{') {
-        depth++;
-        started = true;
-      } else if (ch === '}') depth--;
-    }
-    if (started && depth <= 0) break;
+    out.push(lines[i]);
+    scanBraces(lines[i], st);
+    if (st.started && st.depth <= 0) break;
     if (out.length > 60) break;
   }
   return out.join('\n');

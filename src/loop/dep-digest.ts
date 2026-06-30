@@ -108,6 +108,17 @@ function resolveImportToFile(spec: string, abs: string, pkgs: Map<string, string
   return spec === name ? pkgs.get(name)! : resolveModule(join(dirname(pkgs.get(name)!), spec.slice(name.length + 1)));
 }
 
+/** Resolve one import spec to its module file + a digest line, or null (skip). */
+function depLine(spec: string, abs: string, pkgs: Map<string, string>, root: string): { modAbs: string; line: string } | null {
+  const modAbs = resolveImportToFile(spec, abs, pkgs);
+  if (!modAbs) return null;
+  let api: string[];
+  try { api = moduleApi(readFileSync(modAbs, 'utf8')); } catch { return null; }
+  if (!api.length) return null;
+  const rel = relative(root, modAbs);
+  return { modAbs, line: `  from '${spec}' (${rel}): ${api.join('; ')}` };
+}
+
 /** Build the dependency-API context block for a focus file (empty if nothing useful). */
 export function buildDepDigest(dir: string, onlyPath: string): string {
   const abs = resolveModule(resolve(dir, onlyPath));
@@ -122,14 +133,10 @@ export function buildDepDigest(dir: string, onlyPath: string): string {
 
   for (const spec of importSpecs(src)) {
     if (lines.length >= MAX_MODULES) break;
-    const modAbs = resolveImportToFile(spec, abs, pkgs);
-    if (!modAbs || seen.has(modAbs)) continue;
-    seen.add(modAbs);
-    let api: string[];
-    try { api = moduleApi(readFileSync(modAbs, 'utf8')); } catch { continue; }
-    if (!api.length) continue;
-    const rel = relative(root, modAbs);
-    lines.push(`  from '${spec}' (${rel}): ${api.join('; ')}`);
+    const r = depLine(spec, abs, pkgs, root);
+    if (!r || seen.has(r.modAbs)) continue;
+    seen.add(r.modAbs);
+    lines.push(r.line);
   }
 
   if (!lines.length) return '';
