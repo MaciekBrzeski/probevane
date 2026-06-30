@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
-import { resolve, join, dirname, basename } from 'node:path';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
-import { scanMfe, readFederation } from './scan.js';
+import { resolve, dirname, basename } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { scanMfe, collectRepoShared } from './scan.js';
 import { planContracts } from './contract-scan.js';
-import { versionAlign, formatMfe, type RepoShared } from './standards.js';
+import { versionAlign, formatMfe } from './standards.js';
 import { runPool } from '../util/concurrent.js';
 import { aggregateMfe, type MfeDriverReport, type MfeDriverResult } from './report.js';
 
@@ -104,14 +104,7 @@ export async function runMfe(opts: MfeDriverOpts): Promise<MfeDriverReport> {
   );
 
   // Cross-repo shared-version alignment over the federation fleet.
-  const feds: RepoShared[] = [];
-  for (const repo of opts.repos) {
-    const cfg = await readFederation(resolve(repo)).catch(() => null);
-    if (cfg) {
-      const pkg = await readFile(join(resolve(repo), 'package.json'), 'utf8').then(JSON.parse).catch(() => ({}));
-      feds.push({ name: cfg.name || repo, shared: cfg.shared, pkg });
-    }
-  }
+  const feds = await collectRepoShared(opts.repos);
   const align = feds.length >= 2 ? versionAlign(feds) : [];
   return aggregateMfe(results, align, new Date().toISOString());
 }
