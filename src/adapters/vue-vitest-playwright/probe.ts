@@ -42,21 +42,26 @@ export async function probeVueUnit(dir: string, target: TestTarget): Promise<Pro
   return { target, facts: { isVue }, digest: lines.join('\n'), ok, error: ok ? undefined : 'nothing testable found' };
 }
 
-export async function discoverVue(dir: string, _kind: string): Promise<TestTarget[]> {
-  const root = join(dir, 'src');
-  const out: TestTarget[] = [];
-  const walk = async (d: string) => {
-    for (const e of await readdir(d, { withFileTypes: true }).catch(() => [])) {
-      if (e.isDirectory()) {
-        if (['node_modules', 'dist', 'coverage'].includes(e.name)) continue;
-        await walk(join(d, e.name));
-      } else if (/\.(vue|ts)$/.test(e.name) && !/\.(test|spec|d)\.ts$/.test(e.name) && !/main\.ts$/.test(e.name) && e.name !== 'vite-env.d.ts') {
-        const rel = relative(dir, join(d, e.name));
-        out.push({ kind: 'unit', sourcePath: rel, name: e.name.replace(/\.(vue|ts)$/, '') });
-      }
+const SKIP_DIRS = ['node_modules', 'dist', 'coverage'];
+
+function isVueTarget(name: string): boolean {
+  return /\.(vue|ts)$/.test(name) && !/\.(test|spec|d)\.ts$/.test(name) && !/main\.ts$/.test(name) && name !== 'vite-env.d.ts';
+}
+
+async function walkVue(d: string, dir: string, out: TestTarget[]): Promise<void> {
+  for (const e of await readdir(d, { withFileTypes: true }).catch(() => [])) {
+    if (e.isDirectory()) {
+      if (!SKIP_DIRS.includes(e.name)) await walkVue(join(d, e.name), dir, out);
+    } else if (isVueTarget(e.name)) {
+      const rel = relative(dir, join(d, e.name));
+      out.push({ kind: 'unit', sourcePath: rel, name: e.name.replace(/\.(vue|ts)$/, '') });
     }
-  };
-  await walk(root).catch(() => {});
+  }
+}
+
+export async function discoverVue(dir: string, _kind: string): Promise<TestTarget[]> {
+  const out: TestTarget[] = [];
+  await walkVue(join(dir, 'src'), dir, out).catch(() => {});
   return out;
 }
 
