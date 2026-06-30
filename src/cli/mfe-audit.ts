@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { scanMfe } from '../mfe/scan.js';
-import { formatMfe, versionAlign, type MfeViolation, type RepoShared } from '../mfe/standards.js';
+import { formatMfe, versionAlign, type MfeViolation, type RepoShared, type MfeAudit } from '../mfe/standards.js';
 import { parseRepoList } from '../factory/report.js';
 
 // probevane mfe-audit <dir | repos.txt> [--repos <file>] [--json] [--strict]
@@ -30,6 +30,15 @@ async function resolveRepos(args: string[]): Promise<string[]> {
   return positional ? [positional] : ['.'];
 }
 
+/** Human-readable per-repo report + the cross-repo alignment section. */
+function printHuman(rows: { repo: string; audit: MfeAudit }[], align: MfeViolation[]): void {
+  for (const { repo, audit: a } of rows) {
+    if (a.violations.length) console.log(`\n# ${repo} (${a.name || '?'}${a.isHost ? ', host' : ''})\n${formatMfe(a.violations)}`);
+    console.log(`[mfe] ${repo}: ${a.errors} error(s), ${a.warns} warn(s), grade ${a.grade}/100`);
+  }
+  if (align.length) console.log(`\n# cross-repo\n${formatMfe(align)}`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const json = args.includes('--json');
@@ -50,12 +59,7 @@ async function main() {
   if (json) {
     console.log(JSON.stringify({ repos: found.map((x) => ({ repo: x.repo, audit: x.s!.audit })), versionAlign: align }, null, 2));
   } else {
-    for (const { repo, s } of found) {
-      const a = s!.audit;
-      if (a.violations.length) console.log(`\n# ${repo} (${a.name || '?'}${a.isHost ? ', host' : ''})\n${formatMfe(a.violations)}`);
-      console.log(`[mfe] ${repo}: ${a.errors} error(s), ${a.warns} warn(s), grade ${a.grade}/100`);
-    }
-    if (align.length) console.log(`\n# cross-repo\n${formatMfe(align)}`);
+    printHuman(found.map((x) => ({ repo: x.repo, audit: x.s!.audit })), align);
   }
 
   const errors = found.reduce((n, x) => n + x.s!.audit.errors, 0) + align.filter((v) => v.severity === 'error').length;

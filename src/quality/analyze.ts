@@ -85,6 +85,7 @@ export interface QualityReport {
 // here so the public API (stripToCode, detectFunctions) is unchanged.
 import { stripToCode, detectFunctions } from './analyze-detect.js';
 export { stripToCode, detectFunctions };
+import { mkViolation, fileLevelViolations, fnLevelViolations } from './analyze-violations.js';
 
 const DEBT = /\b(TODO|FIXME|HACK|XXX)\b/;
 
@@ -128,16 +129,15 @@ const DUP_CAP = 25;
 /** Cross-file duplicate-block detection — reports MAXIMAL blocks, not fixed-size
  *  windows. A duplicated 10-line block is one Dup of `lines:10`, not five
  *  overlapping 6-line ones. Returns whether the report was capped. */
-export function findDuplication(
-  perFile: { file: string; code: string[] }[],
-  minLines: number,
-): { dups: Dup[]; capped: boolean } {
-  const norm = (l: string) => l.trim().replace(/\s+/g, ' ');
-  const trivial = (l: string) => l.length <= 2; // '', '}', '{', ');' etc.
-  const normed = perFile.map((f) => ({ file: f.file, code: f.code.map(norm) }));
+type Occ = { file: string; idx: number };
 
-  // Hash every minLines window → its occurrences (file + 0-based index).
-  const seen = new Map<string, { file: string; idx: number }[]>();
+/** Hash every minLines-window of each file → its occurrences (mostly-blank skipped). */
+function hashWindows(
+  normed: { file: string; code: string[] }[],
+  minLines: number,
+  trivial: (l: string) => boolean,
+): Map<string, Occ[]> {
+  const seen = new Map<string, Occ[]>();
   for (const { file, code } of normed) {
     for (let i = 0; i + minLines <= code.length; i++) {
       const window = code.slice(i, i + minLines);
@@ -146,6 +146,28 @@ export function findDuplication(
       (seen.get(key) ?? seen.set(key, []).get(key)!).push({ file, idx: i });
     }
   }
+  return seen;
+}
+
+/** Maximal block length from minLines, extending while ALL occurrences match the next line. */
+function extendBlock(occ: Occ[], codeOf: Map<string, string[]>, minLines: number): number {
+  let len = minLines;
+  while (true) {
+    const next = occ.map((o) => codeOf.get(o.file)?.[o.idx + len]);
+    if (next.some((x) => x === undefined) || new Set(next).size !== 1) break;
+    len++;
+  }
+  return len;
+}
+
+export function findDuplication(
+  perFile: { file: string; code: string[] }[],
+  minLines: number,
+): { dups: Dup[]; capped: boolean } {
+  const norm = (l: string) => l.trim().replace(/\s+/g, ' ');
+  const trivial = (l: string) => l.length <= 2; // '', '}', '{', ');' etc.
+  const normed = perFile.map((f) => ({ file: f.file, code: f.code.map(norm) }));
+  const seen = hashWindows(normed, minLines, trivial);
   const codeOf = new Map(normed.map((f) => [f.file, f.code] as const));
   const groups = [...seen.values()]
     .filter((occ) => occ.length >= 2)
@@ -155,13 +177,7 @@ export function findDuplication(
   const dups: Dup[] = [];
   for (const occ of groups) {
     if (occ.some((o) => covered.has(`${o.file}:${o.idx}`))) continue;
-    // Extend the block while ALL occurrences keep matching the next line.
-    let len = minLines;
-    while (true) {
-      const next = occ.map((o) => codeOf.get(o.file)?.[o.idx + len]);
-      if (next.some((x) => x === undefined) || new Set(next).size !== 1) break;
-      len++;
-    }
+    const len = extendBlock(occ, codeOf, minLines);
     for (const o of occ) for (let k = 0; k <= len - minLines; k++) covered.add(`${o.file}:${o.idx + k}`);
     dups.push({
       lines: len,
@@ -171,47 +187,6 @@ export function findDuplication(
   }
   dups.sort((a, b) => b.lines * b.count - a.lines * a.count);
   return { dups: dups.slice(0, DUP_CAP), capped: dups.length > DUP_CAP };
-}
-
-/** A single violation with the analyzer's standard `(value > threshold)` message. */
-function mkViolation(
-  file: string,
-  line: number,
-  rule: string,
-  severity: 'error' | 'warn',
-  value: number,
-  threshold: number,
-  what: string,
-): QViolation {
-  return { file, line, rule, severity, value, threshold, message: `${what} (${value} > ${threshold})` };
-}
-
-/** File-level violations (size, import fan-out, long lines, debt markers). */
-function fileLevelViolations(f: FileReport, cfg: QualityConfig): QViolation[] {
-  const v: QViolation[] = [];
-  if (f.loc > cfg.maxFileLoc) v.push(mkViolation(f.file, 1, 'file-size', 'error', f.loc, cfg.maxFileLoc, 'file too long'));
-  if (f.imports > cfg.maxImports)
-    v.push(mkViolation(f.file, 1, 'import-fanout', 'warn', f.imports, cfg.maxImports, 'too many imports'));
-  if (f.longLines > 0)
-    v.push(mkViolation(f.file, f.longLineNos[0], 'long-lines', 'warn', f.longLines, 0, `${f.longLines} line(s) over ${cfg.maxLineWidth} chars`));
-  if (f.debt > 0) v.push(mkViolation(f.file, f.debtLineNos[0], 'debt', 'warn', f.debt, 0, `${f.debt} debt marker(s)`));
-  return v;
-}
-
-/** Per-function violations (size, cyclomatic, cognitive, nesting, params). */
-function fnLevelViolations(file: string, fn: FnMetric, cfg: QualityConfig): QViolation[] {
-  const v: QViolation[] = [];
-  if (fn.loc > cfg.maxFnLoc)
-    v.push(mkViolation(file, fn.startLine, 'fn-size', 'error', fn.loc, cfg.maxFnLoc, `function ${fn.name} too long`));
-  if (fn.complexity > cfg.maxComplexity)
-    v.push(mkViolation(file, fn.startLine, 'complexity', 'error', fn.complexity, cfg.maxComplexity, `function ${fn.name} too complex (cyclomatic)`));
-  if (fn.cognitive > cfg.maxCognitive)
-    v.push(mkViolation(file, fn.startLine, 'cognitive', 'warn', fn.cognitive, cfg.maxCognitive, `function ${fn.name} cognitively complex (nesting-weighted)`));
-  if (fn.nesting > cfg.maxNesting)
-    v.push(mkViolation(file, fn.startLine, 'nesting', 'warn', fn.nesting, cfg.maxNesting, `function ${fn.name} nested too deep`));
-  if (fn.params > cfg.maxParams)
-    v.push(mkViolation(file, fn.startLine, 'params', 'warn', fn.params, cfg.maxParams, `function ${fn.name} has too many params`));
-  return v;
 }
 
 export function analyzeProject(
@@ -234,7 +209,10 @@ export function analyzeProject(
   );
   for (const d of duplication) {
     const o = d.occurrences[0];
-    violations.push(mkViolation(o.file, o.startLine, 'duplication', 'warn', d.count, 1, `${d.lines}-line block duplicated ${d.count}×`));
+    violations.push(mkViolation({
+      file: o.file, line: o.startLine, rule: 'duplication', severity: 'warn',
+      value: d.count, threshold: 1, what: `${d.lines}-line block duplicated ${d.count}×`,
+    }));
   }
 
   const errors = violations.filter((v) => v.severity === 'error').length;
