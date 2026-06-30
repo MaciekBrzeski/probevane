@@ -84,25 +84,29 @@ function buildHarness(modulePaths: string[], fixtures: Record<string, unknown>):
     .map((p, i) => `import * as m${i} from './${p.replace(/\.[tj]sx?$/, '.js')}';`)
     .join('\n');
   const mods = modulePaths.map((p, i) => `[${JSON.stringify(p)}, m${i}]`).join(', ');
-  return `${imports}
-const FIX = ${fixtureLiteral};
-const fixtureArrays = Object.values(FIX).filter(Array.isArray);
-const out = {};
-const bad = (v) => { const s = JSON.stringify(v); return s === undefined || s.includes('NaN') || s.includes('Infinity'); };
-for (const [path, mod] of [${mods}]) {
-  for (const [name, fn] of Object.entries(mod)) {
-    if (typeof fn !== 'function') continue;
-    // Only capture transformers that accept the collection fixture (one array arg).
-    if (fn.length !== 1) continue;
-    for (const arr of fixtureArrays) {
-      try {
-        const res = fn(arr);
-        // keep only sensible outputs (array/object), not scalars from a type mismatch
-        if (res !== undefined && !bad(res) && typeof res === 'object') { out[path + '#' + name] = res; break; }
-      } catch {}
-    }
-  }
-}
-console.log('__CONTRACTS__' + JSON.stringify(out));
-`;
+  // Built line-by-line (each a single-line string) so the harness body — which is
+  // generated CODE, not source we run — reads as data here, not nested control flow.
+  return [
+    imports,
+    `const FIX = ${fixtureLiteral};`,
+    `const fixtureArrays = Object.values(FIX).filter(Array.isArray);`,
+    `const out = {};`,
+    `const bad = (v) => { const s = JSON.stringify(v); return s === undefined || s.includes('NaN') || s.includes('Infinity'); };`,
+    `for (const [path, mod] of [${mods}]) {`,
+    `  for (const [name, fn] of Object.entries(mod)) {`,
+    `    if (typeof fn !== 'function') continue;`,
+    `    // Only capture transformers that accept the collection fixture (one array arg).`,
+    `    if (fn.length !== 1) continue;`,
+    `    for (const arr of fixtureArrays) {`,
+    `      try {`,
+    `        const res = fn(arr);`,
+    `        // keep only sensible outputs (array/object), not scalars from a type mismatch`,
+    `        if (res !== undefined && !bad(res) && typeof res === 'object') { out[path + '#' + name] = res; break; }`,
+    `      } catch {}`,
+    `    }`,
+    `  }`,
+    `}`,
+    `console.log('__CONTRACTS__' + JSON.stringify(out));`,
+    ``,
+  ].join('\n');
 }
