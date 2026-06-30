@@ -18,17 +18,7 @@ import { tailFrom, sseFrame } from '../loop/observe.js';
 // project's own quality bar. State is module-level (one daemon process); daemon.ts
 // wires its config + helpers in via initControl().
 
-export interface Job {
-  id: string;
-  op: string;
-  dir: string;
-  flags: string[];
-  pid?: number;
-  status: 'running' | 'done' | 'error' | 'cancelled';
-  startedAt: string;
-  endedAt?: string;
-  exitCode?: number;
-  tail: string[]; // last N output lines (for the dashboard)
+export interface Job extends PersistedJob {
   proc?: ChildProcess; // runtime handle (not persisted) — for /cancel
 }
 

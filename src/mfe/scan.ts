@@ -1,7 +1,7 @@
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { parseFederation, isFederationConfig, type FederationConfig } from './federation.js';
-import { auditRepo, type MfeAudit, type MfeRepoInput } from './standards.js';
+import { auditRepo, type MfeAudit, type MfeRepoInput, type RepoShared } from './standards.js';
 
 // I/O wrapper for the MFE audit: find a repo's Module Federation config, read its
 // package.json + source tree, and run the pure auditRepo. Shared by the
@@ -32,6 +32,20 @@ export async function readFederation(dir: string): Promise<FederationConfig | nu
     if (isFederationConfig(text)) combined += '\n' + text;
   }
   return combined ? parseFederation(combined) : null;
+}
+
+/** Build the federation shared[] list across a repo fleet: read each repo's config
+ *  + package.json, skipping non-MFE repos. Shared by the factory + mfe driver. */
+export async function collectRepoShared(repos: string[]): Promise<RepoShared[]> {
+  const feds: RepoShared[] = [];
+  for (const repo of repos) {
+    const cfg = await readFederation(resolve(repo)).catch(() => null);
+    if (cfg) {
+      const pkg = await readFile(join(resolve(repo), 'package.json'), 'utf8').then(JSON.parse).catch(() => ({}));
+      feds.push({ name: cfg.name || repo, shared: cfg.shared, pkg });
+    }
+  }
+  return feds;
 }
 
 export interface MfeScan {
