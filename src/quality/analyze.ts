@@ -173,7 +173,17 @@ export function findDuplication(
   minLines: number,
 ): { dups: Dup[]; capped: boolean } {
   const norm = (l: string) => l.trim().replace(/\s+/g, ' ');
-  const trivial = (l: string) => l.length <= 2; // '', '}', '{', ');' etc.
+  // Trivial-for-dup lines don't count toward a window's substance: structural
+  // punctuation, AND import statements / their member lines (`import …`, a bare
+  // `Name,` inside a multi-line `import type { … }`, the `} from '…'` close).
+  // Import blocks look near-identical across files by nature — that's not logic
+  // duplication, so a window made only of them is skipped.
+  const trivial = (l: string) =>
+    l.length <= 2 ||
+    /^import\b/.test(l) ||
+    /^export\s+(type\s+)?\{/.test(l) ||
+    /^\}?\s*from\s+['"]/.test(l) ||
+    /^[A-Za-z0-9_$]+,?$/.test(l); // lone identifier (type-import member / re-export name)
   const normed = perFile.map((f) => ({ file: f.file, code: f.code.map(norm) }));
   const seen = hashWindows(normed, minLines, trivial);
   const codeOf = new Map(normed.map((f) => [f.file, f.code] as const));
