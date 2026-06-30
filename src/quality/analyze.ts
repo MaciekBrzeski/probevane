@@ -173,52 +173,59 @@ export function findDuplication(
   return { dups: dups.slice(0, DUP_CAP), capped: dups.length > DUP_CAP };
 }
 
+/** A single violation with the analyzer's standard `(value > threshold)` message. */
+function mkViolation(
+  file: string,
+  line: number,
+  rule: string,
+  severity: 'error' | 'warn',
+  value: number,
+  threshold: number,
+  what: string,
+): QViolation {
+  return { file, line, rule, severity, value, threshold, message: `${what} (${value} > ${threshold})` };
+}
+
+/** File-level violations (size, import fan-out, long lines, debt markers). */
+function fileLevelViolations(f: FileReport, cfg: QualityConfig): QViolation[] {
+  const v: QViolation[] = [];
+  if (f.loc > cfg.maxFileLoc) v.push(mkViolation(f.file, 1, 'file-size', 'error', f.loc, cfg.maxFileLoc, 'file too long'));
+  if (f.imports > cfg.maxImports)
+    v.push(mkViolation(f.file, 1, 'import-fanout', 'warn', f.imports, cfg.maxImports, 'too many imports'));
+  if (f.longLines > 0)
+    v.push(mkViolation(f.file, f.longLineNos[0], 'long-lines', 'warn', f.longLines, 0, `${f.longLines} line(s) over ${cfg.maxLineWidth} chars`));
+  if (f.debt > 0) v.push(mkViolation(f.file, f.debtLineNos[0], 'debt', 'warn', f.debt, 0, `${f.debt} debt marker(s)`));
+  return v;
+}
+
+/** Per-function violations (size, cyclomatic, cognitive, nesting, params). */
+function fnLevelViolations(file: string, fn: FnMetric, cfg: QualityConfig): QViolation[] {
+  const v: QViolation[] = [];
+  if (fn.loc > cfg.maxFnLoc)
+    v.push(mkViolation(file, fn.startLine, 'fn-size', 'error', fn.loc, cfg.maxFnLoc, `function ${fn.name} too long`));
+  if (fn.complexity > cfg.maxComplexity)
+    v.push(mkViolation(file, fn.startLine, 'complexity', 'error', fn.complexity, cfg.maxComplexity, `function ${fn.name} too complex (cyclomatic)`));
+  if (fn.cognitive > cfg.maxCognitive)
+    v.push(mkViolation(file, fn.startLine, 'cognitive', 'warn', fn.cognitive, cfg.maxCognitive, `function ${fn.name} cognitively complex (nesting-weighted)`));
+  if (fn.nesting > cfg.maxNesting)
+    v.push(mkViolation(file, fn.startLine, 'nesting', 'warn', fn.nesting, cfg.maxNesting, `function ${fn.name} nested too deep`));
+  if (fn.params > cfg.maxParams)
+    v.push(mkViolation(file, fn.startLine, 'params', 'warn', fn.params, cfg.maxParams, `function ${fn.name} has too many params`));
+  return v;
+}
+
 export function analyzeProject(
   inputs: { file: string; source: string }[],
   cfg: QualityConfig = DEFAULT_QUALITY,
 ): QualityReport {
   const files = inputs.map((x) => analyzeFile(x.file, x.source, cfg));
   const violations: QViolation[] = [];
-  const push = (
-    file: string,
-    line: number,
-    rule: string,
-    severity: 'error' | 'warn',
-    value: number,
-    threshold: number,
-    what: string,
-  ) =>
-    violations.push({
-      file,
-      line,
-      rule,
-      severity,
-      value,
-      threshold,
-      message: `${what} (${value} > ${threshold})`,
-    });
 
   let fnCount = 0;
   for (const f of files) {
     fnCount += f.functions.length;
-    if (f.loc > cfg.maxFileLoc) push(f.file, 1, 'file-size', 'error', f.loc, cfg.maxFileLoc, 'file too long');
-    if (f.imports > cfg.maxImports)
-      push(f.file, 1, 'import-fanout', 'warn', f.imports, cfg.maxImports, 'too many imports');
-    if (f.longLines > 0)
-      push(f.file, f.longLineNos[0], 'long-lines', 'warn', f.longLines, 0, `${f.longLines} line(s) over ${cfg.maxLineWidth} chars`);
-    if (f.debt > 0) push(f.file, f.debtLineNos[0], 'debt', 'warn', f.debt, 0, `${f.debt} debt marker(s)`);
-    for (const fn of f.functions) {
-      if (fn.loc > cfg.maxFnLoc)
-        push(f.file, fn.startLine, 'fn-size', 'error', fn.loc, cfg.maxFnLoc, `function ${fn.name} too long`);
-      if (fn.complexity > cfg.maxComplexity)
-        push(f.file, fn.startLine, 'complexity', 'error', fn.complexity, cfg.maxComplexity, `function ${fn.name} too complex (cyclomatic)`);
-      if (fn.cognitive > cfg.maxCognitive)
-        push(f.file, fn.startLine, 'cognitive', 'warn', fn.cognitive, cfg.maxCognitive, `function ${fn.name} cognitively complex (nesting-weighted)`);
-      if (fn.nesting > cfg.maxNesting)
-        push(f.file, fn.startLine, 'nesting', 'warn', fn.nesting, cfg.maxNesting, `function ${fn.name} nested too deep`);
-      if (fn.params > cfg.maxParams)
-        push(f.file, fn.startLine, 'params', 'warn', fn.params, cfg.maxParams, `function ${fn.name} has too many params`);
-    }
+    violations.push(...fileLevelViolations(f, cfg));
+    for (const fn of f.functions) violations.push(...fnLevelViolations(f.file, fn, cfg));
   }
 
   const { dups: duplication, capped: duplicationCapped } = findDuplication(
@@ -227,15 +234,7 @@ export function analyzeProject(
   );
   for (const d of duplication) {
     const o = d.occurrences[0];
-    push(
-      o.file,
-      o.startLine,
-      'duplication',
-      'warn',
-      d.count,
-      1,
-      `${d.lines}-line block duplicated ${d.count}×`,
-    );
+    violations.push(mkViolation(o.file, o.startLine, 'duplication', 'warn', d.count, 1, `${d.lines}-line block duplicated ${d.count}×`));
   }
 
   const errors = violations.filter((v) => v.severity === 'error').length;

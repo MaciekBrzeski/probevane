@@ -30,10 +30,86 @@ function findNodeModules(root: string, sub = '', depth = 0): string[] {
   return out;
 }
 
+// A fresh worktree has no node_modules (gitignored) → symlink EVERY node_modules
+// dir from the source tree (root + nested, e.g. fixtures/*/node_modules) so
+// tsc/vitest resolve everywhere — not just hoisted root deps.
+function linkNodeModules(root: string, wt: string): void {
+  for (const rel of findNodeModules(root)) {
+    const src = join(root, rel);
+    const dst = join(wt, rel);
+    if (existsSync(dst)) continue;
+    try { mkdirSync(dirname(dst), { recursive: true }); symlinkSync(src, dst, 'dir'); } catch { /* best-effort */ }
+  }
+}
+
 export interface WorktreeOpts {
   merge?: boolean; // auto-merge the branch into the original branch on accept
   review?: (diff: string) => Promise<Finding[]>; // self-review the accepted diff before keep/merge
   log?: (l: string) => void;
+}
+
+interface AcceptCtx {
+  root: string;
+  wt: string;
+  rel: string;
+  branch: string;
+  onBranch: string;
+  label: string;
+  outcome: RunOutcome;
+  opts: WorktreeOpts;
+  log: (l: string) => void;
+}
+
+/** Self-review the committed diff and decide keep-vs-merge. Honors opts.merge,
+ *  but never auto-merges over a review error — keeps the branch for a human.
+ *  Reviewing the COMMIT (vs HEAD~1) — not the working tree — so new files are
+ *  included. The gates prove the suite is green; this catches behavior/quality
+ *  smells a green suite misses. */
+async function reviewBeforeMerge(
+  wt: string,
+  branch: string,
+  opts: WorktreeOpts,
+  log: (l: string) => void,
+): Promise<boolean> {
+  let doMerge = opts.merge;
+  if (opts.review) {
+    const findings = await opts.review(await getDiff(wt, 'HEAD~1')).catch(() => [] as Finding[]);
+    const errs = findings.filter((f) => f.severity === 'error');
+    const head = `[probevane] worktree review — ${findings.length} finding(s), ${errs.length} error`;
+    log(findings.length ? `${head}:\n${findingsMarkdown(findings)}` : '[probevane] worktree review: clean');
+    if (doMerge && errs.length) {
+      doMerge = false; // don't auto-merge over review errors — keep the branch for a human
+      log(`[probevane] worktree: ${errs.length} review error(s) — auto-merge BLOCKED; keeping branch ${branch}`);
+    }
+  }
+  return !!doMerge;
+}
+
+/** ACCEPTED path: commit ONLY the loop's edited files (prefixed by the run
+ *  subdir) — never `git add -A`, which would capture the node_modules symlink /
+ *  fixtures — then self-review and merge-or-keep the branch. */
+async function commitAndFinalize(ctx: AcceptCtx): Promise<void> {
+  const { root, wt, rel, branch, onBranch, label, outcome, opts, log } = ctx;
+  const files = outcome.editedFiles.map((f) => (rel ? join(rel, f) : f));
+  await commitFiles(wt, files, `probevane ${label}: ${files.length} file(s) (gates green)`);
+  const stat = await diffStat(wt, 'HEAD~1'); // the committed change (incl. new files)
+
+  const doMerge = await reviewBeforeMerge(wt, branch, opts, log);
+
+  if (doMerge) {
+    const ok = await mergeBranch(root, branch, `merge ${branch} (probevane ${label}, gates green)`);
+    await removeWorktree(root, wt, branch);
+    log(ok
+      ? `[probevane] worktree: merged ${branch} into ${onBranch}, cleaned up`
+      : `[probevane] worktree: MERGE FAILED (conflict?) — branch ${branch} kept; resolve manually`);
+  } else {
+    // Keep the branch for review; remove only the worktree directory.
+    await removeWorktree(root, wt);
+    log(`[probevane] worktree: changes committed on ${branch} (live tree untouched)`);
+    log(`[probevane]   review:  git -C ${root} diff ${onBranch}..${branch}`);
+    log(`[probevane]   merge:   git -C ${root} merge ${branch}`);
+  }
+  if (stat) log(`[probevane] worktree diff:\n${stat}`);
 }
 
 /** Run `run(workdir)` inside an isolated git worktree of `dir`'s repo. */
@@ -56,15 +132,7 @@ export async function runInWorktree(
   log(`[probevane] worktree ${wt} (branch ${branch}) — live tree untouched`);
 
   try {
-    // A fresh worktree has no node_modules (gitignored) → symlink EVERY node_modules
-    // dir from the source tree (root + nested, e.g. fixtures/*/node_modules) so
-    // tsc/vitest resolve everywhere — not just hoisted root deps.
-    for (const rel of findNodeModules(root)) {
-      const src = join(root, rel);
-      const dst = join(wt, rel);
-      if (existsSync(dst)) continue;
-      try { mkdirSync(dirname(dst), { recursive: true }); symlinkSync(src, dst, 'dir'); } catch { /* best-effort */ }
-    }
+    linkNodeModules(root, wt);
 
     const outcome = await run(join(wt, rel));
 
@@ -74,41 +142,7 @@ export async function runInWorktree(
       return outcome;
     }
 
-    // ACCEPTED. Commit ONLY the loop's edited files (prefixed by the run subdir) —
-    // never `git add -A`, which would capture the node_modules symlink / fixtures.
-    const files = outcome.editedFiles.map((f) => (rel ? join(rel, f) : f));
-    await commitFiles(wt, files, `probevane ${label}: ${files.length} file(s) (gates green)`);
-    const stat = await diffStat(wt, 'HEAD~1'); // the committed change (incl. new files)
-
-    // Self-review the committed diff before keep-vs-merge (the gates prove the suite
-    // is green; this catches behavior/quality smells a green suite misses). Reviewing
-    // the COMMIT (vs HEAD~1) — not the working tree — so new files are included.
-    let doMerge = opts.merge;
-    if (opts.review) {
-      const findings = await opts.review(await getDiff(wt, 'HEAD~1')).catch(() => [] as Finding[]);
-      const errs = findings.filter((f) => f.severity === 'error');
-      const head = `[probevane] worktree review — ${findings.length} finding(s), ${errs.length} error`;
-      log(findings.length ? `${head}:\n${findingsMarkdown(findings)}` : '[probevane] worktree review: clean');
-      if (doMerge && errs.length) {
-        doMerge = false; // don't auto-merge over review errors — keep the branch for a human
-        log(`[probevane] worktree: ${errs.length} review error(s) — auto-merge BLOCKED; keeping branch ${branch}`);
-      }
-    }
-
-    if (doMerge) {
-      const ok = await mergeBranch(root, branch, `merge ${branch} (probevane ${label}, gates green)`);
-      await removeWorktree(root, wt, branch);
-      log(ok
-        ? `[probevane] worktree: merged ${branch} into ${onBranch}, cleaned up`
-        : `[probevane] worktree: MERGE FAILED (conflict?) — branch ${branch} kept; resolve manually`);
-    } else {
-      // Keep the branch for review; remove only the worktree directory.
-      await removeWorktree(root, wt);
-      log(`[probevane] worktree: changes committed on ${branch} (live tree untouched)`);
-      log(`[probevane]   review:  git -C ${root} diff ${onBranch}..${branch}`);
-      log(`[probevane]   merge:   git -C ${root} merge ${branch}`);
-    }
-    if (stat) log(`[probevane] worktree diff:\n${stat}`);
+    await commitAndFinalize({ root, wt, rel, branch, onBranch, label, outcome, opts, log });
     return outcome;
   } catch (e) {
     await removeWorktree(root, wt, branch).catch(() => {});
