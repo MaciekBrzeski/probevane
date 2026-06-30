@@ -101,6 +101,18 @@ function apiLines(plan: Plan): string[] {
   return lines;
 }
 
+/** Parse `path: sentence` lines from a model reply into the narratives map. */
+function parseNarratives(
+  text: string,
+  graph: Awaited<ReturnType<typeof buildGraph>>,
+  out: Record<string, string>,
+): void {
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*([^\s:]+):\s*(.+)$/);
+    if (m && graph.nodes.has(m[1])) out[m[1]] = m[2].trim();
+  }
+}
+
 async function narrate(
   brain: Brain,
   graph: Awaited<ReturnType<typeof buildGraph>>,
@@ -114,13 +126,16 @@ async function narrate(
     digests.push(`${path} (${graph.nodes.get(path)!.kind}):\n${probe.digest}`);
   }
   const sys = 'You document codebases. For each module below, write ONE concise sentence describing its responsibility. Reply as lines `path: sentence`, nothing else.';
-  const resp = await brain
-    .complete({ system: sys, messages: [{ role: 'user', text: digests.join('\n\n') }], tools: [] })
-    .catch(() => null);
   const out: Record<string, string> = {};
-  for (const line of (resp?.text ?? '').split('\n')) {
-    const m = line.match(/^\s*([^\s:]+):\s*(.+)$/);
-    if (m && graph.nodes.has(m[1])) out[m[1]] = m[2].trim();
+  // Chunk the modules: one batched call for all of them overruns the model's
+  // output cap (~4k tokens) and only the first ~40 get described. Smaller batches
+  // keep every response complete, so every module is narrated.
+  const CHUNK = 25;
+  for (let i = 0; i < digests.length; i += CHUNK) {
+    const resp = await brain
+      .complete({ system: sys, messages: [{ role: 'user', text: digests.slice(i, i + CHUNK).join('\n\n') }], tools: [] })
+      .catch(() => null);
+    if (resp?.text) parseNarratives(resp.text, graph, out);
   }
   return out;
 }
