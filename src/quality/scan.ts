@@ -18,16 +18,27 @@ async function walk(dir: string): Promise<string[]> {
   return out;
 }
 
+/** Narrow walked paths to a changed subset (`--since`); undefined keeps all. */
+export function selectInputPaths(allPaths: string[], changed?: string[]): string[] {
+  if (!changed) return allPaths;
+  const set = new Set(changed);
+  return allPaths.filter((p) => set.has(p));
+}
+
 export async function scanProject(
   dir: string,
   cfg: QualityConfig = DEFAULT_QUALITY,
+  only?: string[],
 ): Promise<QualityReport> {
   const srcRoot = (await stat(join(dir, 'src')).then((s) => s.isDirectory()).catch(() => false))
     ? join(dir, 'src')
     : dir;
   const files = (await walk(srcRoot)).filter((f) => SRC.test(f) && !TEST.test(f));
+  const keep = new Set(selectInputPaths(files.map((f) => relative(dir, f)), only));
   const inputs = await Promise.all(
-    files.map(async (f) => ({ file: relative(dir, f), source: await readFile(f, 'utf8').catch(() => '') })),
+    files
+      .filter((f) => keep.has(relative(dir, f)))
+      .map(async (f) => ({ file: relative(dir, f), source: await readFile(f, 'utf8').catch(() => '') })),
   );
   return analyzeProject(inputs, cfg);
 }
