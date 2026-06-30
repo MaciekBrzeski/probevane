@@ -21,6 +21,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `ci` | PR helper: report changed-untested files + coverage; --generate adds tests; --review-fix reviews the diff (gated) and auto-fixes. |
 | `mock` | Synthesize the mock boundary (MSW handlers, fixtures, contracts) from the module graph. |
 | `graph` | Render the module dependency graph (ASCII tree + Mermaid). |
+| `search` | Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Index cached at .probevane/search-index.json. |
 | `spec` | Generate a project SPEC.md (graph, modules, API surface, coverage); --narrate adds LLM descriptions; --wiki publishes. |
 | `run` | Execute the test suite via the detected adapter. |
 | `coverage` | Report coverage via the adapter. |
@@ -173,6 +174,14 @@ Render the module dependency graph (ASCII tree + Mermaid).
 ```bash
 probevane graph <dir> [--mermaid <file>]
 # e.g. probevane graph ./app --mermaid graph.md
+```
+
+### search
+Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Index cached at .probevane/search-index.json.
+
+```bash
+probevane search <dir> "<concept>" [--top N] [--fresh] | probevane search <dir> --similar [--threshold 0.85] [--top N]
+# e.g. probevane search . "retry with backoff"
 ```
 
 ### spec
