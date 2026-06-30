@@ -40,7 +40,11 @@ async function main() {
   if (endpoint) {
     const base = endpoint.replace(/\/$/, '');
     for (const [path, body] of [['/v1/traces', traces], ['/v1/metrics', metrics]] as const) {
-      const r = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch((e) => ({ ok: false, status: String(e?.message ?? e) }) as any);
+      const r = await fetch(base + path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch((e) => ({ ok: false, status: String(e?.message ?? e) }) as any);
       console.error(`[probevane] otel POST ${base}${path} → ${r.ok ? 'ok' : 'FAILED ' + (r.status ?? '')}`);
     }
     return;

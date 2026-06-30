@@ -63,7 +63,12 @@ async function trySurvivor(c: MutantCtx, re: RegExp, repl: string): Promise<Surv
     const run = await c.adapter.run(c.dir, 'unit');
     if (!run.green) return null;
     const line = lineOf(c.original, m.index);
-    return { sourcePath: c.sourcePath, line, mutation: `${m[0]} → ${repl}`, snippet: (c.original.split('\n')[line - 1] ?? '').trim().slice(0, 90) };
+    return {
+      sourcePath: c.sourcePath,
+      line,
+      mutation: `${m[0]} → ${repl}`,
+      snippet: (c.original.split('\n')[line - 1] ?? '').trim().slice(0, 90),
+    };
   } finally {
     await writeFile(c.abs, c.original);
   }
@@ -71,7 +76,12 @@ async function trySurvivor(c: MutantCtx, re: RegExp, repl: string): Promise<Surv
 
 /** Mutation-driven steering: apply one mutation at a time; a mutant that leaves
  *  the suite GREEN survived — collect it with its location. */
-export async function survivingMutants(dir: string, adapter: StackAdapter, maxMutants = 6, maxTargets = 3): Promise<SurvivingMutant[]> {
+export async function survivingMutants(
+  dir: string,
+  adapter: StackAdapter,
+  maxMutants = 6,
+  maxTargets = 3,
+): Promise<SurvivingMutant[]> {
   const out: SurvivingMutant[] = [];
   const targets = (await adapter.discover(dir, 'unit')).slice(0, maxTargets);
   for (const t of targets) {
@@ -109,7 +119,12 @@ async function scoreMutant(c: MutantCtx, re: RegExp, repl: string): Promise<bool
   }
 }
 
-export async function mutationScore(dir: string, adapter: StackAdapter, maxMutants = 5, maxTargets = 3): Promise<MutationResult> {
+export async function mutationScore(
+  dir: string,
+  adapter: StackAdapter,
+  maxMutants = 5,
+  maxTargets = 3,
+): Promise<MutationResult> {
   const targets = (await adapter.discover(dir, 'unit')).slice(0, maxTargets);
   let total = 0;
   let killed = 0;

@@ -32,7 +32,12 @@ export function initRoutes(ctx: RouteCtx): void {
 }
 
 /** POST routes; returns true if it handled the request (else fall through to GET). */
-async function handlePost(url: string, query: URLSearchParams, req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+async function handlePost(
+  url: string,
+  query: URLSearchParams,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<boolean> {
   if (url === '/run') {
     await launch(req, res);
     return true;
@@ -92,11 +97,23 @@ async function handleMetrics(url: string, res: ServerResponse): Promise<void> {
 }
 
 /** GET routes. */
-async function handleGet(url: string, query: URLSearchParams, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (url === '/queue') return CTX.sendJson(res, 200, { paused: isPaused(), summary: queueSummary(getQueue()), items: getQueue().slice(-100) });
+async function handleGet(
+  url: string,
+  query: URLSearchParams,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  if (url === '/queue')
+    return CTX.sendJson(res, 200, {
+      paused: isPaused(),
+      summary: queueSummary(getQueue()),
+      items: getQueue().slice(-100),
+    });
   if (url === '/jobs') {
     // snapshot() drops the ChildProcess handle (not serializable) + caps the tail.
-    return CTX.sendJson(res, 200, { jobs: [...jobs.values()].map((j) => ({ ...snapshot(j), tail: j.tail.slice(-CTX.JOBS_RETURN) })) });
+    return CTX.sendJson(res, 200, {
+      jobs: [...jobs.values()].map((j) => ({ ...snapshot(j), tail: j.tail.slice(-CTX.JOBS_RETURN) })),
+    });
   }
   if (url === '/stream') {
     const dir = query.get('dir');

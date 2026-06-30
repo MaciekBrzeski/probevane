@@ -33,7 +33,8 @@ async function resolveRepos(args: string[]): Promise<string[]> {
 /** Human-readable per-repo report + the cross-repo alignment section. */
 function printHuman(rows: { repo: string; audit: MfeAudit }[], align: MfeViolation[]): void {
   for (const { repo, audit: a } of rows) {
-    if (a.violations.length) console.log(`\n# ${repo} (${a.name || '?'}${a.isHost ? ', host' : ''})\n${formatMfe(a.violations)}`);
+    if (a.violations.length)
+      console.log(`\n# ${repo} (${a.name || '?'}${a.isHost ? ', host' : ''})\n${formatMfe(a.violations)}`);
     console.log(`[mfe] ${repo}: ${a.errors} error(s), ${a.warns} warn(s), grade ${a.grade}/100`);
   }
   if (align.length) console.log(`\n# cross-repo\n${formatMfe(align)}`);
@@ -45,7 +46,9 @@ async function main() {
   const designSystem = flag(args, '--design-system');
   const repos = await resolveRepos(args);
 
-  const scans = (await Promise.all(repos.map((r) => scanMfe(resolve(r), designSystem)))).map((s, i) => ({ repo: repos[i], s }));
+  const scans = (await Promise.all(repos.map((r) => scanMfe(resolve(r), designSystem)))).map(
+    (s, i) => ({ repo: repos[i], s }),
+  );
   const found = scans.filter((x) => x.s);
   if (!found.length) {
     console.log('[probevane] mfe-audit: no Module Federation config found');
@@ -53,11 +56,19 @@ async function main() {
   }
 
   // Cross-repo: shared version alignment (only meaningful with >1 MFE).
-  const shared: RepoShared[] = found.map((x) => ({ name: x.s!.audit.name || x.repo, shared: x.s!.input.config.shared, pkg: x.s!.input.pkg }));
+  const shared: RepoShared[] = found.map((x) => ({
+    name: x.s!.audit.name || x.repo,
+    shared: x.s!.input.config.shared,
+    pkg: x.s!.input.pkg,
+  }));
   const align: MfeViolation[] = repos.length > 1 ? versionAlign(shared) : [];
 
   if (json) {
-    console.log(JSON.stringify({ repos: found.map((x) => ({ repo: x.repo, audit: x.s!.audit })), versionAlign: align }, null, 2));
+    console.log(JSON.stringify(
+      { repos: found.map((x) => ({ repo: x.repo, audit: x.s!.audit })), versionAlign: align },
+      null,
+      2,
+    ));
   } else {
     printHuman(found.map((x) => ({ repo: x.repo, audit: x.s!.audit })), align);
   }

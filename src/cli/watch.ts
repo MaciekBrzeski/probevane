@@ -40,9 +40,16 @@ async function main() {
     const { runPath } = await import('../loop/run-path.js');
     const { generateTests } = await import('../loop/run-generation.js');
     if (action === 'repair') {
-      await runPath({ dir, adapter, profileName: 'repair', task: `The source file ${rel} changed; update its affected tests so the suite is green.`, model: cfg.model ?? 'auto', budget: cfg.budget, log: (l) => console.error(l) }).catch((e) => console.error(String(e)));
+      await runPath({
+        dir, adapter, profileName: 'repair',
+        task: `The source file ${rel} changed; update its affected tests so the suite is green.`,
+        model: cfg.model ?? 'auto', budget: cfg.budget, log: (l) => console.error(l),
+      }).catch((e) => console.error(String(e)));
     } else {
-      await generateTests({ dir, kind: 'unit', adapter, model: cfg.model ?? 'auto', only: rel, maxTargets: 1, budget: cfg.budget, log: (l) => console.error(l) }).catch((e) => console.error(String(e)));
+      await generateTests({
+        dir, kind: 'unit', adapter, model: cfg.model ?? 'auto',
+        only: rel, maxTargets: 1, budget: cfg.budget, log: (l) => console.error(l),
+      }).catch((e) => console.error(String(e)));
     }
   }
 }

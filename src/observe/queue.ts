@@ -39,7 +39,11 @@ export function newItem(id: string, op: string, dir: string, flags: string[], at
 }
 
 /** Transition an item (immutable) — bump attempts on running, stamp end on finish. */
-export function mark(item: QueueItem, status: QueueStatus, extra: { exitCode?: number; endedAt?: string; nextAt?: number } = {}): QueueItem {
+export function mark(
+  item: QueueItem,
+  status: QueueStatus,
+  extra: { exitCode?: number; endedAt?: string; nextAt?: number } = {},
+): QueueItem {
   return {
     ...item,
     status,

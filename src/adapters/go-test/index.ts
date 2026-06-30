@@ -50,7 +50,11 @@ export const goAdapter: StackAdapter = {
 
   async discover(dir: string, _kind: TestKind): Promise<TestTarget[]> {
     const files = (await walk(dir)).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go'));
-    return files.map((f) => ({ kind: 'unit', sourcePath: relative(dir, f), name: f.split('/').pop()!.replace(/\.go$/, '') }));
+    return files.map((f) => ({
+      kind: 'unit',
+      sourcePath: relative(dir, f),
+      name: f.split('/').pop()!.replace(/\.go$/, ''),
+    }));
   },
 
   async probe(dir: string, target: TestTarget): Promise<ProbeResult> {
@@ -74,11 +78,21 @@ export const goAdapter: StackAdapter = {
     for (const line of r.stdout.split('\n')) tallyGoEvent(line, counts);
     const { passed, failed, skipped } = counts;
     const total = passed + failed + skipped;
-    return { passed, failed, skipped, green: r.ok && failed === 0 && total > 0 && passed > 0, raw: (r.stdout + r.stderr).slice(-4000) };
+    return {
+      passed,
+      failed,
+      skipped,
+      green: r.ok && failed === 0 && total > 0 && passed > 0,
+      raw: (r.stdout + r.stderr).slice(-4000),
+    };
   },
 
   async coverage(dir: string): Promise<CoverageResult> {
-    const r = await sh('go test -coverprofile=.probevane-cover.out -count=1 ./... && go tool cover -func=.probevane-cover.out', dir, 120_000);
+    const r = await sh(
+      'go test -coverprofile=.probevane-cover.out -count=1 ./... && go tool cover -func=.probevane-cover.out',
+      dir,
+      120_000,
+    );
     const m = r.stdout.match(/total:\s+\(statements\)\s+([\d.]+)%/);
     const pct = m ? parseFloat(m[1]) : 0;
     return { statements: pct, branches: 0, functions: pct, lines: pct, ok: !!m, raw: r.stdout.slice(-1500) };
@@ -101,7 +115,13 @@ export const goAdapter: StackAdapter = {
   },
 
   commands(): AdapterCommands {
-    return { typecheck: 'go build ./...', lint: 'gofmt -l . || true', testUnit: 'go test ./...', testE2e: 'true', coverage: 'go test -cover ./...' };
+    return {
+      typecheck: 'go build ./...',
+      lint: 'gofmt -l . || true',
+      testUnit: 'go test ./...',
+      testE2e: 'true',
+      coverage: 'go test -cover ./...',
+    };
   },
 };
 

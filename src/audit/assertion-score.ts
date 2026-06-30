@@ -49,7 +49,9 @@ export function scoreAssertions(source: string): AssertionScore {
 }
 
 /** Roll several files' scores into one. */
-export function aggregateScore(perFile: Array<{ file: string; s: AssertionScore }>): { score: number; total: number; weak: number } {
+export function aggregateScore(
+  perFile: Array<{ file: string; s: AssertionScore }>,
+): { score: number; total: number; weak: number } {
   const total = perFile.reduce((n, x) => n + x.s.total, 0);
   const strong = perFile.reduce((n, x) => n + x.s.strong, 0);
   const weak = perFile.reduce((n, x) => n + x.s.weak.length, 0);

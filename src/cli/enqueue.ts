@@ -25,7 +25,13 @@ async function main() {
     process.exit(2);
   }
   const path = root ? join(resolve(root), 'queue.jsonl') : statePath('queue.jsonl');
-  const item = newItem(randomUUID().slice(0, 8), v.plan.op, resolve(v.plan.dir), v.plan.flags, new Date().toISOString());
+  const item = newItem(
+    randomUUID().slice(0, 8),
+    v.plan.op,
+    resolve(v.plan.dir),
+    v.plan.flags,
+    new Date().toISOString(),
+  );
   await appendJsonl(path, item);
   console.log(`[probevane] enqueued ${item.op} ${item.dir} (${item.id}) → ${path}`);
 }

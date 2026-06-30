@@ -129,7 +129,9 @@ async function setupPathCase(c: PathCase): Promise<string> {
   const dir = join(ROOT, '.probevane-live', `${c.fixture}-${c.path}`);
   await rm(dir, { recursive: true, force: true }).catch(() => {});
   await cp(src, dir, { recursive: true, filter: (p) => !p.includes('node_modules') && !p.includes('/coverage') });
-  await (await import('node:fs/promises')).symlink(join(src, 'node_modules'), join(dir, 'node_modules')).catch(() => {});
+  await (await import('node:fs/promises'))
+    .symlink(join(src, 'node_modules'), join(dir, 'node_modules'))
+    .catch(() => {});
   if (c.mutate) {
     const { writeFile } = await import('node:fs/promises');
     const f = join(dir, c.mutate.file);
@@ -148,7 +150,9 @@ interface PathOpts {
 
 async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   const { live, record, stamp, logPath } = opts;
-  const base = JSON.parse(await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.path}.json`), 'utf8')) as Baseline;
+  const base = JSON.parse(
+    await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.path}.json`), 'utf8'),
+  ) as Baseline;
   const cassette = join(ROOT, 'eval', 'cassettes', `${c.fixture}.${c.path}.jsonl`);
   const dir = await setupPathCase(c);
 
@@ -160,16 +164,32 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   }
   const { runPath } = await import('../loop/run-path.js');
   console.log(`[eval] ${live ? (record ? 'recording' : 'live') : 'replay'} ${c.fixture}.${c.path}…`);
-  const outcome = await runPath({ dir, adapter, profileName: c.path, task: c.task, model, budget: 16000, log: (l) => console.error(l) }).catch((e) => {
+  const outcome = await runPath({
+    dir,
+    adapter,
+    profileName: c.path,
+    task: c.task,
+    model,
+    budget: 16000,
+    log: (l) => console.error(l),
+  }).catch((e) => {
     console.error(`[eval] ${c.path} failed: ${e}`);
     return null;
   });
   delete process.env.PROBEVANE_RECORD;
 
-  const score = await scoreFixture(dir, adapter, { scope: 'unit', flakeRuns: 1, oracleAssertions: base.oracleAssertions });
+  const score = await scoreFixture(dir, adapter, {
+    scope: 'unit',
+    flakeRuns: 1,
+    oracleAssertions: base.oracleAssertions,
+  });
   const verdict = judge(score, base);
   const ok = !!outcome?.accepted && verdict.pass;
-  await appendLog(logPath, { timestamp: stamp, target: c.fixture, kind: c.path, pass: ok ? 1 : 0, audit_score: score.auditScore, tests: score.tests, coverage: score.coverage, flake: score.flake, note: live ? (record ? 'path-record' : 'path-live') : 'path-replay' });
+  await appendLog(logPath, {
+    timestamp: stamp, target: c.fixture, kind: c.path, pass: ok ? 1 : 0,
+    audit_score: score.auditScore, tests: score.tests, coverage: score.coverage,
+    flake: score.flake, note: live ? (record ? 'path-record' : 'path-live') : 'path-replay',
+  });
   console.log(`[eval] ${c.fixture}.${c.path}: ${ok ? 'PASS' : `FAIL (${outcome?.accepted ? verdict.reasons.join('; ') : 'did not accept'})`} — tests=${score.tests} green=${score.green} audit=${score.auditScore}/5`);
   await rm(dir, { recursive: true, force: true }).catch(() => {});
   return ok;
