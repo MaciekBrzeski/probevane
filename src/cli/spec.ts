@@ -1,12 +1,13 @@
 import { resolve, join, basename } from 'node:path';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { anthropicBrain } from '../brain/anthropic-sdk.js';
+import { brainFor } from '../brain/select.js';
 import { buildSpec } from '../spec/build.js';
 
-// probevane spec <dir> [--narrate] [--out <file>] [--wiki]
+// probevane spec <dir> [--narrate] [--model <id>] [--out <file>] [--wiki]
 //   Generate a project specification (module graph, responsibilities, API
-//   surface, coverage). --narrate adds an LLM one-liner per module.
+//   surface, coverage). --narrate adds an LLM one-liner per module (any brain via
+//   --model, e.g. openai:<model> / local:<model> / bridge; default Anthropic).
 //   --wiki publishes it to the probevane wiki as a "Projects" page.
 async function main() {
   const args = process.argv.slice(2);
@@ -19,7 +20,7 @@ async function main() {
   const md = await buildSpec({
     dir,
     adapter,
-    brain: narrate ? anthropicBrain() : undefined,
+    brain: narrate ? brainFor(flag(args, '--model')) : undefined,
     stamp: new Date().toISOString().slice(0, 10),
   });
 
