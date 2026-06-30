@@ -76,8 +76,14 @@ function ruleSingletons(i: MfeRepoInput): MfeViolation[] {
   for (const dep of FRAMEWORKS) {
     if (!(dep in deps)) continue;
     const s: SharedDep | undefined = i.config.shared[dep];
-    if (!s) v.push({ rule: 'shared-missing', severity: 'error', message: `framework dep "${dep}" is not in Module Federation shared` });
-    else if (!s.singleton) v.push({ rule: 'singleton', severity: 'error', message: `shared "${dep}" must be a singleton` });
+    if (!s)
+      v.push({
+        rule: 'shared-missing',
+        severity: 'error',
+        message: `framework dep "${dep}" is not in Module Federation shared`,
+      });
+    else if (!s.singleton)
+      v.push({ rule: 'singleton', severity: 'error', message: `shared "${dep}" must be a singleton` });
   }
   return v;
 }
@@ -91,7 +97,8 @@ function ruleResilience(i: MfeRepoInput): MfeViolation[] {
     if (usesRemote(source) && !/\bSuspense\b/.test(source))
       v.push({ rule: 'resilience', severity: 'warn', file, message: 'federated import without a Suspense boundary' });
   const hasBoundary = i.sources.some((s) => /ErrorBoundary|componentDidCatch|getDerivedStateFromError/.test(s.source));
-  if (!hasBoundary) v.push({ rule: 'resilience', severity: 'warn', message: 'host has no error boundary for remote-load failures' });
+  if (!hasBoundary)
+    v.push({ rule: 'resilience', severity: 'warn', message: 'host has no error boundary for remote-load failures' });
   return v;
 }
 
@@ -100,7 +107,11 @@ function ruleContracts(i: MfeRepoInput): MfeViolation[] {
   const v: MfeViolation[] = [];
   for (const [key, path] of Object.entries(i.config.exposes))
     if (/\.(jsx?|mjs)$/.test(path))
-      v.push({ rule: 'contract', severity: 'warn', message: `exposed "${key}" is untyped (${path}) — expose a typed (.ts/.tsx) module` });
+      v.push({
+        rule: 'contract',
+        severity: 'warn',
+        message: `exposed "${key}" is untyped (${path}) — expose a typed (.ts/.tsx) module`,
+      });
   return v;
 }
 
@@ -116,7 +127,14 @@ export function auditRepo(input: MfeRepoInput): MfeAudit {
   ];
   const errors = violations.filter((x) => x.severity === 'error').length;
   const warns = violations.length - errors;
-  return { name: input.config.name, isHost: input.config.remotes.length > 0, violations, errors, warns, grade: grade(errors, warns) };
+  return {
+    name: input.config.name,
+    isHost: input.config.remotes.length > 0,
+    violations,
+    errors,
+    warns,
+    grade: grade(errors, warns),
+  };
 }
 
 export interface RepoShared {
@@ -137,7 +155,11 @@ export function versionAlign(repos: RepoShared[]): MfeViolation[] {
     }
     if (seen.size > 1) {
       const detail = [...seen.entries()].map(([ver, names]) => `${ver} (${names.join(',')})`).join(' vs ');
-      v.push({ rule: 'version-align', severity: 'error', message: `shared "${dep}" version misaligned across repos: ${detail}` });
+      v.push({
+        rule: 'version-align',
+        severity: 'error',
+        message: `shared "${dep}" version misaligned across repos: ${detail}`,
+      });
     }
   }
   return v;

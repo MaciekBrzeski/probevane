@@ -17,9 +17,11 @@ export type Phase = 'context' | 'guard' | 'observer' | 'gate' | 'harvest';
 export const PHASES: { id: Phase; label: string; detail: string }[] = [
   { id: 'context', label: 'Context / prepare', detail: 'Before the run: prepare()/systemPromptAddition runes seed the model with project context, rules, and few-shot exemplars.' },
   { id: 'guard', label: 'Per-turn guards (beforeToolCall — first block wins)', detail: 'On every tool call, beforeToolCall runes can veto it before it runs. The first rune to block wins, so order matters.' },
-  { id: 'observer', label: 'Observers (afterToolCall)', detail: 'After a tool completes, afterToolCall runes observe the result to track state — they do not block.' },
+  { id: 'observer', label: 'Observers (afterToolCall)', detail:
+    'After a tool completes, afterToolCall runes observe the result to track state — they do not block.' },
   { id: 'gate', label: 'Finish gates (shouldStop — first block injects + continues)', detail: "When the model tries to finish, shouldStop runes gate it. A block injects feedback and the loop continues; acceptance needs every gate green." },
-  { id: 'harvest', label: 'Harvest (onStop)', detail: 'On termination, onStop runes record and learn — diaries, caveats, traces, library promotion.' },
+  { id: 'harvest', label: 'Harvest (onStop)', detail:
+    'On termination, onStop runes record and learn — diaries, caveats, traces, library promotion.' },
 ];
 
 /** Subroutines — the reused pipeline segments a profile composes from (ordered). */
@@ -35,11 +37,16 @@ export const SUBROUTINES: { id: SubroutineId; label: string; detail: string }[] 
 export const TOGGLES: { key: keyof ProfileOpts; label: string; detail: string }[] = [
   { key: 'quality', label: 'quality', detail: 'Adds quality_gate — blocks finishing if the source you edited regresses in quality (oversized files/functions, etc.).' },
   { key: 'mutation', label: 'mutation', detail: 'Adds mutation_gate — mutates the source and requires the new tests to catch the mutants (slow, strongest signal).' },
-  { key: 'flakeGuard', label: 'flake', detail: 'Adds flake_gate — runs the new specs several times and rejects nondeterminism.' },
-  { key: 'assertMin', label: 'assertion', detail: 'Adds assertion_gate — enforces an assertion-quality floor on the new tests.' },
-  { key: 'a11y', label: 'a11y', detail: 'Adds a11y_gate — requires component/e2e specs to assert accessibility (roles / labels / axe).' },
-  { key: 'visual', label: 'visual', detail: 'Adds visual_gate (e2e only) — requires e2e specs to capture a screenshot checkpoint.' },
-  { key: 'mfe', label: 'mfe', detail: 'Adds mfe_gate — enforces Module Federation standards on a micro-frontend project (no-op off-federation).' },
+  { key: 'flakeGuard', label: 'flake', detail:
+    'Adds flake_gate — runs the new specs several times and rejects nondeterminism.' },
+  { key: 'assertMin', label: 'assertion', detail:
+    'Adds assertion_gate — enforces an assertion-quality floor on the new tests.' },
+  { key: 'a11y', label: 'a11y', detail:
+    'Adds a11y_gate — requires component/e2e specs to assert accessibility (roles / labels / axe).' },
+  { key: 'visual', label: 'visual', detail:
+    'Adds visual_gate (e2e only) — requires e2e specs to capture a screenshot checkpoint.' },
+  { key: 'mfe', label: 'mfe', detail:
+    'Adds mfe_gate — enforces Module Federation standards on a micro-frontend project (no-op off-federation).' },
 ];
 
 export interface RuneInfo {
@@ -75,7 +82,15 @@ export function describePipeline(name: ProfileName, opts: ProfileOpts): { profil
     seg.runes.map((r): RuneInfo => {
       const hooks = hooksOf(r);
       const d = describeRune(r.name, r);
-      return { name: r.name, hooks, phase: phaseOf(hooks), subroutine: seg.sub, summary: d.summary, detail: d.detail, rule: d.rule };
+      return {
+        name: r.name,
+        hooks,
+        phase: phaseOf(hooks),
+        subroutine: seg.sub,
+        summary: d.summary,
+        detail: d.detail,
+        rule: d.rule,
+      };
     }),
   );
   return { profile: name, runes };

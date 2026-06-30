@@ -80,7 +80,10 @@ function stripConstruct(raw: string, i: number, st: StripState, keep: boolean): 
   if (st.inBlock) return { i: skipBlockComment(raw, i, st), emit: '' };
   if (raw.startsWith('/*', i)) { st.inBlock = true; return { i: i + 2, emit: '' }; }
   const ch = raw[i];
-  if (ch === '"' || ch === "'") { const n = skipString(raw, i + 1, ch); return { i: n, emit: keep ? raw.slice(i, n) : '""' }; }
+  if (ch === '"' || ch === "'") {
+    const n = skipString(raw, i + 1, ch);
+    return { i: n, emit: keep ? raw.slice(i, n) : '""' };
+  }
   if (ch === '`') { const n = skipTemplate(raw, i + 1, st); return { i: n, emit: keep ? raw.slice(i, n) : '""' }; }
   return null;
 }

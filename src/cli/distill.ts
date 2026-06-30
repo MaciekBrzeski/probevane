@@ -60,7 +60,13 @@ async function runTrain(): Promise<void> {
 }
 
 // CPU model bake-off → bake one model in an isolated copy of the fixture.
-async function bakeModel(model: string, fixture: string, adapter: Adapter, testFile: string, prompt: string): Promise<BaseResult> {
+async function bakeModel(
+  model: string,
+  fixture: string,
+  adapter: Adapter,
+  testFile: string,
+  prompt: string,
+): Promise<BaseResult> {
   const work = join(tmpdir(), `pv-base-${model.replace(/[^a-z0-9]/gi, '_')}`);
   rmSync(work, { recursive: true, force: true });
   cpSync(fixture, work, { recursive: true });
@@ -70,7 +76,15 @@ async function bakeModel(model: string, fixture: string, adapter: Adapter, testF
     const gen = await cpuGenerate(model, 'You write tests. Output ONLY the test file.', prompt);
     writeFileSync(join(work, testFile), stripFences(gen.text));
     const s = await scoreSuite(work, adapter);
-    const r = { model, green: s.green, tests: s.tests, coverage: s.coverage, auditErrors: s.auditErrors, ms: gen.ms, tokPerSec: gen.tokPerSec };
+    const r = {
+      model,
+      green: s.green,
+      tests: s.tests,
+      coverage: s.coverage,
+      auditErrors: s.auditErrors,
+      ms: gen.ms,
+      tokPerSec: gen.tokPerSec,
+    };
     return { ...r, value: baseValue(r) };
   } catch (e) {
     console.error(`[distill] ${model} failed: ${String(e).slice(0, 100)}`);
@@ -91,7 +105,10 @@ function printBases(results: BaseResult[]): void {
 
 async function runBases(): Promise<void> {
   // CPU model bake-off → best base for GPU-less machines.
-  const models = (arg('--models') ?? 'qwen2.5-coder:3b,qwen2.5-coder:7b').split(',').map((s) => s.trim()).filter(Boolean);
+  const models = (arg('--models') ?? 'qwen2.5-coder:3b,qwen2.5-coder:7b')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const fixture = join(process.env.PROBEVANE_ROOT ?? process.cwd(), arg('--fixture') ?? 'fixtures/py-calc');
   const adapter = await selectAdapterOrThrow(fixture);
   const target = (await adapter.discover(fixture, 'unit'))[0];

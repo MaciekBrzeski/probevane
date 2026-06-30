@@ -47,7 +47,9 @@ export const rustAdapter: StackAdapter = {
     );
     const lines = [`GROUND TRUTH for ${target.sourcePath} (crate \`${crate}\`):`];
     if (fns.length) lines.push(`- pub fns: ${fns.join('; ')}`);
-    lines.push(`- write an integration test at tests/<name>.rs: \`use ${crate}::*;\` then #[test] fns with assert_eq!/assert!.`);
+    lines.push(
+      `- write an integration test at tests/<name>.rs: \`use ${crate}::*;\` then #[test] fns with assert_eq!/assert!.`,
+    );
     const ok = fns.length > 0;
     return { target, facts: { crate, fns }, digest: lines.join('\n'), ok, error: ok ? undefined : 'no pub fns' };
   },
@@ -59,7 +61,13 @@ export const rustAdapter: StackAdapter = {
       passed += parseInt(m[1], 10);
       failed += parseInt(m[2], 10);
     }
-    return { passed, failed, skipped: 0, green: r.ok && failed === 0 && passed > 0, raw: (r.stdout + r.stderr).slice(-4000) };
+    return {
+      passed,
+      failed,
+      skipped: 0,
+      green: r.ok && failed === 0 && passed > 0,
+      raw: (r.stdout + r.stderr).slice(-4000),
+    };
   },
 
   async coverage(_dir: string): Promise<CoverageResult> {
@@ -83,7 +91,13 @@ export const rustAdapter: StackAdapter = {
     return rustAuditRules();
   },
   commands(): AdapterCommands {
-    return { typecheck: 'cargo build --quiet', lint: 'cargo fmt --check || true', testUnit: 'cargo test --quiet', testE2e: 'true', coverage: 'true' };
+    return {
+      typecheck: 'cargo build --quiet',
+      lint: 'cargo fmt --check || true',
+      testUnit: 'cargo test --quiet',
+      testE2e: 'true',
+      coverage: 'true',
+    };
   },
 };
 

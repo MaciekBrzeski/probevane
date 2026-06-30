@@ -91,12 +91,19 @@ export function parseDecision(text: string): { text?: string; toolCalls: ToolCal
 
 /** First top-level JSON object in the text — the shared strict extractor, object-shaped. */
 export function extractJson(text: string): any | null {
-  return extractJsonStrict<Record<string, unknown>>(text, (x): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x));
+  return extractJsonStrict<Record<string, unknown>>(
+    text,
+    (x): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x),
+  );
 }
 
 function run(cmd: string, args: string[], input: string, env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(cmd, args, { env, maxBuffer: 16 * 1024 * 1024, timeout: TIMEOUT_MS }, (err, stdout, stderr) => {
+    const child = execFile(
+      cmd,
+      args,
+      { env, maxBuffer: 16 * 1024 * 1024, timeout: TIMEOUT_MS },
+      (err, stdout, stderr) => {
       if (err) return reject(new Error(`claude -p failed: ${err.message}\n${stderr}`));
       resolve(stdout);
     });

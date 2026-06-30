@@ -23,7 +23,10 @@ export function assertionGate(min: number): Rune {
       const specs = newSpecs(ctx);
       if (!specs.length) return ALLOW;
       const perFile = await Promise.all(
-        specs.map(async (f) => ({ file: f, s: scoreAssertions(await readFile(join(ctx.workdir, f), 'utf8').catch(() => '')) })),
+        specs.map(async (f) => ({
+          file: f,
+          s: scoreAssertions(await readFile(join(ctx.workdir, f), 'utf8').catch(() => '')),
+        })),
       );
       const agg = aggregateScore(perFile);
       if (agg.total === 0 || agg.score >= min) return ALLOW;

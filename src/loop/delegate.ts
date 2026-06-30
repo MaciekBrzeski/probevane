@@ -89,10 +89,14 @@ async function delegateRound(c: RoundCtx): Promise<RoundResult> {
   const run = await adapter.run(dir, scope, changed.length ? changed : undefined).catch((e) => {
     log(`[delegate] run error: ${e}`); return { passed: 0, failed: 1, green: false } as any;
   });
-  const report = await auditFiles(changed.map((f) => join(dir, f)), adapter.auditRules()).catch(() => ({ errors: 0, violations: [] } as any));
+  const report = await auditFiles(changed.map((f) => join(dir, f)), adapter.auditRules())
+    .catch(() => ({ errors: 0, violations: [] } as any));
   const green = !!run.green && changed.length > 0;
   const auditErrors = report.errors ?? 0;
-  log(`[delegate] round ${round}: ${changed.length} spec(s), suite ${green ? 'GREEN' : 'red'} (${run.passed}/${run.passed + run.failed}), audit ${auditErrors} err`);
+  log(
+    `[delegate] round ${round}: ${changed.length} spec(s), suite ${green ? 'GREEN' : 'red'} ` +
+      `(${run.passed}/${run.passed + run.failed}), audit ${auditErrors} err`,
+  );
 
   const nextFeedback = [
     green ? '' : `- Suite not green: ${run.failed} failing test(s).`,
@@ -152,7 +156,11 @@ function git(dir: string, args: string[]): Promise<string> {
 
 function spawn(cmd: string, args: string[], input: string, cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(cmd, args, { cwd, env, maxBuffer: 32 * 1024 * 1024, timeout: TIMEOUT_MS }, (err, stdout, stderr) => {
+    const child = execFile(
+      cmd,
+      args,
+      { cwd, env, maxBuffer: 32 * 1024 * 1024, timeout: TIMEOUT_MS },
+      (err, stdout, stderr) => {
       if (err) return reject(new Error(`claude -p (delegate) failed: ${err.message}\n${stderr}`));
       resolve(stdout);
     });

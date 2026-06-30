@@ -80,7 +80,11 @@ export function toApiMessages(req: BrainRequest): any[] {
     if (m.role === 'assistant') {
       const msg: any = { role: 'assistant', content: m.text ?? '' };
       if (m.toolCalls?.length)
-        msg.tool_calls = m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.input) } }));
+        msg.tool_calls = m.toolCalls.map((c) => ({
+          id: c.id,
+          type: 'function',
+          function: { name: c.name, arguments: JSON.stringify(c.input) },
+        }));
       out.push(msg);
     } else {
       // tool results become individual `tool` messages; trailing user text its own.
@@ -101,7 +105,13 @@ export function fromApi(resp: any): BrainResponse {
   }));
   const fr = choice.finish_reason;
   const stopReason: StopReason =
-    fr === 'tool_calls' || toolCalls.length ? 'tool_use' : fr === 'length' ? 'max_tokens' : fr === 'stop' ? 'end_turn' : 'other';
+    fr === 'tool_calls' || toolCalls.length
+      ? 'tool_use'
+      : fr === 'length'
+        ? 'max_tokens'
+        : fr === 'stop'
+          ? 'end_turn'
+          : 'other';
   return {
     text: message.content ?? '',
     toolCalls,

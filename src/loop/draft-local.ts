@@ -31,7 +31,9 @@ export interface DraftResult {
 // computed values (the local model's residual wall after fact-RAG binds facts).
 function promptBlocks(source: string): { factBlock: string; propBlock: string } {
   const facts = factDigest(source);
-  const factBlock = facts ? `=== EXACT FACTS (use these literal names + values + shapes; do NOT invent any) ===\n${facts}\n\n` : '';
+  const factBlock = facts
+    ? `=== EXACT FACTS (use these literal names + values + shapes; do NOT invent any) ===\n${facts}\n\n`
+    : '';
   const propBlock = looksPropertyTestable(source) ? `${propertyGuidance()}\n\n` : '';
   return { factBlock, propBlock };
 }
@@ -47,7 +49,9 @@ function buildUser(o: {
 }): string {
   return (
     `Write a ${o.kind} test ${o.placement}\nTarget: ${o.sourcePath}\n\n${o.propBlock}${o.factBlock}=== SOURCE ===\n${o.source.slice(0, 3000)}` +
-    (o.feedback ? `\n\n=== YOUR PREVIOUS ATTEMPT FAILED ===\n${o.feedback}\nFix it and output the full file again.` : '')
+    (o.feedback
+      ? `\n\n=== YOUR PREVIOUS ATTEMPT FAILED ===\n${o.feedback}\nFix it and output the full file again.`
+      : '')
   );
 }
 
@@ -63,7 +67,9 @@ async function verifyDraft(o: {
   adapter: StackAdapter;
 }): Promise<{ feedback: string; kind: string } | null> {
   const { dir, specPath, abs, scope, adapter } = o;
-  const run = await adapter.run(dir, scope, [specPath]).catch(() => ({ green: false, passed: 0, failed: 1, raw: '' } as any));
+  const run = await adapter
+    .run(dir, scope, [specPath])
+    .catch(() => ({ green: false, passed: 0, failed: 1, raw: '' } as any));
   const report = await auditFiles([abs], adapter.auditRules()).catch(() => ({ errors: 0 } as any));
   const tc = await sh(adapter.commands().typecheck, dir).catch(() => ({ stdout: '', stderr: '' } as any));
   const tcErrs = (tc.stdout + tc.stderr).split('\n').filter((l: string) => l.includes(specPath) && /error TS/.test(l));
@@ -119,6 +125,7 @@ export async function draftLocal(opts: {
     log(`[draft-local] ✗ ${specPath} attempt ${attempt + 1}: ${fail.kind}`);
   }
 
-  if (process.env.PROBEVANE_KEEP_DRAFT !== '1') await rm(abs, { force: true }); // leave nothing for the bridge to trip on (unless inspecting)
+  // leave nothing for the bridge to trip on (unless inspecting)
+  if (process.env.PROBEVANE_KEEP_DRAFT !== '1') await rm(abs, { force: true });
   return { accepted: false, specPath, reason: 'local could not produce a green+clean test' };
 }

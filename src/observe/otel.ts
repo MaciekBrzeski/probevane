@@ -23,7 +23,10 @@ function hashHex(s: string, len: number): string {
     h = Math.imul(h, 16777619) >>> 0;
   }
   let hex = '';
-  while (hex.length < len) hex += (h >>> 0).toString(16).padStart(8, '0') + (h = Math.imul(h ^ hex.length, 16777619) >>> 0).toString(16).padStart(8, '0');
+  while (hex.length < len)
+    hex +=
+      (h >>> 0).toString(16).padStart(8, '0') +
+      (h = Math.imul(h ^ hex.length, 16777619) >>> 0).toString(16).padStart(8, '0');
   return hex.slice(0, len);
 }
 
@@ -74,10 +77,21 @@ const gauge = (name: string, dataPoints: unknown[]) => ({ name, gauge: { dataPoi
 export function metricsPayload(records: RunRecord[], now: string) {
   const s = summarize(records);
   const t = nanos(now);
-  const tokenDP = (type: string, val: number) => ({ asInt: String(val), timeUnixNano: t, attributes: [attr('gen_ai.token.type', type)] });
-  const modelCostDP = Object.entries(s.byModel).map(([m, v]) => ({ asDouble: v.cost, timeUnixNano: t, attributes: [attr('gen_ai.request.model', m)] }));
+  const tokenDP = (type: string, val: number) => ({
+    asInt: String(val),
+    timeUnixNano: t,
+    attributes: [attr('gen_ai.token.type', type)],
+  });
+  const modelCostDP = Object.entries(s.byModel).map(([m, v]) => ({
+    asDouble: v.cost,
+    timeUnixNano: t,
+    attributes: [attr('gen_ai.request.model', m)],
+  }));
   const metrics = [
-    sum('gen_ai.client.token.usage', '{token}', true, [tokenDP('input', s.totalTokensIn), tokenDP('output', s.totalTokensOut)]),
+    sum('gen_ai.client.token.usage', '{token}', true, [
+      tokenDP('input', s.totalTokensIn),
+      tokenDP('output', s.totalTokensOut),
+    ]),
     sum('probevane.runs', '{run}', true, [{ asInt: String(s.runs), timeUnixNano: t }]),
     sum('probevane.accepted', '{run}', true, [{ asInt: String(s.accepted), timeUnixNano: t }]),
     gauge('probevane.acceptance_rate', [{ asDouble: s.acceptRate, timeUnixNano: t }]),
