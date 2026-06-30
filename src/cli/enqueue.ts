@@ -1,8 +1,7 @@
 import { resolve, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { statePath } from '../util/state.js';
 import { appendJsonl } from '../util/jsonl.js';
-import { newItem } from '../observe/queue.js';
+import { itemFromPlan } from '../observe/jobs.js';
 import { validateLaunch } from '../observe/launch.js';
 
 // probevane enqueue <op> <dir> [--root <stateDir>] [...op flags]
@@ -25,13 +24,7 @@ async function main() {
     process.exit(2);
   }
   const path = root ? join(resolve(root), 'queue.jsonl') : statePath('queue.jsonl');
-  const item = newItem(
-    randomUUID().slice(0, 8),
-    v.plan.op,
-    resolve(v.plan.dir),
-    v.plan.flags,
-    new Date().toISOString(),
-  );
+  const item = itemFromPlan(v.plan);
   await appendJsonl(path, item);
   console.log(`[probevane] enqueued ${item.op} ${item.dir} (${item.id}) → ${path}`);
 }

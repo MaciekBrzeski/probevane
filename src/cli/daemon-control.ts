@@ -6,8 +6,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RunRecord } from '../cost/ledger.js';
 import { appendJsonl, readJsonl } from '../util/jsonl.js';
 import { backoffMs } from '../observe/quarantine.js';
-import { reduceJobs, jobsToEvict, type PersistedJob } from '../observe/jobs.js';
-import { reduceQueue, nextReady, newItem, mark, type QueueItem } from '../observe/queue.js';
+import { reduceJobs, jobsToEvict, itemFromPlan, type PersistedJob } from '../observe/jobs.js';
+import { reduceQueue, nextReady, mark, type QueueItem } from '../observe/queue.js';
 import { validateLaunch } from '../observe/launch.js';
 import { overCap } from '../cost/budget.js';
 import { shipRun, latestDiary } from '../ship/ship.js';
@@ -178,13 +178,7 @@ export async function enqueue(req: IncomingMessage, res: ServerResponse) {
   }
   const v = validateLaunch(body);
   if (!v.ok) return CTX.sendJson(res, 400, { error: v.error });
-  const item = newItem(
-    randomUUID().slice(0, 8),
-    v.plan.op,
-    resolve(v.plan.dir),
-    v.plan.flags,
-    new Date().toISOString(),
-  );
+  const item = itemFromPlan(v.plan);
   await persistItem(item);
   await CTX.log('info', 'enqueue', { id: item.id, op: item.op, dir: item.dir });
   return CTX.sendJson(res, 200, { id: item.id, status: 'queued' });
