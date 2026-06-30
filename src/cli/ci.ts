@@ -31,7 +31,13 @@ async function findUntested(dir: string, changed: string[]): Promise<string[]> {
 }
 
 /** Generate tests for the untested changed files (needs a key). Returns 1 if accepted. */
-async function maybeGenerate(args: string[], dir: string, cfg: Cfg, adapter: Adapter, untested: string[]): Promise<number> {
+async function maybeGenerate(
+  args: string[],
+  dir: string,
+  cfg: Cfg,
+  adapter: Adapter,
+  untested: string[],
+): Promise<number> {
   if (!(args.includes('--generate') && untested.length && process.env.ANTHROPIC_API_KEY)) return 0;
   const { generateTests } = await import('../loop/run-generation.js');
   const outcome = await generateTests({
@@ -62,13 +68,22 @@ async function runReviewFix(args: string[], dir: string, cfg: Cfg, base: string,
   const grounded = await groundFindings(dir, raw);
   const verifier = brainFor('sonnet'); // fresh, independent
   const findings = await verifyFindings(grounded, diff, verifier).catch(() => grounded);
-  if (raw.length !== findings.length) console.error(`[probevane] review: ${raw.length} raw → ${grounded.length} grounded → ${findings.length} verified`);
+  if (raw.length !== findings.length)
+    console.error(`[probevane] review: ${raw.length} raw → ${grounded.length} grounded → ${findings.length} verified`);
   let reviewMd = '\n' + findingsMarkdown(findings);
   const actionable = findings.filter((f) => f.severity !== 'nit');
   if (!actionable.length) return reviewMd;
   const { runPath } = await import('../loop/run-path.js');
   console.error(`[probevane] review: ${actionable.length} actionable finding(s) — running fix path`);
-  const outcome = await runPath({ dir, adapter, profileName: 'fix', task: findingsTask(actionable), model: cfg.model ?? 'auto', budget: cfg.budget, log: (l) => console.error(l) }).catch(() => null);
+  const outcome = await runPath({
+    dir,
+    adapter,
+    profileName: 'fix',
+    task: findingsTask(actionable),
+    model: cfg.model ?? 'auto',
+    budget: cfg.budget,
+    log: (l) => console.error(l),
+  }).catch(() => null);
   if (outcome?.accepted) {
     await sh('git add -A && git -c user.name=probevane -c user.email=probevane@local commit -m "probevane: auto-fix review findings"', dir);
     reviewMd += `\n_Auto-fixed ${actionable.length} finding(s) and committed; suite green._\n`;

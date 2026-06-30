@@ -59,7 +59,15 @@ export async function shipRun(
   const branch = branchName(rec.runId ?? 'run');
   if (!(await createBranch(root, branch))) return { shipped: false, reason: `could not create branch ${branch}` };
 
-  const info: ShipInfo = { op: meta.op, repo: meta.repo, runId: rec.runId ?? 'run', files, tests: meta.tests, coverage: meta.coverage, cost: meta.cost };
+  const info: ShipInfo = {
+    op: meta.op,
+    repo: meta.repo,
+    runId: rec.runId ?? 'run',
+    files,
+    tests: meta.tests,
+    coverage: meta.coverage,
+    cost: meta.cost,
+  };
   const title = prTitle(info);
   if (!(await commitFiles(root, files, title))) return { shipped: false, branch, reason: 'commit failed' };
   log(`[ship] committed ${files.length} file(s) on ${branch}`);

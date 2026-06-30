@@ -209,7 +209,10 @@ async function tryTextExtract(lr: LoopRun, resp: BrainResponse): Promise<boolean
   if (decision.kind === 'block') {
     ctx.gateBlocks++; ctx.barren++; ctx.noteBlock(decision.reason);
     messages.push({ role: 'assistant', toolCalls: [call] });
-    messages.push({ role: 'user', toolResults: [{ id: call.id, content: decision.inject ?? decision.reason, isError: true }] });
+    messages.push({
+      role: 'user',
+      toolResults: [{ id: call.id, content: decision.inject ?? decision.reason, isError: true }],
+    });
     log(`[engine]   text-extract write BLOCKED: ${decision.reason}`);
   } else {
     const out = capOutput(await execTool(call, ctx));
@@ -239,7 +242,10 @@ async function runStopGate(lr: LoopRun): Promise<'break' | 'fallthrough'> {
     if (!st.exemplarShown && ctx.editedFiles.size > 0 && opts.onConsult) {
       st.exemplarShown = true;
       const ex = await opts.onConsult(ctx).catch(() => undefined);
-      if (ex) { inject += `\n\nA passing test for a SIMILAR module (adapt its approach):\n${ex}`; log('[engine]   + similar exemplar injected'); }
+      if (ex) {
+        inject += `\n\nA passing test for a SIMILAR module (adapt its approach):\n${ex}`;
+        log('[engine]   + similar exemplar injected');
+      }
     }
     messages.push({ role: 'user', text: inject });
     return 'fallthrough';

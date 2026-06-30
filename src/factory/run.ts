@@ -117,7 +117,8 @@ async function measureAccepted(
   try {
     const adapter = await selectAdapterOrThrow(dir);
     const specs = await adapter.specFiles(dir).catch(() => [] as string[]);
-    if (specs.length) base.tests = (await adapter.run(dir, opts.kind as RunScope, specs).catch(() => null))?.passed ?? 0;
+    if (specs.length)
+      base.tests = (await adapter.run(dir, opts.kind as RunScope, specs).catch(() => null))?.passed ?? 0;
     base.coverage = (await adapter.coverage(dir).catch(() => null))?.lines ?? null;
   } catch (e: any) {
     base.error = `measure: ${e?.message ?? e}`;
@@ -134,7 +135,12 @@ async function shipAccepted(
   if (!opts.ship) return;
   const diary = await latestDiary(dir);
   if (!diary) return;
-  const r = await shipRun(dir, diary, { op: 'generate', repo, tests: base.tests, coverage: base.coverage, cost: base.cost }, opts.log).catch(() => null);
+  const r = await shipRun(
+    dir,
+    diary,
+    { op: 'generate', repo, tests: base.tests, coverage: base.coverage, cost: base.cost },
+    opts.log,
+  ).catch(() => null);
   base.shipped = !!r?.shipped;
   base.prUrl = r?.prUrl;
 }
@@ -198,7 +204,10 @@ export async function runFactory(opts: FactoryOpts): Promise<FactoryReport> {
         return Promise.resolve<FactoryRepoResult>(
           prev
             ? { ...prev, cached: true }
-            : { repo: r, accepted: true, stopReason: 'accepted', tests: 0, coverage: null, cost: 0, tokensIn: 0, tokensOut: 0, reverted: false, cached: true },
+            : {
+                repo: r, accepted: true, stopReason: 'accepted', tests: 0, coverage: null,
+                cost: 0, tokensIn: 0, tokensOut: 0, reverted: false, cached: true,
+              },
         );
       }
       return processRepo(r, opts).catch(

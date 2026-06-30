@@ -73,7 +73,8 @@ async function processRepo(repo: string, opts: MfeDriverOpts): Promise<MfeDriver
   if (opts.fix) {
     const errs = scan.audit.violations.filter((v) => v.severity === 'error');
     const task = `Fix these Module Federation standards violations:\n${formatMfe(errs).slice(0, 1500)}`;
-    const code = await spawnCmd(opts.binPath, ['refactor', dir, '--mfe', '--quality', ...model, '--task', task], tag, opts.log);
+    const code = await spawnCmd(opts.binPath,
+      ['refactor', dir, '--mfe', '--quality', ...model, '--task', task], tag, opts.log);
     stages.push('fix');
     if (code !== 0) stageErrors.push(`fix: exit ${code}`);
     const re = await scanMfe(dir).catch(() => null);
@@ -99,7 +100,10 @@ async function processRepo(repo: string, opts: MfeDriverOpts): Promise<MfeDriver
 export async function runMfe(opts: MfeDriverOpts): Promise<MfeDriverReport> {
   const results = await runPool(
     opts.repos,
-    (r) => processRepo(r, opts).catch((e): MfeDriverResult => ({ repo: r, isMfe: false, stages: [], stageErrors: [String(e?.message ?? e)] })),
+    (r) =>
+      processRepo(r, opts).catch(
+        (e): MfeDriverResult => ({ repo: r, isMfe: false, stages: [], stageErrors: [String(e?.message ?? e)] }),
+      ),
     opts.concurrency,
   );
 

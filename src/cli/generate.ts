@@ -10,7 +10,8 @@ import { generateTests } from '../loop/run-generation.js';
 import { loadConfig, pick } from '../config.js';
 import type { TestKind } from '../adapters/adapter.js';
 
-// probevane generate <dir> [--kind unit|e2e] [--model …] [--max-steps N] [--max-targets N] [--min-tests N] [--min-coverage P]
+// probevane generate <dir> [--kind unit|e2e] [--model …] [--max-steps N] [--max-targets N]
+//   [--min-tests N] [--min-coverage P]
 //
 // Precedence for every option: CLI flag > probevane.config.{ts,json} > default.
 
@@ -39,7 +40,13 @@ async function resolveModel(args: string[], cfg: Cfg): Promise<string> {
 
 // Build the per-dir generate options (a closure so passk can re-target a copy).
 // Explicit --takeover overrides the escalation tier.
-function buildGenOpts(args: string[], cfg: Cfg, adapter: Adapter, kind: TestKind, model: string): (d: string) => GenOpts {
+function buildGenOpts(
+  args: string[],
+  cfg: Cfg,
+  adapter: Adapter,
+  kind: TestKind,
+  model: string,
+): (d: string) => GenOpts {
   const maxSteps = pick(num(flag(args, '--max-steps')), cfg.maxSteps, 30)!;
   const maxTargets = pick(num(flag(args, '--max-targets')), cfg.maxTargets, 8)!;
   const minTests = pick(num(flag(args, '--min-tests')), cfg.minTests, kind === 'e2e' ? 1 : 5)!;
@@ -123,7 +130,9 @@ async function runHybrid(o: HybridOpts): Promise<void> {
   console.error(`[hybrid] ${easy.length} easy → local (${localBrain.model}, ${conc}-way), rest → bridge (${model})`);
   const drafts = await runPool(
     easy,
-    (t) => draftLocal({ dir, target: t, kind, adapter, brain: localBrain, log: (l) => console.error(l) }).catch(() => ({ accepted: false } as any)),
+    (t) =>
+      draftLocal({ dir, target: t, kind, adapter, brain: localBrain, log: (l) => console.error(l) })
+        .catch(() => ({ accepted: false } as any)),
     conc,
   );
   const localOk = drafts.filter((r) => r.accepted).length;
@@ -134,10 +143,24 @@ async function runHybrid(o: HybridOpts): Promise<void> {
 
 // Shape B: --delegate hands the WHOLE task to an external harness (claude -p),
 // then runs probevane's gates on the diff.
-async function runDelegate(args: string[], dir: string, kind: TestKind, adapter: Adapter, model: string): Promise<void> {
+async function runDelegate(
+  args: string[],
+  dir: string,
+  kind: TestKind,
+  adapter: Adapter,
+  model: string,
+): Promise<void> {
   const { runDelegated } = await import('../loop/delegate.js');
   const ccModel = model.startsWith('cc:') ? model.slice(3) : model === 'claude-code' ? undefined : 'sonnet';
-  const out = await runDelegated({ dir, kind, adapter, model: ccModel, only: flag(args, '--only'), maxRounds: num(flag(args, '--rounds')) ?? 3, log: (l) => console.error(l) });
+  const out = await runDelegated({
+    dir,
+    kind,
+    adapter,
+    model: ccModel,
+    only: flag(args, '--only'),
+    maxRounds: num(flag(args, '--rounds')) ?? 3,
+    log: (l) => console.error(l),
+  });
   console.log(
     `[probevane] DELEGATE ${out.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'} rounds=${out.rounds} ` +
       `specs=${out.changedFiles.length} green=${out.green} auditErr=${out.auditErrors} cost=$${out.costUsd.toFixed(4)}`,
@@ -169,7 +192,13 @@ async function runPassk(o: PasskOpts): Promise<void> {
 
 // Machine-readable result (for `probevane factory`). Prefer the signals the gates
 // already captured; only measure what's missing, once.
-async function maybeReport(args: string[], dir: string, kind: TestKind, adapter: Adapter, outcome: Outcome): Promise<void> {
+async function maybeReport(
+  args: string[],
+  dir: string,
+  kind: TestKind,
+  adapter: Adapter,
+  outcome: Outcome,
+): Promise<void> {
   const reportPath = flag(args, '--report');
   if (!reportPath) return;
   const { writeFile } = await import('node:fs/promises');
@@ -184,7 +213,11 @@ async function maybeReport(args: string[], dir: string, kind: TestKind, adapter:
   }
   await writeFile(
     reportPath,
-    JSON.stringify({ accepted: outcome.accepted, stopReason: outcome.stopReason, tests: tests ?? 0, coverage: coverage ?? null }, null, 2),
+    JSON.stringify(
+      { accepted: outcome.accepted, stopReason: outcome.stopReason, tests: tests ?? 0, coverage: coverage ?? null },
+      null,
+      2,
+    ),
   );
 }
 
@@ -194,7 +227,12 @@ async function maybeShip(args: string[], dir: string, outcome: Outcome): Promise
   const { shipRun, latestDiary } = await import('../ship/ship.js');
   const diary = await latestDiary(dir);
   if (!diary) return;
-  const r = await shipRun(dir, diary, { op: 'generate', repo: dir, tests: outcome.tests, coverage: outcome.coverage, cost: undefined }, (l) => console.error(l));
+  const r = await shipRun(
+    dir,
+    diary,
+    { op: 'generate', repo: dir, tests: outcome.tests, coverage: outcome.coverage, cost: undefined },
+    (l) => console.error(l),
+  );
   console.log(`[probevane] ship: ${r.shipped ? r.prUrl ?? r.branch ?? 'delivered' : 'skipped — ' + r.reason}`);
 }
 

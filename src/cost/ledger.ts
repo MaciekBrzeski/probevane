@@ -27,7 +27,8 @@ export interface RunRecord {
 
 export async function recordRun(rec: Omit<RunRecord, 'cost'>): Promise<void> {
   if (process.env.PROBEVANE_LEDGER === '0') return;
-  const cost = rec.costUsd ?? costOf(rec.model, { input: rec.tokensIn, output: rec.tokensOut, cacheRead: rec.cacheRead });
+  const cost =
+    rec.costUsd ?? costOf(rec.model, { input: rec.tokensIn, output: rec.tokensOut, cacheRead: rec.cacheRead });
   const full: RunRecord = { ...rec, cost };
   await appendJsonl(LEDGER_PATH, full).catch(() => {}); // best-effort
 }
@@ -65,7 +66,10 @@ export function summarize(records: RunRecord[]): LedgerSummary {
     if (r.accepted) { s.accepted++; if (r.tookOver) s.withTakeover++; else s.harnessOnly++; } else s.needsHand++;
     const m = (s.byModel[r.model] ??= { runs: 0, cost: 0 }); m.runs++; m.cost += r.cost;
     const path = r.label.split(':')[0];
-    const p = (s.byPath[path] ??= { runs: 0, cost: 0, accepted: 0 }); p.runs++; p.cost += r.cost; if (r.accepted) p.accepted++;
+    const p = (s.byPath[path] ??= { runs: 0, cost: 0, accepted: 0 });
+    p.runs++;
+    p.cost += r.cost;
+    if (r.accepted) p.accepted++;
   }
   s.totalCost = Math.round(s.totalCost * 1e6) / 1e6;
   s.acceptRate = records.length ? +(s.accepted / records.length).toFixed(3) : 0;

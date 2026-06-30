@@ -69,7 +69,10 @@ function entryOf(pkg: Record<string, unknown>): string {
 
 /** Resolve a path to a concrete source file (try extensions + /index). */
 function resolveModule(p: string): string | null {
-  const cands = [p, p + '.ts', p + '.tsx', p + '.js', p + '.jsx', join(p, 'index.ts'), join(p, 'index.tsx'), join(p, 'index.js')];
+  const cands = [
+    p, p + '.ts', p + '.tsx', p + '.js', p + '.jsx',
+    join(p, 'index.ts'), join(p, 'index.tsx'), join(p, 'index.js'),
+  ];
   for (const c of cands) { try { if (statSync(c).isFile()) return c; } catch { /* next */ } }
   return null;
 }
@@ -109,7 +112,12 @@ function resolveImportToFile(spec: string, abs: string, pkgs: Map<string, string
 }
 
 /** Resolve one import spec to its module file + a digest line, or null (skip). */
-function depLine(spec: string, abs: string, pkgs: Map<string, string>, root: string): { modAbs: string; line: string } | null {
+function depLine(
+  spec: string,
+  abs: string,
+  pkgs: Map<string, string>,
+  root: string,
+): { modAbs: string; line: string } | null {
   const modAbs = resolveImportToFile(spec, abs, pkgs);
   if (!modAbs) return null;
   let api: string[];
@@ -140,7 +148,9 @@ export function buildDepDigest(dir: string, onlyPath: string): string {
   }
 
   if (!lines.length) return '';
-  let block = `\n\nDEPENDENCY APIs (already imported by ${onlyPath} — call these directly; no need to read their source):\n${lines.join('\n')}`;
+  let block =
+    `\n\nDEPENDENCY APIs (already imported by ${onlyPath} — call these directly; ` +
+    `no need to read their source):\n${lines.join('\n')}`;
   if (block.length > MAX_CHARS) block = block.slice(0, MAX_CHARS) + '\n  …(truncated)';
   return block;
 }

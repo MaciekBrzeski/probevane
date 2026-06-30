@@ -20,7 +20,12 @@ export interface BaseResult {
 const OLLAMA = (process.env.PROBEVANE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/v1\/?$/, '');
 
 /** One completion, forced onto CPU via ollama-native options.num_gpu=0. */
-export async function cpuGenerate(model: string, system: string, user: string, numPredict = 700): Promise<{ text: string; ms: number; tokPerSec: number }> {
+export async function cpuGenerate(
+  model: string,
+  system: string,
+  user: string,
+  numPredict = 700,
+): Promise<{ text: string; ms: number; tokPerSec: number }> {
   const t0 = Date.now();
   const res = await fetch(`${OLLAMA}/api/chat`, {
     method: 'POST',

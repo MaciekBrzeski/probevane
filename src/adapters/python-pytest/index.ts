@@ -82,7 +82,13 @@ export const pythonAdapter: StackAdapter = {
     if (classes.length) lines.push(`- classes: ${classes.join(', ')}`);
     if (raises.length) lines.push(`- raises: ${[...new Set(raises)].join(', ')} (test with pytest.raises)`);
     const ok = funcs.length + classes.length > 0;
-    return { target, facts: { funcs, classes, raises }, digest: lines.join('\n'), ok, error: ok ? undefined : 'no defs found' };
+    return {
+      target,
+      facts: { funcs, classes, raises },
+      digest: lines.join('\n'),
+      ok,
+      error: ok ? undefined : 'no defs found',
+    };
   },
 
   async run(dir: string, _scope: RunScope, files?: string[]): Promise<RunResult> {
@@ -107,7 +113,13 @@ export const pythonAdapter: StackAdapter = {
       failed = r.ok ? 0 : 1;
     }
     const total = passed + failed + skipped;
-    return { passed, failed, skipped, green: r.ok && failed === 0 && total > 0 && passed > 0, raw: (r.stdout + r.stderr).slice(-4000) };
+    return {
+      passed,
+      failed,
+      skipped,
+      green: r.ok && failed === 0 && total > 0 && passed > 0,
+      raw: (r.stdout + r.stderr).slice(-4000),
+    };
   },
 
   async coverage(dir: string): Promise<CoverageResult> {
@@ -116,7 +128,14 @@ export const pythonAdapter: StackAdapter = {
     try {
       const j = JSON.parse(await readFile(join(dir, 'coverage.json'), 'utf8'));
       const pct = j.totals?.percent_covered ?? 0;
-      return { statements: Math.round(pct * 100) / 100, branches: 0, functions: 0, lines: Math.round(pct * 100) / 100, ok: true, raw: r.stdout.slice(-1500) };
+      return {
+        statements: Math.round(pct * 100) / 100,
+        branches: 0,
+        functions: 0,
+        lines: Math.round(pct * 100) / 100,
+        ok: true,
+        raw: r.stdout.slice(-1500),
+      };
     } catch {
       return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false, raw: (r.stdout + r.stderr).slice(-1500) };
     }
