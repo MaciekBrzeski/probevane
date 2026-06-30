@@ -28,7 +28,11 @@ export const angularAdapter: StackAdapter = {
     const all = { ...pkg.dependencies, ...pkg.devDependencies };
     if (!all['jest-preset-angular']) {
       // jest-preset-angular 17 needs the jsdom env (unbundled since Jest 28).
-      const r = await sh('npm install -D --legacy-peer-deps jest jest-preset-angular jest-environment-jsdom @types/jest', dir, 600_000);
+      const r = await sh(
+        'npm install -D --legacy-peer-deps jest jest-preset-angular jest-environment-jsdom @types/jest',
+        dir,
+        600_000,
+      );
       if (!r.ok) throw new Error(`probevane: angular test-dep install failed\n${r.stderr.slice(-1500)}`);
     }
     const { writeFile } = await import('node:fs/promises');
@@ -64,7 +68,13 @@ export const angularAdapter: StackAdapter = {
       ? '- TestBed.configureTestingModule({declarations:[Cmp]}); createComponent; assert via fixture.componentInstance + fixture.nativeElement (getByRole-style queries).'
       : '- import the class; for a service use TestBed.inject or `new`; assert real return values + error paths.');
     const ok = !!cls;
-    return { target, facts: { cls, isComponent, isService }, digest: lines.join('\n'), ok, error: ok ? undefined : 'no exported class' };
+    return {
+      target,
+      facts: { cls, isComponent, isService },
+      digest: lines.join('\n'),
+      ok,
+      error: ok ? undefined : 'no exported class',
+    };
   },
 
   async run(dir: string, _scope: RunScope, files?: string[]): Promise<RunResult> {
@@ -75,7 +85,13 @@ export const angularAdapter: StackAdapter = {
       const j = JSON.parse(await readFile(join(dir, REPORT), 'utf8'));
       passed = j.numPassedTests ?? 0; failed = j.numFailedTests ?? 0; skipped = j.numPendingTests ?? 0;
     } catch { failed = r.ok ? 0 : Math.max(failed, 1); }
-    return { passed, failed, skipped, green: r.ok && failed === 0 && passed > 0, raw: (r.stdout + r.stderr).slice(-4000) };
+    return {
+      passed,
+      failed,
+      skipped,
+      green: r.ok && failed === 0 && passed > 0,
+      raw: (r.stdout + r.stderr).slice(-4000),
+    };
   },
 
   async coverage(dir: string): Promise<CoverageResult> {
@@ -83,7 +99,13 @@ export const angularAdapter: StackAdapter = {
     try {
       const j = JSON.parse(await readFile(join(dir, 'coverage', 'coverage-summary.json'), 'utf8'));
       const t = j.total;
-      return { statements: t.statements.pct, branches: t.branches.pct, functions: t.functions.pct, lines: t.lines.pct, ok: true };
+      return {
+        statements: t.statements.pct,
+        branches: t.branches.pct,
+        functions: t.functions.pct,
+        lines: t.lines.pct,
+        ok: true,
+      };
     } catch { return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false }; }
   },
 
@@ -98,14 +120,23 @@ export const angularAdapter: StackAdapter = {
   patternsDoc(_kind: TestKind): Promise<string> { return loadPrompt('angular-unit-patterns.md'); },
   auditRules(): AuditRule[] { return jsAuditRules(); },
   commands(): AdapterCommands {
-    return { typecheck: 'npx tsc --noEmit', lint: 'true', testUnit: 'npx jest', testE2e: 'true', coverage: 'npx jest --coverage' };
+    return {
+      typecheck: 'npx tsc --noEmit',
+      lint: 'true',
+      testUnit: 'npx jest',
+      testE2e: 'true',
+      coverage: 'npx jest --coverage',
+    };
   },
 };
 
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) { if (['node_modules', 'dist', 'coverage'].includes(e.name)) continue; out.push(...(await walk(join(dir, e.name)))); }
+    if (e.isDirectory()) {
+      if (['node_modules', 'dist', 'coverage'].includes(e.name)) continue;
+      out.push(...(await walk(join(dir, e.name))));
+    }
     else out.push(join(dir, e.name));
   }
   return out;

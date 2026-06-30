@@ -122,8 +122,13 @@ const BUDGET_WINDOW = Number(process.env.PROBEVANE_BUDGET_WINDOW ?? 24); // hour
 const QUARANTINE = Number(process.env.PROBEVANE_QUARANTINE ?? 3); // re-queue with backoff up to N attempts
 const HALT_ON_ALERT = process.env.PROBEVANE_HALT_ON_ALERT === '1';
 
-initControl({ BIN, JOBS_PATH, QUEUE_PATH, JOB_TAIL, MAX_JOBS, MAX_BODY, QUEUE_ON, SHIP_ON, QUARANTINE, BUDGET_CAP, BUDGET_WINDOW, log, sendJson, scanRuns });
-initRoutes({ VERSION, STARTED, ROOT, QUEUE_ON, JOBS_RETURN, AUDIT_RETURN, DASHBOARD, alertOpts, log, sendJson, scanRuns });
+initControl({
+  BIN, JOBS_PATH, QUEUE_PATH, JOB_TAIL, MAX_JOBS, MAX_BODY, QUEUE_ON, SHIP_ON, QUARANTINE,
+  BUDGET_CAP, BUDGET_WINDOW, log, sendJson, scanRuns,
+});
+initRoutes({
+  VERSION, STARTED, ROOT, QUEUE_ON, JOBS_RETURN, AUDIT_RETURN, DASHBOARD, alertOpts, log, sendJson, scanRuns,
+});
 
 const server = createServer((req, res) => {
   const t0 = Date.now();
@@ -149,7 +154,8 @@ async function evalAlerts() {
     setPaused(true);
     await log('error', 'alert_halt', { kinds: alerts.filter((a) => a.severity === 'error').map((a) => a.kind) });
   }
-  for (const a of alerts) await log(a.severity, `alert.${a.kind}`, { message: a.message, value: a.value, threshold: a.threshold });
+  for (const a of alerts)
+    await log(a.severity, `alert.${a.kind}`, { message: a.message, value: a.value, threshold: a.threshold });
 
   // Push genuinely-new alerts to the external webhook (once each).
   if (WEBHOOK) {
@@ -172,7 +178,9 @@ async function evalAlerts() {
 
 // Supervision: log uncaught errors but keep serving.
 process.on('uncaughtException', (e) => void log('error', 'uncaught', { error: String(e?.message ?? e) }));
-process.on('unhandledRejection', (e: any) => void log('error', 'unhandled_rejection', { error: String(e?.message ?? e) }));
+process.on('unhandledRejection', (e: any) =>
+  void log('error', 'unhandled_rejection', { error: String(e?.message ?? e) }),
+);
 
 let shuttingDown = false;
 async function shutdown(sig: string) {
@@ -192,10 +200,18 @@ let queueTimer: NodeJS.Timeout | undefined;
 server.listen(PORT, '127.0.0.1', async () => {
   await loadJobs(); // restore launched-job history (orphaned 'running' → 'error')
   await loadQueue();
-  await log('info', 'listen', { port: PORT, root: ROOT, intervalSec: INTERVAL / 1000, version: VERSION, jobs: jobs.size, queue: QUEUE_ON ? getQueue().length : undefined });
+  await log('info', 'listen', {
+    port: PORT,
+    root: ROOT,
+    intervalSec: INTERVAL / 1000,
+    version: VERSION,
+    jobs: jobs.size,
+    queue: QUEUE_ON ? getQueue().length : undefined,
+  });
   console.log(`probevane daemon → http://127.0.0.1:${PORT}  (state: ${ROOT})`);
   console.log(`  /health  /aggregate  /alerts  /audit  /jobs  /queue  /metrics  /otel/{traces,metrics}  (POST /run, /enqueue, /cancel?id=)`);
-  if (QUEUE_ON) console.log(`  supervisor ON (tick ${QUEUE_TICK / 1000}s${SHIP_ON ? ', ship' : ''}) — pulls /queue + dispatches`);
+  if (QUEUE_ON)
+    console.log(`  supervisor ON (tick ${QUEUE_TICK / 1000}s${SHIP_ON ? ', ship' : ''}) — pulls /queue + dispatches`);
   await evalAlerts();
   timer = setInterval(() => void evalAlerts(), INTERVAL);
   if (QUEUE_ON) queueTimer = setInterval(() => void supervise(), QUEUE_TICK);

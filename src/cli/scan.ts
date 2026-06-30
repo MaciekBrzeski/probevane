@@ -28,7 +28,8 @@ async function main() {
   const positionals = args.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.has(args[i - 1]));
 
   let repos: string[] = [];
-  if (positionals.length === 1 && (await isFile(resolve(positionals[0])))) repos = parseRepoList(await readFile(resolve(positionals[0]), 'utf8'));
+  if (positionals.length === 1 && (await isFile(resolve(positionals[0]))))
+    repos = parseRepoList(await readFile(resolve(positionals[0]), 'utf8'));
   else repos = positionals;
   if (!repos.length) {
     console.error('usage: probevane scan <repos.txt | dir...> [--op generate] [--root <stateDir>]');

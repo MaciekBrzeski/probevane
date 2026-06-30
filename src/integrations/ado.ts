@@ -145,7 +145,10 @@ async function adoQuery(ctx: AdoCtx, wiql: string): Promise<number[]> {
 async function adoGetMany(ctx: AdoCtx, ids: number[]): Promise<AdoWorkItem[]> {
   if (!ids.length) return [];
   const fields = 'System.Title,System.State,System.Description,System.Tags';
-  const res = await ctx.doFetch(`${ctx.base}/workitems?ids=${ids.join(',')}&fields=${fields}&api-version=7.1`, { headers: ctx.headers });
+  const res = await ctx.doFetch(
+    `${ctx.base}/workitems?ids=${ids.join(',')}&fields=${fields}&api-version=7.1`,
+    { headers: ctx.headers },
+  );
   const data = await adoJson(res);
   return (data.value ?? []).map((w: any) => ({
     id: w.id,
@@ -196,7 +199,10 @@ async function adoUpdate(ctx: AdoCtx, id: number, fields: Record<string, string>
 
 /** Current HTML description of a work item. */
 async function adoDescribe(ctx: AdoCtx, id: number): Promise<string> {
-  const res = await ctx.doFetch(`${ctx.base}/workitems/${id}?fields=System.Description&api-version=7.1`, { headers: ctx.headers });
+  const res = await ctx.doFetch(
+    `${ctx.base}/workitems/${id}?fields=System.Description&api-version=7.1`,
+    { headers: ctx.headers },
+  );
   return (await adoJson(res)).fields?.['System.Description'] ?? '';
 }
 
@@ -244,7 +250,8 @@ export function adoClient(cfg: AdoConfig, doFetch: typeof fetch = fetch) {
     /** Current HTML description of a work item. */
     describe: (id: number): Promise<string> => adoDescribe(ctx, id),
     /** Upload a file to the attachment store → { id, url } (not yet linked to any item). */
-    attach: (fileName: string, data: Uint8Array): Promise<{ id: string; url: string }> => adoAttach(ctx, fileName, data),
+    attach: (fileName: string, data: Uint8Array): Promise<{ id: string; url: string }> =>
+      adoAttach(ctx, fileName, data),
     /** Link an uploaded attachment (its url) to a work item as an AttachedFile relation. */
     linkAttachment: (id: number, url: string, comment = ''): Promise<void> => adoLinkAttachment(ctx, id, url, comment),
   };

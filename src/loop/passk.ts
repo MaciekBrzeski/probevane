@@ -55,7 +55,9 @@ export interface PassKOptions {
 }
 
 /** Run K generations into isolated copies, score each, copy the best specs back. */
-export async function passKGenerate(opts: PassKOptions): Promise<{ best: Candidate<string> | null; all: Candidate<string>[] }> {
+export async function passKGenerate(
+  opts: PassKOptions,
+): Promise<{ best: Candidate<string> | null; all: Candidate<string>[] }> {
   const log = opts.log ?? (() => {});
   const all: Candidate<string>[] = [];
   for (let i = 0; i < opts.k; i++) {
@@ -66,8 +68,13 @@ export async function passKGenerate(opts: PassKOptions): Promise<{ best: Candida
     const { symlink } = await import('node:fs/promises');
     await symlink(join(opts.dir, 'node_modules'), join(cand, 'node_modules')).catch(() => {});
     const accepted = await opts.generate(cand).catch(() => false);
-    const score = await scoreSuite(cand, opts.adapter).catch(() => ({ green: false, tests: 0, coverage: 0, auditScore: 0, auditErrors: 1, value: -1 } as SuiteScore));
-    log(`[passk] candidate ${i}: accepted=${accepted} value=${score.value} (tests=${score.tests} cov=${score.coverage}%)`);
+    const score = await scoreSuite(cand, opts.adapter).catch(
+      () => ({ green: false, tests: 0, coverage: 0, auditScore: 0, auditErrors: 1, value: -1 } as SuiteScore),
+    );
+    log(
+      `[passk] candidate ${i}: accepted=${accepted} value=${score.value} ` +
+        `(tests=${score.tests} cov=${score.coverage}%)`,
+    );
     all.push({ label: `k${i}`, score, ref: cand });
   }
   const best = selectBest(all);

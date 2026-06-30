@@ -178,7 +178,13 @@ export async function enqueue(req: IncomingMessage, res: ServerResponse) {
   }
   const v = validateLaunch(body);
   if (!v.ok) return CTX.sendJson(res, 400, { error: v.error });
-  const item = newItem(randomUUID().slice(0, 8), v.plan.op, resolve(v.plan.dir), v.plan.flags, new Date().toISOString());
+  const item = newItem(
+    randomUUID().slice(0, 8),
+    v.plan.op,
+    resolve(v.plan.dir),
+    v.plan.flags,
+    new Date().toISOString(),
+  );
   await persistItem(item);
   await CTX.log('info', 'enqueue', { id: item.id, op: item.op, dir: item.dir });
   return CTX.sendJson(res, 200, { id: item.id, status: 'queued' });
@@ -189,7 +195,12 @@ async function shipDispatched(item: QueueItem) {
   if (!CTX.SHIP_ON) return;
   const diary = await latestDiary(item.dir);
   if (!diary) return;
-  const r = await shipRun(item.dir, diary, { op: item.op, repo: item.dir }, (l) => void CTX.log('info', 'ship', { line: l })).catch(() => null);
+  const r = await shipRun(
+    item.dir,
+    diary,
+    { op: item.op, repo: item.dir },
+    (l) => void CTX.log('info', 'ship', { line: l }),
+  ).catch(() => null);
   await CTX.log('info', 'queue_ship', { id: item.id, shipped: !!r?.shipped, pr: r?.prUrl });
 }
 
