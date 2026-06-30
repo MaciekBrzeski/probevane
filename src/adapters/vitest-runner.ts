@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sh } from '../util/exec.js';
 import type { RunResult, CoverageResult } from './adapter.js';
+import { readCoverageSummary } from './coverage-summary.js';
 
 // Shared vitest + playwright runners for every vitest-based stack (React, Vue,
 // Svelte). One implementation instead of three copies — the adapters just wire
@@ -66,18 +67,8 @@ export async function coverageVitest(dir: string): Promise<CoverageResult> {
     `npx vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=json --coverage.reporter=text`,
     dir,
   );
-  try {
-    const j = JSON.parse(await readFile(join(dir, 'coverage', 'coverage-summary.json'), 'utf8'));
-    const t = j.total;
-    return {
-      statements: t.statements.pct,
-      branches: t.branches.pct,
-      functions: t.functions.pct,
-      lines: t.lines.pct,
-      ok: true,
-      raw: r.stdout.slice(-2000),
-    };
-  } catch {
-    return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false, raw: (r.stdout + r.stderr).slice(-2000) };
-  }
+  const c = await readCoverageSummary(dir);
+  return c.ok
+    ? { ...c, raw: r.stdout.slice(-2000) }
+    : { ...c, raw: (r.stdout + r.stderr).slice(-2000) };
 }
