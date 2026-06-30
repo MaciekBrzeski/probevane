@@ -15,37 +15,45 @@ export interface AstFacts {
   props: string[];
 }
 
+function createProbeFile(src: string, fileName: string): SourceFile {
+  const project = new Project({
+    useInMemoryFileSystem: true,
+    compilerOptions: {
+      allowJs: true,
+      jsx: ts.JsxEmit.Preserve,
+      skipLibCheck: true,
+      noResolve: true,
+      target: ts.ScriptTarget.ES2020,
+    },
+  });
+  return project.createSourceFile(fileName, src, { overwrite: true });
+}
+
+function classifyExport(name: string, d: Node | undefined, isTsx: boolean): AstExport | null {
+  // Skip type-only exports (interface / type alias / enum) — not testable units.
+  if (d && (Node.isInterfaceDeclaration(d) || Node.isTypeAliasDeclaration(d) || Node.isEnumDeclaration(d))) return null;
+  // A PascalCase export in a .tsx file that's a function/arrow is a component.
+  const isComponent = !!d && isTsx && /^[A-Z]/.test(name) && isFunctionLike(d);
+  return { name, isComponent, signature: d ? signatureOf(name, d) : undefined };
+}
+
+function collectExports(sf: SourceFile, isTsx: boolean): AstExport[] {
+  const exports: AstExport[] = [];
+  const seen = new Set<string>();
+  for (const [name, decls] of sf.getExportedDeclarations()) {
+    const e = classifyExport(name, decls[0], isTsx);
+    if (!e || !name || seen.has(name)) continue;
+    seen.add(name);
+    exports.push(e);
+  }
+  return exports;
+}
+
 export function astExtract(src: string, fileName = 'probe.tsx'): AstFacts | null {
   try {
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      compilerOptions: {
-        allowJs: true,
-        jsx: ts.JsxEmit.Preserve,
-        skipLibCheck: true,
-        noResolve: true,
-        target: ts.ScriptTarget.ES2020,
-      },
-    });
-    const sf = project.createSourceFile(fileName, src, { overwrite: true });
+    const sf = createProbeFile(src, fileName);
     const isTsx = /\.[jt]sx$/.test(fileName);
-    const exports: AstExport[] = [];
-    const seen = new Set<string>();
-    const add = (name: string, isComponent: boolean, signature?: string) => {
-      if (!name || seen.has(name)) return;
-      seen.add(name);
-      exports.push({ name, isComponent, signature });
-    };
-
-    for (const [name, decls] of sf.getExportedDeclarations()) {
-      const d = decls[0];
-      // Skip type-only exports (interface / type alias / enum) — not testable units.
-      if (d && (Node.isInterfaceDeclaration(d) || Node.isTypeAliasDeclaration(d) || Node.isEnumDeclaration(d))) continue;
-      // A PascalCase export in a .tsx file that's a function/arrow is a component.
-      const comp = !!d && isTsx && /^[A-Z]/.test(name) && isFunctionLike(d);
-      add(name, comp, d ? signatureOf(name, d) : undefined);
-    }
-
+    const exports = collectExports(sf, isTsx);
     const props = extractProps(sf);
     return { exports, props };
   } catch {

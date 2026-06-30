@@ -37,53 +37,79 @@ function analyze(file: string, source: string, cfg: QualityConfig): QualityRepor
   return analyzeProject([{ file, source }], cfg);
 }
 
+function systemPrompt(cfg: QualityConfig): string {
+  return [
+    'CODE QUALITY (enforced by a quality gate on the source you edit): keep files',
+    `under ${cfg.maxFileLoc} lines and functions under ${cfg.maxFnLoc} lines /`,
+    `complexity ${cfg.maxComplexity} / nesting ${cfg.maxNesting}. Do not let an edited`,
+    'file regress past its starting quality; extract helpers instead of growing one file.',
+  ].join(' ');
+}
+
+interface Regression {
+  file: string;
+  rules: string[];
+  report: string;
+}
+
+/** Analyze one edited file vs its checkpoint baseline; returns a regression or null. */
+async function fileRegression(ctx: RunCtx, cfg: QualityConfig, f: string): Promise<Regression | null> {
+  const nowSrc = await readFile(join(ctx.workdir, f), 'utf8').catch(() => '');
+  if (!nowSrc) return null;
+  const report = analyze(f, nowSrc, cfg);
+  if (report.errors === 0) return null;
+  const beforeSrc = await showFile(ctx.workdir, ctx.checkpointSha, f);
+  const before = worstByRule(analyze(f, beforeSrc, cfg)); // empty source → empty map
+  const now = worstByRule(report);
+  // A rule regresses when its worst value now exceeds the baseline (or is new).
+  const worseRules = [...now].filter(([r, v]) => v > (before.get(r) ?? 0)).map(([r]) => r);
+  if (worseRules.length === 0) return null;
+  const errs = report.violations.filter(
+    (v) => v.severity === 'error' && worseRules.includes(v.rule),
+  );
+  return { file: f, rules: worseRules, report: formatQuality({ ...report, violations: errs }) };
+}
+
+async function collectRegressions(ctx: RunCtx, cfg: QualityConfig, edited: string[]): Promise<Regression[]> {
+  const regressed: Regression[] = [];
+  for (const f of edited) {
+    const r = await fileRegression(ctx, cfg, f);
+    if (r) regressed.push(r);
+  }
+  return regressed;
+}
+
+function blockRegressed(regressed: Regression[]): RuneDecision {
+  const first = regressed[0];
+  return block(
+    `quality_gate: ${regressed.length} edited file(s) regressed code quality`,
+    `FIX THIS FIRST (${first.file} worsened: ${first.rules.join(', ')}):\n${first.report}\n\n` +
+      `Refactor to get back to (or under) where it started — split large files/functions, ` +
+      `reduce nesting/complexity. Pre-existing issues you didn't worsen are fine.`,
+  );
+}
+
+async function evalQuality(ctx: RunCtx, cfg: QualityConfig): Promise<RuneDecision> {
+  const edited = [...ctx.editedFiles]
+    .map((f) => f.replace(/^\.\//, ''))
+    .filter((f) => SRC.test(f) && !TEST.test(f));
+  if (edited.length === 0) return ALLOW; // run touched no source of ours
+  const regressed = await collectRegressions(ctx, cfg, edited);
+  if (regressed.length === 0) return ALLOW;
+  return blockRegressed(regressed);
+}
+
 export function qualityGate(overrides?: Partial<QualityConfig>): Rune {
   const cfg: QualityConfig = { ...DEFAULT_QUALITY, ...(overrides ?? {}) };
   return {
     name: 'quality_gate',
 
     systemPromptAddition(): string {
-      return [
-        'CODE QUALITY (enforced by a quality gate on the source you edit): keep files',
-        `under ${cfg.maxFileLoc} lines and functions under ${cfg.maxFnLoc} lines /`,
-        `complexity ${cfg.maxComplexity} / nesting ${cfg.maxNesting}. Do not let an edited`,
-        'file regress past its starting quality; extract helpers instead of growing one file.',
-      ].join(' ');
+      return systemPrompt(cfg);
     },
 
     async shouldStop(ctx: RunCtx): Promise<RuneDecision> {
-      const edited = [...ctx.editedFiles]
-        .map((f) => f.replace(/^\.\//, ''))
-        .filter((f) => SRC.test(f) && !TEST.test(f));
-      if (edited.length === 0) return ALLOW; // run touched no source of ours
-
-      const regressed: { file: string; rules: string[]; report: string }[] = [];
-      for (const f of edited) {
-        const nowSrc = await readFile(join(ctx.workdir, f), 'utf8').catch(() => '');
-        if (!nowSrc) continue;
-        const report = analyze(f, nowSrc, cfg);
-        if (report.errors === 0) continue;
-        const beforeSrc = await showFile(ctx.workdir, ctx.checkpointSha, f);
-        const before = worstByRule(analyze(f, beforeSrc, cfg)); // empty source → empty map
-        const now = worstByRule(report);
-        // A rule regresses when its worst value now exceeds the baseline (or is new).
-        const worseRules = [...now].filter(([r, v]) => v > (before.get(r) ?? 0)).map(([r]) => r);
-        if (worseRules.length) {
-          const errs = report.violations.filter(
-            (v) => v.severity === 'error' && worseRules.includes(v.rule),
-          );
-          regressed.push({ file: f, rules: worseRules, report: formatQuality({ ...report, violations: errs }) });
-        }
-      }
-
-      if (regressed.length === 0) return ALLOW;
-      const first = regressed[0];
-      return block(
-        `quality_gate: ${regressed.length} edited file(s) regressed code quality`,
-        `FIX THIS FIRST (${first.file} worsened: ${first.rules.join(', ')}):\n${first.report}\n\n` +
-          `Refactor to get back to (or under) where it started — split large files/functions, ` +
-          `reduce nesting/complexity. Pre-existing issues you didn't worsen are fine.`,
-      );
+      return evalQuality(ctx, cfg);
     },
   };
 }

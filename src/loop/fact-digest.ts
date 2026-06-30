@@ -5,6 +5,19 @@
 // shapes, compact. Pure + testable.
 
 /** From an opening { or [ at `start`, return the balanced literal (string-aware). */
+/** Advance the in-string scanner state by one char while inside a string literal. */
+function nextStrState(c: string, inStr: string, esc: boolean): { inStr: string | false; esc: boolean } {
+  if (esc) return { inStr, esc: false };
+  if (c === '\\') return { inStr, esc: true };
+  if (c === inStr) return { inStr: false, esc: false };
+  return { inStr, esc: false };
+}
+
+function isQuote(c: string): boolean {
+  return c === '"' || c === "'" || c === '`';
+}
+
+/** From an opening { or [ at `start`, return the balanced literal (string-aware). */
 function balanced(s: string, start: number): string {
   const open = s[start];
   const close = open === '{' ? '}' : ']';
@@ -14,10 +27,10 @@ function balanced(s: string, start: number): string {
   for (let i = start; i < s.length; i++) {
     const c = s[i];
     if (inStr) {
-      if (esc) esc = false;
-      else if (c === '\\') esc = true;
-      else if (c === inStr) inStr = false;
-    } else if (c === '"' || c === "'" || c === '`') inStr = c;
+      ({ inStr, esc } = nextStrState(c, inStr, esc));
+      continue;
+    }
+    if (isQuote(c)) inStr = c;
     else if (c === open) depth++;
     else if (c === close && --depth === 0) return s.slice(start, i + 1);
   }
