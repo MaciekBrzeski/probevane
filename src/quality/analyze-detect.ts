@@ -1,11 +1,10 @@
-// Function/comment detection helpers for the quality analyzer (Phase 5). Split out
-// of analyze.ts to keep each file/function under the project's own quality bar:
-// stripToCode (string/comment stripping) and detectFunctions (heuristic, brace-
-// matched function detection) plus their small private helpers live here and are
-// re-exported by analyze.ts so the public API is unchanged.
+// Quality analyzer detection helpers. stripToCode (string/comment/regex/template
+// stripping) feeds the line-based metrics (long lines, imports, debt, duplication).
+// detectFunctions is AST-based (ts-morph): each function is measured on its OWN body,
+// so nested closures/methods are their own nodes and are never absorbed into the
+// parent (a line-based brace-matcher can't tell a nested function from a block).
+import { Project, Node, SyntaxKind } from 'ts-morph';
 import type { FnMetric } from './analyze.js';
-
-const BRANCH = /\b(if|for|while|case|catch)\b|&&|\|\|/g;
 
 // --- string + comment stripping -------------------------------------------
 
@@ -121,138 +120,126 @@ export function stripToCode(lines: string[]): string[] {
   return lines.map((raw) => stripLine(raw, st));
 }
 
-// --- function detection ----------------------------------------------------
+// --- function detection (AST-based, ts-morph) -----------------------------
 
-/** Count top-level (depth-0) comma-separated params in a parameter string. */
-function countParams(params: string): number {
-  const p = params.trim();
-  if (!p) return 0;
-  let depth = 0,
-    count = 1;
-  for (const ch of p) {
-    if ('([{<'.includes(ch)) depth++;
-    else if (')]}>'.includes(ch)) depth--;
-    else if (ch === ',' && depth === 0) count++;
+// Reused across calls: in-memory, no type resolution → fast (~200 files < 1s).
+const detectProject = new Project({
+  useInMemoryFileSystem: true,
+  compilerOptions: { allowJs: true, skipLibCheck: true, noResolve: true },
+  skipFileDependencyResolution: true,
+});
+
+const FN_KINDS = new Set<SyntaxKind>([
+  SyntaxKind.FunctionDeclaration, SyntaxKind.FunctionExpression, SyntaxKind.ArrowFunction,
+  SyntaxKind.MethodDeclaration, SyntaxKind.Constructor, SyntaxKind.GetAccessor, SyntaxKind.SetAccessor,
+]);
+// Branch nodes (cyclomatic) — mirrors the old if/for/while/case/catch + && ||.
+const BRANCH_KINDS = new Set<SyntaxKind>([
+  SyntaxKind.IfStatement, SyntaxKind.ForStatement, SyntaxKind.ForInStatement, SyntaxKind.ForOfStatement,
+  SyntaxKind.WhileStatement, SyntaxKind.DoStatement, SyntaxKind.CaseClause, SyntaxKind.CatchClause,
+]);
+// Nodes that deepen nesting for their children (cognitive weighting).
+const NEST_KINDS = new Set<SyntaxKind>([
+  SyntaxKind.IfStatement, SyntaxKind.ForStatement, SyntaxKind.ForInStatement, SyntaxKind.ForOfStatement,
+  SyntaxKind.WhileStatement, SyntaxKind.DoStatement, SyntaxKind.CatchClause, SyntaxKind.SwitchStatement,
+]);
+
+function isFnLike(n: Node): boolean {
+  return FN_KINDS.has(n.getKind());
+}
+
+function isLogicalBinary(n: Node): boolean {
+  if (!Node.isBinaryExpression(n)) return false;
+  const op = n.getOperatorToken().getKind();
+  return op === SyntaxKind.AmpersandAmpersandToken || op === SyntaxKind.BarBarToken;
+}
+
+/** Display name: declaration/method name, or the var/property the function is assigned to. */
+function fnName(n: Node): string {
+  if (Node.isConstructorDeclaration(n)) return 'constructor';
+  const named = n as { getName?: () => string | undefined };
+  if (typeof named.getName === 'function') {
+    const nm = named.getName();
+    if (nm) return nm;
   }
-  return count;
+  const p = n.getParent();
+  if (p && (Node.isVariableDeclaration(p) || Node.isPropertyAssignment(p) || Node.isPropertyDeclaration(p)))
+    return p.getName() ?? '(anonymous)';
+  return '(anonymous)';
 }
 
-// Function-header patterns (matched against code-only lines).
-const HEADERS: { re: RegExp; name: number; params: number }[] = [
-  { re: /\bfunction\b\s*\*?\s*([A-Za-z0-9_$]*)\s*\(([^)]*)\)/, name: 1, params: 2 },
-  {
-    // Arrow with a BLOCK body only (`=> {`). Expression-body arrows (one-liners)
-    // carry no size/complexity worth gating and would let the brace-matcher run
-    // away into the next function, so we deliberately skip them.
-    re: /(?:const|let|var)\s+([A-Za-z0-9_$]+)\s*(?::[^=]+)?=\s*(?:async\s+)?\(([^)]*)\)\s*(?::[^=>]+)?=>\s*\{/,
-    name: 1,
-    params: 2,
-  },
-];
-const METHOD =
-  /^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+|async\s+|get\s+|set\s+)*([A-Za-z0-9_$]+)\s*\(([^)]*)\)\s*(?::[^={]+)?\{/;
-const KEYWORDS = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'do', 'else']);
-
-/** Match a function/method header on a single code-only line, or null. */
-function matchHeader(line: string): { name: string; params: string } | null {
-  for (const h of HEADERS) {
-    const m = line.match(h.re);
-    if (m) return { name: m[h.name] || '(anonymous)', params: m[h.params] ?? '' };
-  }
-  const m = line.match(METHOD);
-  if (m && !KEYWORDS.has(m[1])) return { name: m[1], params: m[2] ?? '' };
-  return null;
+function blockBodyOf(n: Node): Node | undefined {
+  const b = (n as { getBody?: () => Node | undefined }).getBody?.();
+  return b && Node.isBlock(b) ? b : undefined;
 }
 
-/** True while we're still before the header's opening block and should bail (no
- *  block body found within a few lines / a `;` ended the statement first). */
-function noBlockYet(started: boolean, j: number, i: number, t: string): boolean {
-  return !started && j > i && (j - i > 3 || /;\s*$/.test(t));
-}
-
-/** Tally brace open/close over one line; tracks max nesting depth seen. */
-function scanBraces(
-  t: string,
-  depth: number,
-  maxDepth: number,
-): { depth: number; maxDepth: number; opened: boolean } {
-  let opened = false;
-  for (const ch of t) {
-    if (ch === '{') {
-      depth++;
-      opened = true;
-      if (depth - 1 > maxDepth) maxDepth = depth - 1;
-    } else if (ch === '}') {
-      depth--;
-    }
-  }
-  return { depth, maxDepth, opened };
-}
-
-interface BodyScan {
-  endLine: number;
+interface BodyMetrics {
   branches: number;
   cognitive: number;
-  maxDepth: number;
+  nesting: number;
 }
 
-/** Brace-match a function body starting at line `i`; null if no block body. The
- *  opening `{` must appear within a few lines of the header and before any `;`. */
-function scanBody(code: string[], i: number): BodyScan | null {
-  let depth = 0,
-    started = false,
-    maxDepth = 0,
-    branches = 0,
-    cognitive = 0;
-  let j = i;
-  let openFound = false;
-  for (; j < code.length; j++) {
-    const t = code[j];
-    if (noBlockYet(started, j, i, t)) break; // no block here → bail
-    const bc = (t.match(BRANCH) || []).length;
-    branches += bc;
-    // Cognitive cost: each branch costs 1 + its nesting depth (SonarQube-style —
-    // depth here = braces open before this line; body top-level = nesting 0).
-    cognitive += bc * (1 + Math.max(0, depth - 1));
-    const r = scanBraces(t, depth, maxDepth);
-    depth = r.depth;
-    maxDepth = r.maxDepth;
-    if (r.opened) {
-      started = true;
-      openFound = true;
+/** Count branches/cognitive/nesting in a body, NOT descending into nested functions
+ *  (those are reported on their own — the line-based detector wrongly absorbed them). */
+function measureBody(body: Node): BodyMetrics {
+  let branches = 0;
+  let cognitive = 0;
+  let nesting = 0;
+  const visit = (node: Node, depth: number): void => {
+    for (const child of node.getChildren()) {
+      if (isFnLike(child)) continue; // nested function — measured separately
+      const isBranch = BRANCH_KINDS.has(child.getKind()) || isLogicalBinary(child);
+      if (isBranch) {
+        branches++;
+        cognitive += 1 + depth;
+      }
+      const deepens = NEST_KINDS.has(child.getKind());
+      if (deepens) nesting = Math.max(nesting, depth + 1);
+      visit(child, deepens ? depth + 1 : depth);
     }
-    if (started && depth <= 0) break;
-  }
-  if (!openFound) return null; // no block body (expression arrow / declaration)
-  return { endLine: Math.min(j, code.length - 1), branches, cognitive, maxDepth };
+  };
+  visit(body, 0);
+  return { branches, cognitive, nesting };
 }
 
-/** Detect non-nested functions in a file (heuristic, brace-matched). */
-export function detectFunctions(code: string[]): FnMetric[] {
-  const fns: FnMetric[] = [];
-  let i = 0;
-  while (i < code.length) {
-    const hdr = matchHeader(code[i]);
-    if (hdr === null) {
-      i++;
-      continue;
-    }
-    const body = scanBody(code, i);
-    if (body === null) {
-      i++;
-      continue; // header matched but no block body — skip
-    }
-    fns.push({
-      name: hdr.name,
-      startLine: i + 1,
-      endLine: body.endLine + 1,
-      loc: body.endLine - i + 1,
-      params: countParams(hdr.params),
-      complexity: body.branches + 1,
-      cognitive: body.cognitive,
-      nesting: body.maxDepth,
+/** Reportable: named decls/methods/accessors/ctor, plus block-body arrows/fn-exprs
+ *  with a derivable name. Anonymous + expression-body arrows are skipped (too small
+ *  to gate, and they would flood the report). */
+function isReportable(n: Node): boolean {
+  const k = n.getKind();
+  if (
+    k === SyntaxKind.FunctionDeclaration ||
+    k === SyntaxKind.MethodDeclaration ||
+    k === SyntaxKind.Constructor ||
+    k === SyntaxKind.GetAccessor ||
+    k === SyntaxKind.SetAccessor
+  )
+    return true;
+  return (k === SyntaxKind.ArrowFunction || k === SyntaxKind.FunctionExpression) && fnName(n) !== '(anonymous)';
+}
+
+/** Per-function size/complexity metrics via AST. Each function is measured on its
+ *  own body; nested functions are separate nodes, never folded into the parent. */
+export function detectFunctions(source: string): FnMetric[] {
+  const sf = detectProject.createSourceFile('__detect__.tsx', source, { overwrite: true });
+  const out: FnMetric[] = [];
+  sf.forEachDescendant((node) => {
+    if (!isFnLike(node) || !isReportable(node)) return;
+    const body = blockBodyOf(node);
+    if (!body) return; // expression-body arrow / no block — nothing to size
+    const m = measureBody(body);
+    const startLine = node.getStartLineNumber();
+    const endLine = node.getEndLineNumber();
+    out.push({
+      name: fnName(node),
+      startLine,
+      endLine,
+      loc: endLine - startLine + 1,
+      params: (node as { getParameters?: () => unknown[] }).getParameters?.().length ?? 0,
+      complexity: m.branches + 1,
+      cognitive: m.cognitive,
+      nesting: m.nesting,
     });
-    i = body.endLine + 1; // skip past this function (don't re-detect nested)
-  }
-  return fns;
+  });
+  return out;
 }

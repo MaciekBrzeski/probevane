@@ -119,7 +119,7 @@ export function analyzeFile(file: string, source: string, cfg: QualityConfig): F
     debt: debtLineNos.length,
     longLineNos,
     debtLineNos,
-    functions: detectFunctions(code),
+    functions: detectFunctions(source),
   };
 }
 
