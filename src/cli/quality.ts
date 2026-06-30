@@ -2,6 +2,9 @@ import { resolve } from 'node:path';
 import { loadConfig } from '../config.js';
 import { formatQuality, DEFAULT_QUALITY, type QualityConfig, type QualityReport } from '../quality/analyze.js';
 import { scanProject } from '../quality/scan.js';
+import { changedFiles, isSourceFile } from '../git.js';
+import { writeBaseline, applyBaseline } from '../quality/baseline.js';
+import { toSarif } from '../quality/sarif.js';
 
 // probevane quality <dir> [--json] [--strict] [--max-file N] [--max-fn N]
 //                        [--max-complexity N] [--max-cognitive N] [--max-nesting N]
@@ -68,16 +71,35 @@ async function main() {
   const cfg = await loadConfig(dir).catch(() => ({}) as any);
   const qc = buildConfig(args, cfg);
 
-  const report = await scanProject(dir, qc);
+  let report = await scanProject(dir, qc, await changedSince(dir, args));
 
   if (!report.files.length) {
     console.log('[probevane] quality: no source files found');
     return;
   }
 
+  if (args.includes('--write-baseline')) {
+    console.log(`[probevane] quality: wrote baseline (${writeBaseline(dir, report)})`);
+    return;
+  }
+
+  if (!args.includes('--no-baseline')) report = applyBaseline(dir, report);
+
+  if (args.includes('--sarif')) {
+    console.log(JSON.stringify(toSarif(report), null, 2));
+    return;
+  }
+
   printReport(args, report);
 
   if (args.includes('--strict') && report.errors > 0) process.exit(1);
+}
+
+/** Source files changed since a ref (`--since`), or undefined for a full scan. */
+async function changedSince(dir: string, args: string[]): Promise<string[] | undefined> {
+  const ref = flag(args, '--since');
+  if (ref === undefined) return undefined;
+  return (await changedFiles(dir, ref)).filter(isSourceFile);
 }
 
 function clean<T extends Record<string, unknown>>(o: T): Partial<T> {
