@@ -96,3 +96,20 @@ describe('analyzer — debt markers: annotations not prose/docs', () => {
     expect(debtOf('// debt markers (TODO/FIXME) are comment-scoped\n')).toBe(0);
   });
 });
+
+describe('analyzer — duplication skips import blocks (structural, not logic dup)', () => {
+  it('two files sharing an identical import block but different bodies are not flagged', () => {
+    const imports = [
+      "import { readdir, readFile } from 'node:fs/promises';",
+      "import { join } from 'node:path';",
+      'import type {',
+      '  StackAdapter,',
+      '  TestKind,',
+      '  RunResult,',
+      '} from "../adapter.js";',
+    ];
+    const a = stripToCode([...imports, 'export function aaa() { return 1; }'], true);
+    const b = stripToCode([...imports, 'export function bbb() { return 2; }'], true);
+    expect(findDuplication([{ file: 'a.ts', code: a }, { file: 'b.ts', code: b }], 6).dups).toEqual([]);
+  });
+});
