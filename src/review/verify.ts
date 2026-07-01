@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Brain } from '../brain/brain.js';
-import { extractJsonStrict } from '../brain/json.js';
+import { extractJsonStrict } from '../util/json.js';
 import type { Finding } from './diff-review.js';
 
 // Gate issue-discovery: a finding is not acted on until VERIFIED. Two gates —

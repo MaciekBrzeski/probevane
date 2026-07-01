@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import type { Brain, BrainRequest } from './brain.js';
 import type { BrainResponse, Msg, ToolSpec, ToolCall } from '../loop/types.js';
-import { extractJsonStrict } from './json.js';
+import { extractJsonStrict } from '../util/json.js';
 
 // claude-code brain — drives the loop via the headless Claude Code CLI
 // (`claude -p`) instead of the Messages API. A skill/contract tells the subagent
