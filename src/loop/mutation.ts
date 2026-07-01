@@ -1,6 +1,9 @@
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
 import type { StackAdapter } from '../adapters/adapter.js';
+import { buildGraph } from '../mock/graph.js';
+import { stripToCode } from '../quality/analyze-detect.js';
 
 // Shared mutation tester — mutate a few source operators and check the suite
 // fails (kills the mutant). Used by mutation_gate (enforce) and bench (report).
@@ -117,6 +120,145 @@ async function scoreMutant(c: MutantCtx, re: RegExp, repl: string): Promise<bool
     return !run.green; // killed if the suite went red
   } finally {
     await writeFile(c.abs, c.original);
+  }
+}
+
+// --- full per-site mutation run (the `mutation` command) --------------------
+
+export interface MutantSite {
+  file: string;
+  line: number;
+  index: number; // char offset in the file
+  op: string;
+  repl: string;
+  snippet: string;
+}
+export interface MutantOutcome extends MutantSite {
+  status: 'killed' | 'survived';
+}
+export interface MutationRun {
+  total: number;
+  killed: number;
+  survived: number;
+  score: number;
+  survivors: MutantOutcome[];
+  byFile: Record<string, { total: number; killed: number }>;
+  sampled: boolean; // true if budget capped the site list
+}
+
+/** Every real-code mutation site in a source file (operators inside strings/
+ *  comments are skipped — a line is eligible only if the operator survives
+ *  stripToCode). */
+export function sitesIn(file: string, src: string): MutantSite[] {
+  const lines = src.split('\n');
+  const code = stripToCode(lines);
+  const sites: MutantSite[] = [];
+  let offset = 0;
+  lines.forEach((raw, i) => {
+    for (const [re, repl] of MUTATIONS) {
+      if (new RegExp(re.source).test(code[i] ?? '')) {
+        for (const m of raw.matchAll(new RegExp(re.source, 'g')))
+          sites.push({ file, line: i + 1, index: offset + m.index!, op: m[0], repl, snippet: raw.trim().slice(0, 90) });
+      }
+    }
+    offset += raw.length + 1; // + newline
+  });
+  return sites;
+}
+
+/** Down-sample to `budget` sites, spread evenly across the list (deterministic). */
+function sampleSites(sites: MutantSite[], budget: number): MutantSite[] {
+  if (sites.length <= budget) return sites;
+  const stride = sites.length / budget;
+  return Array.from({ length: budget }, (_, i) => sites[Math.floor(i * stride)]);
+}
+
+// Glue with no unit tests (spawn/process/network/browser/CLI) — mutating it only
+// yields survivors that drag the score, so by default mutation mirrors coverage
+// and skips it. `--all` (opts.all) mutates everything.
+const GLUE = /(^|\/)(cli\/|.*\.d\.ts$)|\/(run|install)\.ts$|brain\/(anthropic-sdk|openai-compat|bridge|claude-code)|visual\/(capture|vision|improve)|loop\/(run-generation|run-path|run-docs|delegate|draft-local)|factory\/run|quality\/scan|mfe\/(scan|driver|contract-scan)|ship\/ship|distill\/collect|e2e\//;
+
+/** Full mutation run: mutate each site one at a time, rerun the suite, and record
+ *  killed (suite went red) vs survived. `budget` caps the number of mutants; by
+ *  default untested glue is skipped (pass `all` to include it). */
+export async function runMutation(
+  dir: string,
+  adapter: StackAdapter,
+  opts: { files?: string[]; budget?: number; all?: boolean; log?: (l: string) => void } = {},
+): Promise<MutationRun> {
+  const log = opts.log ?? (() => {});
+  const graphFiles = opts.files ?? (await buildGraph(dir)).order;
+  const files = opts.all ? graphFiles : graphFiles.filter((f) => !GLUE.test(f));
+  const all: MutantSite[] = [];
+  for (const f of files) {
+    const src = await readFile(join(dir, f), 'utf8').catch(() => '');
+    if (src) all.push(...sitesIn(f, src));
+  }
+  const budget = opts.budget ?? 50;
+  const sites = sampleSites(all, budget);
+  log(`[mutation] ${all.length} sites, running ${sites.length}${all.length > sites.length ? ` (budget ${budget})` : ''}`);
+
+  // Restore the in-flight mutant if interrupted (Ctrl-C / kill) — a mutation tool
+  // must never leave a mutated source file behind. (SIGKILL can't be caught.)
+  const restorer = new MutantRestorer();
+  const onSig = () => { restorer.restore(); process.exit(130); };
+  process.on('SIGINT', onSig);
+  process.on('SIGTERM', onSig);
+
+  const survivors: MutantOutcome[] = [];
+  const byFile: Record<string, { total: number; killed: number }> = {};
+  let killed = 0;
+  try {
+    for (let i = 0; i < sites.length; i++) {
+      const s = sites[i];
+      const outcome = await runOneSite(dir, adapter, s, restorer);
+      (byFile[s.file] ??= { total: 0, killed: 0 }).total++;
+      if (outcome === 'killed') { killed++; byFile[s.file].killed++; }
+      else survivors.push({ ...s, status: 'survived' });
+      if ((i + 1) % 10 === 0) log(`[mutation] ${i + 1}/${sites.length} (${killed} killed)`);
+    }
+  } finally {
+    restorer.restore();
+    process.off('SIGINT', onSig);
+    process.off('SIGTERM', onSig);
+  }
+  const total = sites.length;
+  const score = total ? killed / total : 1;
+  return { total, killed, survived: total - killed, score, survivors, byFile, sampled: all.length > sites.length };
+}
+
+/** Remembers the one mutated file in flight so an interrupt handler can restore it
+ *  synchronously (the async try/finally handles the normal path). */
+class MutantRestorer {
+  private active: { abs: string; original: string } | null = null;
+  arm(abs: string, original: string): void { this.active = { abs, original }; }
+  clear(): void { this.active = null; }
+  restore(): void {
+    if (!this.active) return;
+    try { writeFileSync(this.active.abs, this.active.original); } catch { /* best-effort */ }
+    this.active = null;
+  }
+}
+
+/** Apply one site's mutation, rerun the suite, restore. 'killed' = suite went red. */
+async function runOneSite(
+  dir: string,
+  adapter: StackAdapter,
+  s: MutantSite,
+  restorer: MutantRestorer,
+): Promise<'killed' | 'survived'> {
+  const abs = join(dir, s.file);
+  const original = await readFile(abs, 'utf8').catch(() => '');
+  if (!original) return 'killed'; // unreadable — treat as no survivor
+  const mutated = original.slice(0, s.index) + s.repl + original.slice(s.index + s.op.length);
+  restorer.arm(abs, original);
+  try {
+    await writeFile(abs, mutated);
+    const run = await adapter.run(dir, 'unit');
+    return run.green ? 'survived' : 'killed';
+  } finally {
+    await writeFile(abs, original);
+    restorer.clear();
   }
 }
 
