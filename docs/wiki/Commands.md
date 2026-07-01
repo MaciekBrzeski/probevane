@@ -36,6 +36,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
+| `arch` | Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits. |
 | `design` | Combined design loop — write a Playwright spec that screenshots each page/tab, a vision model judges each shot for design practice, then rewrite the target html's <style> to address findings, and repeat. Leaves the spec as a visual-regression test. $0 vision via PROBEVANE_VISION_BASE (ollama cloud minimax-m3). |
 | `enqueue` | Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake. |
 | `scan` | Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon). |
@@ -296,6 +297,14 @@ Screenshot-driven visual improvement loop — capture a page, a vision model jud
 ```bash
 probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload <cmd>] [--max N]
 # e.g. probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"
+```
+
+### arch
+Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits.
+
+```bash
+probevane arch <dir> [--no-llm] [--folder-only]
+# e.g. probevane arch . --no-llm
 ```
 
 ### design
