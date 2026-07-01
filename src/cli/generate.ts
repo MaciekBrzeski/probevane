@@ -64,7 +64,11 @@ function buildGenOpts(
     kind,
     adapter,
     model,
-    takeoverBrain: takeoverOverride && takeoverOverride !== 'none' ? anthropicBrain(takeoverOverride) : undefined,
+    // Resolve --takeover through brainFor (NOT anthropicBrain directly) so
+    // `--takeover ollama`/`openai:`/`local:` route to their backend + haiku/
+    // sonnet/opus hit their alias — an all-ollama hybrid needs a non-Anthropic
+    // rescue tier.
+    takeoverBrain: takeoverOverride && takeoverOverride !== 'none' ? brainFor(takeoverOverride) : undefined,
     maxSteps,
     maxTargets,
     only: flag(args, '--only'),
