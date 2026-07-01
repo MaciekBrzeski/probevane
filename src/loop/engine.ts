@@ -42,6 +42,7 @@ export interface RunOptions {
   forceStopAfter?: number; // barren-turn ceiling before giving up
   budget?: number; // hard ceiling on output tokens — stop (budget) when exceeded
   consultAfter?: number; // barren turns before the consult/takeover escalation
+  consultAtStep?: number; // step-based escalation: consult/takeover once a STARTED run passes this step while still failing gates (rescues edit-happy thrashers whose `barren` never grows — the barren ladder's blind spot)
   /** Stronger model to take over a bounded window when stuck (optional). */
   takeoverBrain?: Brain;
   /** Extra guidance pulled when stuck (e.g. a library exemplar). */
@@ -87,6 +88,12 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   const maxSteps = opts.maxSteps ?? 24;
   const forceStopAfter = opts.forceStopAfter ?? 6;
   const consultAfter = opts.consultAfter ?? Math.max(2, forceStopAfter - 3);
+  // Step-based escalation: an edit-happy model that keeps failing gates never
+  // grows `barren` (every turn resets it), so the barren ladder never rescues it.
+  // Once a STARTED run passes ~60% of its step budget while still blocking on
+  // gates, escalate anyway (consult/takeover). Absolute floor keeps it firing
+  // before max_steps on small budgets too.
+  const consultAtStep = opts.consultAtStep ?? Math.max(consultAfter + 2, Math.floor(maxSteps * 0.6));
   // Read-thrash nudge fires EARLY (a handful of non-edit turns), always < forceStopAfter.
   const nudgeAfter = Math.max(3, Math.min(6, forceStopAfter - 1));
   const log = opts.log ?? (() => {});
@@ -113,7 +120,7 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   return {
     opts, ctx, runes, messages, system, log, st,
     runId, eventsOn, eventsPath,
-    maxSteps, forceStopAfter, consultAfter, nudgeAfter, readBudget: READ_BUDGET,
+    maxSteps, forceStopAfter, consultAfter, consultAtStep, nudgeAfter, readBudget: READ_BUDGET,
   };
 }
 
