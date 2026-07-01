@@ -111,7 +111,13 @@ function sendJson(res: ServerResponse, code: number, body: unknown) {
 // --- Control center + router wiring ----------------------------------------
 const BIN = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'bin', 'probevane');
 const UI_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'ui');
-const DASHBOARD = readFileSync(join(UI_DIR, 'control.html'), 'utf8');
+const UI_FILE = join(UI_DIR, 'control.html');
+// Cached at startup; PROBEVANE_UI_DEV re-reads per request so the `design` loop
+// sees its edits without a daemon restart.
+const cachedDashboard = readFileSync(UI_FILE, 'utf8');
+const DASHBOARD = process.env.PROBEVANE_UI_DEV
+  ? () => readFileSync(UI_FILE, 'utf8')
+  : () => cachedDashboard;
 const WIKI_DIR = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'docs', 'wiki');
 
 // supervisor + queue (Pillar B/C) config — passed into the control module.
