@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 // Precedence (resolved by the CLI): flag > config > built-in default.
 
 export interface ProbevaneConfig {
-  model?: string; // auto | haiku | sonnet | opus | <id> | local:<id>
+  model?: string; // auto | haiku | sonnet | opus | <id> | local:<id> | ollama[:<id>] (ollama cloud, kimi-k2.7-code default)
   kind?: 'unit' | 'e2e';
   minTests?: number;
   minCoverage?: number;

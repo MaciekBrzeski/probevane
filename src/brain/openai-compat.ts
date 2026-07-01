@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { Brain, BrainRequest } from './brain.js';
 import type { BrainResponse, Msg, StopReason, ToolCall } from '../loop/types.js';
 
@@ -5,6 +8,13 @@ import type { BrainResponse, Msg, StopReason, ToolCall } from '../loop/types.js'
 // exposing POST /v1/chat/completions with function tool-calling. Cheap/offline
 // alternative to the Anthropic brain. Base URL: PROBEVANE_BASE_URL (default
 // Ollama). Key: PROBEVANE_API_KEY / OPENAI_API_KEY (optional for local servers).
+
+// Ollama Cloud endpoint — `--model ollama[:<id>]` targets it with the key
+// auto-loaded, so hard autonomous loops run there with zero env setup.
+const OLLAMA_CLOUD = 'https://ollama.com/v1';
+// Benchmarked best for HARD open-ended loops (multi-module networked generate):
+// passed where glm-5.2 stalled, most token-efficient of the cloud coders.
+export const OLLAMA_DEFAULT_MODEL = 'kimi-k2.7-code';
 
 const MAX_RETRIES = 4;
 const TIMEOUT_MS = Number(process.env.PROBEVANE_HTTP_TIMEOUT_MS ?? 120_000);
@@ -62,16 +72,41 @@ async function completeWith(baseUrl: string, key: string, model: string, req: Br
   throw lastErr;
 }
 
-export function openaiCompatBrain(model: string): Brain {
-  const baseUrl = (process.env.PROBEVANE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const key = process.env.PROBEVANE_API_KEY ?? process.env.OPENAI_API_KEY ?? 'sk-local';
+/** An OpenAI-compatible brain bound to a specific base URL + key. */
+function openaiWith(baseUrl: string, key: string, model: string): Brain {
+  const url = baseUrl.replace(/\/$/, '');
   return {
     id: 'openai-compat',
     model,
     async complete(req: BrainRequest): Promise<BrainResponse> {
-      return completeWith(baseUrl, key, model, req);
+      return completeWith(url, key, model, req);
     },
   };
+}
+
+export function openaiCompatBrain(model: string): Brain {
+  const baseUrl = process.env.PROBEVANE_BASE_URL ?? 'http://localhost:11434/v1';
+  const key = process.env.PROBEVANE_API_KEY ?? process.env.OPENAI_API_KEY ?? 'sk-local';
+  return openaiWith(baseUrl, key, model);
+}
+
+/** Read the Ollama Cloud key: PROBEVANE_API_KEY / OPENAI_API_KEY, else the key
+ *  file (PROBEVANE_OLLAMA_KEY_FILE, default ~/.config/probevane/ollama.key). */
+function ollamaKey(): string {
+  const env = process.env.PROBEVANE_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (env) return env;
+  const file = process.env.PROBEVANE_OLLAMA_KEY_FILE ?? join(homedir(), '.config', 'probevane', 'ollama.key');
+  try {
+    return readFileSync(file, 'utf8').trim();
+  } catch {
+    throw new Error(`ollama: no API key — set PROBEVANE_API_KEY or create ${file}`);
+  }
+}
+
+/** Ollama Cloud brain: base URL fixed to the cloud endpoint, key auto-loaded,
+ *  default model kimi-k2.7-code. Lets `--model ollama` run with zero env setup. */
+export function ollamaCloudBrain(model = OLLAMA_DEFAULT_MODEL): Brain {
+  return openaiWith(process.env.PROBEVANE_BASE_URL ?? OLLAMA_CLOUD, ollamaKey(), model);
 }
 
 export function toApiMessages(req: BrainRequest): any[] {
