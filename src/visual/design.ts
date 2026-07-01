@@ -121,7 +121,8 @@ export async function designLoop(opts: DesignOpts): Promise<{ rounds: DesignRoun
   const allShots: string[] = [];
 
   for (let r = 1; r <= rounds; r++) {
-    const shots = await capturePages(opts.url, opts.pages, opts.outDir, r, { width: opts.width, settleMs: opts.settleMs });
+    const capOpts = { width: opts.width, settleMs: opts.settleMs };
+    const shots = await capturePages(opts.url, opts.pages, opts.outDir, r, capOpts);
     allShots.push(...shots.map((s) => s.path));
     const findings: { name: string; text: string }[] = [];
     for (const s of shots) {

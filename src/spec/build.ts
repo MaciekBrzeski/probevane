@@ -53,7 +53,10 @@ function overviewLines(graph: Graph, plan: Plan, cov: Cov): string[] {
 
 /** The `## Module graph` section: ASCII tree + mermaid. */
 function graphLines(graph: Graph): string[] {
-  return ['## Module graph', '', '```', toAscii(graph), '```', '', toMermaid(graph), ''];
+  // Big graphs: collapse ubiquitous hubs (imported by >=8) so the tree isn't
+  // drowned in repeated shared-module leaves — they're listed once in a footer.
+  const ascii = toAscii(graph, graph.nodes.size > 40 ? { collapseHubs: 8 } : undefined);
+  return ['## Module graph', '', '```', ascii, '```', '', toMermaid(graph), ''];
 }
 
 /** One `### path` module section: header, narrative, deps, probe facts. */

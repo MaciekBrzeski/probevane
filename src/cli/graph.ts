@@ -12,8 +12,9 @@ async function main() {
   const mermaidOut = flag(args, '--mermaid');
 
   const graph = await buildGraph(dir);
+  const full = args.includes('--full'); // --full disables hub-collapse on big graphs
   console.log(`[probevane] ${graphSummary(graph)}\n`);
-  console.log(toAscii(graph));
+  console.log(toAscii(graph, !full && graph.nodes.size > 40 ? { collapseHubs: 8 } : undefined));
 
   const mermaid = toMermaid(graph);
   if (mermaidOut !== undefined) {

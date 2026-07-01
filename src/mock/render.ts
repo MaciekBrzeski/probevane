@@ -71,11 +71,31 @@ function dirLevelMermaid(graph: ModuleGraph): string {
   return lines.join('\n');
 }
 
-export function toAscii(graph: ModuleGraph): string {
+export function sharedModules(graph: ModuleGraph, minImporters = 8): { path: string; importedBy: number }[] {
+  const counts = new Map<string, number>();
+  for (const n of graph.nodes.values()) {
+    for (const d of n.imports) {
+      if (!graph.nodes.has(d)) continue;
+      counts.set(d, (counts.get(d) ?? 0) + 1);
+    }
+  }
+  return [...counts]
+    .filter(([, c]) => c >= minImporters)
+    .map(([path, importedBy]) => ({ path, importedBy }))
+    .sort((a, b) => (b.importedBy - a.importedBy) || a.path.localeCompare(b.path));
+}
+
+export function toAscii(graph: ModuleGraph, opts?: { collapseHubs?: number }): string {
   // Roots = modules nobody imports (the app's entry points). Walk down to deps.
   const imported = new Set<string>();
   for (const n of graph.nodes.values()) for (const d of n.imports) imported.add(d);
   const roots = [...graph.nodes.keys()].filter((p) => !imported.has(p)).sort();
+
+  const collapseThreshold = opts?.collapseHubs;
+  const hubs =
+    collapseThreshold == null
+      ? new Set<string>()
+      : new Set(sharedModules(graph, collapseThreshold).map((m) => m.path));
 
   const out: string[] = [];
   const seen = new Set<string>();
@@ -84,15 +104,27 @@ export function toAscii(graph: ModuleGraph): string {
     if (!n) return;
     const connector = root ? '' : last ? '└─ ' : '├─ ';
     const net = n.callsNetwork ? ' 🌐net' : '';
-    const dup = seen.has(path) ? ' ↺' : '';
-    out.push(`${prefix}${connector}${ICON[n.kind]} ${n.path.replace(/^src\//, '')}${net}${dup}`);
+    const isHub = hubs.has(path);
+    // A collapsed hub already signals "not expanded" via ⇗ shared — don't also
+    // stack the ↺ revisit marker on it.
+    const dup = seen.has(path) && !isHub ? ' ↺' : '';
+    const hub = isHub ? ' ⇗ shared' : '';
+    out.push(`${prefix}${connector}${ICON[n.kind]} ${n.path.replace(/^src\//, '')}${net}${dup}${hub}`);
     if (seen.has(path)) return;
     seen.add(path);
+    if (hubs.has(path)) return;
     const childPrefix = root ? '' : prefix + (last ? '   ' : '│  ');
     const deps = n.imports.filter((d) => graph.nodes.has(d));
     deps.forEach((d, i) => walk(d, childPrefix, i === deps.length - 1, false));
   };
   roots.forEach((r, i) => walk(r, '', i === roots.length - 1, true));
+
+  if (hubs.size > 0) {
+    const list = sharedModules(graph, collapseThreshold!);
+    out.push('', `Shared (imported by >=${collapseThreshold}):`);
+    for (const m of list) out.push(`${m.path.replace(/^src\//, '')} (${m.importedBy})`);
+  }
+
   return out.join('\n');
 }
 
