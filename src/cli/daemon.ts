@@ -9,8 +9,8 @@ import { appendJsonl } from '../util/jsonl.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
 import { computeAlerts, shouldHalt, DEFAULT_ALERT_OPTS } from '../observe/alerts.js';
 import { buildAlertPayload, newAlerts, alertKey } from '../observe/notify.js';
-import { initControl, jobs, getQueue, isPaused, setPaused, loadJobs, loadQueue, supervise } from './daemon-control.js';
-import { initRoutes, handle } from './daemon-routes.js';
+import { initControl, jobs, getQueue, isPaused, setPaused, loadJobs, loadQueue, supervise } from '../server/daemon-control.js';
+import { initRoutes, handle } from '../server/daemon-routes.js';
 
 // probevane daemon [--port N] [--root <stateDir>] [--interval SEC]
 //
