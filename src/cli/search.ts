@@ -43,7 +43,9 @@ function resolveDirAndQuery(args: string[]): { dir: string; query: string } {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const { dir, query } = resolveDirAndQuery(args);
-  const adapter = await selectAdapterOrThrow(dir);
+  // Adapter is optional — search falls back to a source digest, so it works on any
+  // dir / monorepo package even when no stack adapter matches.
+  const adapter = await selectAdapterOrThrow(dir).catch(() => null);
   const index = await buildSearchIndex(dir, adapter, { fresh: args.includes('--fresh') });
   console.error(`[probevane] search: ${index.length} modules indexed via ${embedModel()}`);
 
