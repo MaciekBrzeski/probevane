@@ -35,7 +35,7 @@ export interface RouteCtx {
   QUEUE_ON: boolean;
   JOBS_RETURN: number;
   AUDIT_RETURN: number;
-  DASHBOARD: string;
+  DASHBOARD: () => string; // getter — re-reads control.html each call under PROBEVANE_UI_DEV (design loop)
   WIKI_DIR: string;
   alertOpts: Parameters<typeof computeAlerts>[1];
   log: (level: string, event: string, data?: Record<string, unknown>) => Promise<void>;
@@ -223,7 +223,7 @@ async function handleGet(
   if (await handleData(url, query, req, res)) return;
   if (url === '/' || url === '/index') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(CTX.DASHBOARD);
+    res.end(CTX.DASHBOARD());
     return;
   }
   return handleMetrics(url, res);
