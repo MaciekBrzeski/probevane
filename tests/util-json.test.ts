@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractJsonValue, extractJsonStrict } from '../src/brain/json.js';
+import { extractJsonValue, extractJsonStrict } from '../src/util/json.js';
 import { parseDecision } from '../src/brain/claude-code.js';
 import { parseFindings } from '../src/review/diff-review.js';
 import { parseVerdicts } from '../src/review/verify.js';

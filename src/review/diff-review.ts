@@ -1,6 +1,6 @@
 import { sh } from '../util/exec.js';
 import type { Brain } from '../brain/brain.js';
-import { extractJsonStrict } from '../brain/json.js';
+import { extractJsonStrict } from '../util/json.js';
 
 // LLM code review over a PR diff → structured findings. One brain call (not the
 // full loop). Findings feed the `fix` path for auto-remediation.
