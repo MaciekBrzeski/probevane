@@ -128,6 +128,44 @@ export function toAscii(graph: ModuleGraph, opts?: { collapseHubs?: number }): s
   return out.join('\n');
 }
 
+/** Filesystem view: the module paths as a nested folder tree with per-dir file
+ *  counts. Distinct from toAscii (which is the dependency/import tree) — this is
+ *  the on-disk layout, for comparing structure against coupling. */
+type FolderDir = { files: string[]; subs: Map<string, FolderDir> };
+
+export function toFolderTree(paths: string[]): string {
+  const root: FolderDir = { files: [], subs: new Map() };
+  for (const p of [...paths].sort()) {
+    const parts = p.replace(/^\.\//, '').split('/');
+    const file = parts.pop()!;
+    let cur = root;
+    for (const seg of parts) {
+      if (!cur.subs.has(seg)) cur.subs.set(seg, { files: [], subs: new Map() });
+      cur = cur.subs.get(seg)!;
+    }
+    cur.files.push(file);
+  }
+  const out: string[] = [];
+  const walk = (dir: FolderDir, name: string, prefix: string, last: boolean, root0: boolean) => {
+    const count = countFiles(dir);
+    const connector = root0 ? '' : last ? '└─ ' : '├─ ';
+    out.push(`${prefix}${connector}${name}/ (${count})`);
+    const childPrefix = root0 ? '' : prefix + (last ? '   ' : '│  ');
+    const subs = [...dir.subs.entries()].sort(([a], [b]) => a.localeCompare(b));
+    subs.forEach(([n, d], i) => walk(d, n, childPrefix, i === subs.length - 1, false));
+  };
+  const topLevel = [...root.subs.entries()].sort(([a], [b]) => a.localeCompare(b));
+  topLevel.forEach(([n, d], i) => walk(d, n, '', i === topLevel.length - 1, true));
+  return out.join('\n');
+}
+
+/** Total files under a directory (recursive). */
+function countFiles(dir: FolderDir): number {
+  let n = dir.files.length;
+  for (const sub of dir.subs.values()) n += countFiles(sub);
+  return n;
+}
+
 export function graphSummary(graph: ModuleGraph): string {
   const byKind: Record<string, number> = {};
   let net = 0;
