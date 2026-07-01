@@ -251,7 +251,15 @@ export async function supervise() {
 }
 
 // SSE tail of a launched run's event log (<dir>/.probevane/events-*.jsonl).
-export async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
+// SSE-tail every file in <dir>/.probevane matching `pattern`, rebroadcasting new
+// lines as they're appended. Shared by /stream (events-*) and
+// /transcript?follow=1 (transcript-<runId>).
+export async function streamFiles(
+  dir: string,
+  pattern: RegExp,
+  res: ServerResponse,
+  req: IncomingMessage,
+) {
   res.writeHead(200, {
     'content-type': 'text/event-stream',
     'cache-control': 'no-cache',
@@ -263,7 +271,7 @@ export async function streamEvents(dir: string, res: ServerResponse, req: Incomi
   let alive = true;
   req.on('close', () => (alive = false));
   while (alive) {
-    const files = (await readdir(evDir).catch(() => [])).filter((f) => /^events-.*\.jsonl$/.test(f));
+    const files = (await readdir(evDir).catch(() => [])).filter((f) => pattern.test(f));
     for (const f of files.sort()) {
       const p = join(evDir, f);
       const content = await readFile(p, 'utf8').catch(() => '');
@@ -273,4 +281,8 @@ export async function streamEvents(dir: string, res: ServerResponse, req: Incomi
     }
     await new Promise((r) => setTimeout(r, 500));
   }
+}
+
+export async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
+  return streamFiles(dir, /^events-.*\.jsonl$/, res, req);
 }

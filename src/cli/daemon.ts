@@ -112,6 +112,7 @@ function sendJson(res: ServerResponse, code: number, body: unknown) {
 const BIN = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'bin', 'probevane');
 const UI_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'ui');
 const DASHBOARD = readFileSync(join(UI_DIR, 'control.html'), 'utf8');
+const WIKI_DIR = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'docs', 'wiki');
 
 // supervisor + queue (Pillar B/C) config — passed into the control module.
 const QUEUE_ON = process.env.PROBEVANE_QUEUE === '1';
@@ -127,7 +128,7 @@ initControl({
   BUDGET_CAP, BUDGET_WINDOW, log, sendJson, scanRuns,
 });
 initRoutes({
-  VERSION, STARTED, ROOT, QUEUE_ON, JOBS_RETURN, AUDIT_RETURN, DASHBOARD, alertOpts, log, sendJson, scanRuns,
+  VERSION, STARTED, ROOT, QUEUE_ON, JOBS_RETURN, AUDIT_RETURN, DASHBOARD, WIKI_DIR, alertOpts, log, sendJson, scanRuns,
 });
 
 const server = createServer((req, res) => {

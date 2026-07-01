@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { resolve, join, basename } from 'node:path';
+import { readFile, readdir } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RunRecord } from '../cost/ledger.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
@@ -6,8 +7,23 @@ import { computeAlerts } from '../observe/alerts.js';
 import { readAudit } from '../observe/audit.js';
 import { tracesPayload, metricsPayload, prometheusText } from '../observe/otel.js';
 import { queueSummary } from '../observe/queue.js';
+import { buildProjects } from '../observe/projects.js';
+import { pageRuns, mergeRun } from '../observe/run-detail.js';
+import { parseEvents } from '../loop/events.js';
+import { parseTranscript } from '../loop/transcript.js';
 import { scanProject } from '../quality/scan.js';
-import { jobs, getQueue, isPaused, snapshot, launch, cancelJob, enqueue, streamEvents } from './daemon-control.js';
+import { jobs, getQueue, isPaused, snapshot, launch, cancelJob, enqueue, streamEvents, streamFiles } from './daemon-control.js';
+
+// A runId / wiki filename is safe to interpolate into a path only if it has no
+// separators or traversal — defense in depth atop the 127.0.0.1 binding.
+const SAFE_ID = /^[A-Za-z0-9._-]+$/;
+/** Resolve <dir>/.probevane/<file> and assert it stays under that dir; null if unsafe. */
+function probevaneFile(dir: string, file: string): string | null {
+  if (!SAFE_ID.test(file)) return null;
+  const base = join(resolve(dir), '.probevane');
+  const p = join(base, file);
+  return p.startsWith(base) ? p : null;
+}
 
 // HTTP router for the daemon. Split out of daemon.ts so each file stays under the
 // project quality bar. daemon.ts injects its observability deps via initRoutes().
@@ -20,6 +36,7 @@ export interface RouteCtx {
   JOBS_RETURN: number;
   AUDIT_RETURN: number;
   DASHBOARD: string;
+  WIKI_DIR: string;
   alertOpts: Parameters<typeof computeAlerts>[1];
   log: (level: string, event: string, data?: Record<string, unknown>) => Promise<void>;
   sendJson: (res: ServerResponse, code: number, body: unknown) => void;
@@ -96,6 +113,76 @@ async function handleMetrics(url: string, res: ServerResponse): Promise<void> {
   return CTX.sendJson(res, 404, { error: `no route ${url}` });
 }
 
+/** Control-center run/project data + folded-in wiki. Returns true if handled. */
+async function handleData(
+  url: string,
+  query: URLSearchParams,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (url === '/projects') {
+    const files = (await readdir(CTX.WIKI_DIR).catch(() => [])).filter((f) => /^project-.*\.md$/.test(f));
+    const { records } = await CTX.scanRuns();
+    CTX.sendJson(res, 200, { projects: buildProjects(files, records) });
+    return true;
+  }
+  if (url === '/runs') {
+    const { records } = await CTX.scanRuns();
+    CTX.sendJson(res, 200, pageRuns(records, Number(query.get('limit') ?? 50), Number(query.get('offset') ?? 0)));
+    return true;
+  }
+  if (url === '/run') return handleRun(query, res);
+  if (url === '/transcript') return handleTranscript(query, req, res);
+  if (url === '/wiki') {
+    const files = (await readdir(CTX.WIKI_DIR).catch(() => [])).filter((f) => f.endsWith('.md'));
+    CTX.sendJson(res, 200, {
+      core: files.filter((f) => !/^project-/.test(f)).sort(),
+      projects: files.filter((f) => /^project-/.test(f)).sort(),
+    });
+    return true;
+  }
+  if (url.startsWith('/wiki/raw/')) return handleWikiRaw(url, res);
+  return false;
+}
+
+/** GET /run?dir&runId — merge ledger record + diary + events summary. */
+async function handleRun(query: URLSearchParams, res: ServerResponse): Promise<boolean> {
+  const dir = query.get('dir');
+  const runId = query.get('runId');
+  if (!dir || !runId) { CTX.sendJson(res, 400, { error: 'dir + runId query params required' }); return true; }
+  if (!SAFE_ID.test(runId)) { CTX.sendJson(res, 400, { error: 'invalid runId' }); return true; }
+  const record = (await CTX.scanRuns()).records.find((r) => r.runId === runId);
+  const dPath = join(resolve(dir), '.probevane', 'diary', `${runId}.json`); // runId guarded above
+  const diary = await readFile(dPath, 'utf8').then((t) => JSON.parse(t)).catch(() => undefined);
+  const evPath = probevaneFile(dir, `events-${runId}.jsonl`);
+  const events = evPath ? parseEvents(await readFile(evPath, 'utf8').catch(() => '')) : [];
+  CTX.sendJson(res, 200, mergeRun(runId, record, diary, events));
+  return true;
+}
+
+/** GET /transcript?dir&runId[&follow=1] — full transcript JSON, or SSE file-tail. */
+async function handleTranscript(query: URLSearchParams, req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const dir = query.get('dir');
+  const runId = query.get('runId');
+  if (!dir || !runId || !SAFE_ID.test(runId)) { CTX.sendJson(res, 400, { error: 'valid dir + runId required' }); return true; }
+  if (query.get('follow') === '1') { await streamFiles(dir, new RegExp(`^transcript-${runId}\\.jsonl$`), res, req); return true; }
+  const tPath = probevaneFile(dir, `transcript-${runId}.jsonl`);
+  const turns = tPath ? parseTranscript(await readFile(tPath, 'utf8').catch(() => '')) : [];
+  CTX.sendJson(res, 200, { runId, turns });
+  return true;
+}
+
+/** GET /wiki/raw/<file>.md — raw markdown for client-side render (path-guarded). */
+async function handleWikiRaw(url: string, res: ServerResponse): Promise<boolean> {
+  const file = basename(url.slice('/wiki/raw/'.length));
+  if (!SAFE_ID.test(file) || !file.endsWith('.md')) { CTX.sendJson(res, 400, { error: 'invalid wiki file' }); return true; }
+  const md = await readFile(join(CTX.WIKI_DIR, file), 'utf8').catch(() => null);
+  if (md === null) { CTX.sendJson(res, 404, { error: 'not found' }); return true; }
+  res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' });
+  res.end(md);
+  return true;
+}
+
 /** GET routes. */
 async function handleGet(
   url: string,
@@ -133,6 +220,7 @@ async function handleGet(
     const entries = await readAudit();
     return CTX.sendJson(res, 200, { count: entries.length, entries: entries.slice(-CTX.AUDIT_RETURN) });
   }
+  if (await handleData(url, query, req, res)) return;
   if (url === '/' || url === '/index') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(CTX.DASHBOARD);
