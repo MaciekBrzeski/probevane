@@ -2,7 +2,6 @@ import { join } from 'node:path';
 import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { stateRoot } from '../util/state.js';
 import { appendJsonl, readJsonl } from '../util/jsonl.js';
-import { recordAudit } from '../observe/audit.js';
 
 // Cross-project learning library — mirrors qaforge's ~/.local/share/qa-harness
 // layout: an append-only index.jsonl + per-example <kind>/<category>/<slug>.{md,meta.json}.
@@ -41,11 +40,6 @@ export async function saveExample(m: ExampleMeta, contents: string): Promise<str
   await writeFile(join(LIB_ROOT, metaRel), JSON.stringify(m, null, 2) + '\n');
   const row: IndexRow = { ...m, path: mdRel };
   await appendJsonl(join(LIB_ROOT, 'index.jsonl'), row);
-  await recordAudit({
-    action: 'library.save',
-    target: m.slug,
-    detail: { stack: m.stack, kind: m.kind, category: m.category, quality: m.quality, score: m.score },
-  });
   return mdRel;
 }
 

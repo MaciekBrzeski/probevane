@@ -4,6 +4,7 @@ import { join, basename } from 'node:path';
 import type { Rune } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
 import { saveExample, readIndex, type ExampleMeta } from '../../library/store.js';
+import { recordAudit } from '../../observe/audit.js';
 
 // library_promote — closes the RAG flywheel. On an ACCEPTED run, promote each
 // accepted spec into the cross-project learning library (index.jsonl) so
@@ -65,6 +66,12 @@ export const libraryPromote: Rune = {
         savedAt: new Date().toISOString(),
       };
       await saveExample(meta, spec).catch(() => {});
+      const { stack, kind, category, quality, score } = meta;
+      await recordAudit({
+        action: 'library.save',
+        target: meta.slug,
+        detail: { stack, kind, category, quality, score },
+      }).catch(() => {});
     }
   },
 };
