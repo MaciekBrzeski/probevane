@@ -30,3 +30,4 @@ test-results/
 playwright-report/
 .screens/
 .playwright-mcp/
+.covtmp-*
