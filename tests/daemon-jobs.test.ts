@@ -68,13 +68,24 @@ describe('control center XSS guard (asset)', () => {
     join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'ui', 'control.html'),
     'utf8',
   );
-  it('defines an esc() escaper', () => {
+  it('defines an esc() escaper + textContent el() helper', () => {
     expect(html).toMatch(/const esc =/);
     expect(html).toContain('&lt;');
+    // The control center builds DOM via a createElement/textContent helper.
+    expect(html).toMatch(/const el = \(tag/);
   });
-  it('escapes the user-supplied job dir before it hits innerHTML', () => {
-    // the /jobs row must run jb.dir through esc(), not interpolate it raw
-    expect(html).toMatch(/esc\(String\(jb\.dir\)/);
-    expect(html).not.toMatch(/<td class="muted">\$\{jb\.dir/);
+  it('renders the transcript via textContent, never innerHTML', () => {
+    // renderTurn is the highest XSS surface (arbitrary model output + file
+    // contents). It must build nodes with el()/textContent, not innerHTML.
+    expect(html).toMatch(/function renderTurn/);
+    const fn = html.slice(html.indexOf('function renderTurn'), html.indexOf('function renderTurn') + 900);
+    expect(fn).not.toMatch(/innerHTML/);
+    expect(fn).toMatch(/el\('pre', null, r\.content\)/); // tool result body as text
+  });
+  it('renders wiki markdown only with mermaid securityLevel strict', () => {
+    expect(html).toMatch(/securityLevel:\s*'strict'/);
+  });
+  it('has the control-center tabs', () => {
+    for (const t of ['projects', 'runs', 'docs', 'launch']) expect(html).toContain(`data-go="${t}"`);
   });
 });

@@ -457,6 +457,8 @@ function makeLR(over: Partial<LoopRun> = {}, stOver: Partial<LoopState> = {}): L
     consultAtStep: 14,
     nudgeAfter: 5,
     readBudget: 5,
+    transcriptOn: false,
+    transcriptPath: '',
     ...over,
   };
   return { lr, ctx, st, messages, logs };

@@ -7,6 +7,8 @@ import { TOOL_SPECS, execTool } from './tools.js';
 import { capOutput } from '../util/exec.js';
 import type { Msg, ToolResult, BrainResponse } from './types.js';
 import { formatEvent } from './events.js';
+import { buildTurn, formatTurn, type TranscriptTurn } from './transcript.js';
+import { BASE_SYSTEM, MINIMAL_SYSTEM } from './engine-prompts.js';
 import { extractTestBlock } from './extract.js';
 import { appendFileSync } from 'node:fs';
 import type { RunOptions, RunOutcome } from './engine.js';
@@ -15,22 +17,6 @@ import type { RunOptions, RunOutcome } from './engine.js';
 // transcript (re-sent every turn) stays bounded. The files persist on disk —
 // the model can re-read if it needs them.
 export const PRUNE_TOOL_RESULTS_AFTER = 8;
-
-export const BASE_SYSTEM = `You are probevane, an agent that edits a codebase to satisfy a task.
-You work by calling tools. Read the relevant files first, record a plan, then make the change.
-Follow the project's existing conventions. The specific rules for this task (what you may edit,
-what must stay green) are stated below. When you believe the work is complete and the gates will
-pass, STOP CALLING TOOLS and give a one-paragraph summary; the gates then verify.`;
-
-// Focused system for small NON-tool-calling local models (minimalSystem mode):
-// the full BASE_SYSTEM + every gate's systemPromptAddition is an instruction wall
-// that makes a 3B model emit nothing usable. Strip it to the one thing it must do;
-// the GATES still verify and feed failures back (the model learns from feedback,
-// not upfront rules).
-export const MINIMAL_SYSTEM = `You write ONE test file for the task below.
-Use ONLY the symbols listed in GROUND TRUTH. Assert concrete values; cover edge and error cases.
-Output the COMPLETE test file as a SINGLE fenced code block (start it with a \`// <path>\` comment) and NOTHING else — no prose.
-If a gate reports a failure, fix THAT failure and output the full file again.`;
 
 // Mutable per-run state threaded through the phase helpers (the consult ladder can
 // swap in a stronger brain; token/cost counters and stop signals accumulate here).
@@ -69,6 +55,8 @@ export interface LoopRun {
   consultAtStep: number;
   nudgeAfter: number;
   readBudget: number;
+  transcriptOn: boolean;
+  transcriptPath: string;
 }
 
 // Index marking the end of the STABLE (already-pruned) transcript prefix, for the
@@ -132,6 +120,16 @@ export function emit(lr: LoopRun, extra: Record<string, unknown>): void {
   } catch { /* observability is best-effort */ }
 }
 
+// Full transcript — append one turn to <workdir>/.probevane/transcript-<runId>.jsonl
+// (best-effort, guarded by lr.transcriptOn). Verbatim: the transcript is never
+// re-sent to the model, so it costs disk only, not tokens.
+export function appendTranscript(lr: LoopRun, turn: TranscriptTurn): void {
+  if (!lr.transcriptOn) return;
+  try {
+    appendFileSync(lr.transcriptPath, formatTurn(turn) + '\n');
+  } catch { /* transcript is best-effort */ }
+}
+
 async function requestCompletion(lr: LoopRun): Promise<BrainResponse | null> {
   try {
     return await lr.st.brain.complete({
@@ -155,7 +153,7 @@ async function requestCompletion(lr: LoopRun): Promise<BrainResponse | null> {
   }
 }
 
-async function applyToolCalls(lr: LoopRun, resp: BrainResponse): Promise<void> {
+async function applyToolCalls(lr: LoopRun, resp: BrainResponse): Promise<ToolResult[]> {
   const { ctx, runes, messages, log } = lr;
   const results: ToolResult[] = [];
   let productive = false;
@@ -184,6 +182,7 @@ async function applyToolCalls(lr: LoopRun, resp: BrainResponse): Promise<void> {
   ctx.barren = productive ? 0 : ctx.barren + 1;
   messages.push({ role: 'user', toolResults: results });
   pruneOldToolResults(messages, PRUNE_TOOL_RESULTS_AFTER);
+  return results;
 }
 
 // Text-extract fallback: a non-tool-calling local model emits the test as a
@@ -276,10 +275,16 @@ export async function runStep(lr: LoopRun): Promise<'break' | 'fallthrough'> {
   );
   emit(lr, { tool: resp.toolCalls[0]?.name });
   messages.push({ role: 'assistant', text: resp.text || undefined, toolCalls: resp.toolCalls });
-  if (resp.toolCalls.length > 0) {
-    await applyToolCalls(lr, resp);
-    return 'fallthrough';
-  }
+  const results = resp.toolCalls.length ? await applyToolCalls(lr, resp) : [];
+  // One transcript write per turn, after results are known. st.brain.model is read
+  // per turn → a takeover swap (engine-escalation swaps st.brain) is recorded on
+  // the turns the stronger model drives. Covers tool turns, the final stop
+  // paragraph, and text-extract prose (empty toolCalls → text-only turn).
+  appendTranscript(lr, buildTurn({
+    runId: lr.runId, step: ctx.step, model: st.brain.model,
+    text: resp.text, toolCalls: resp.toolCalls, results, usage: resp.usage,
+  }));
+  if (resp.toolCalls.length > 0) return 'fallthrough';
   if (await tryTextExtract(lr, resp)) return 'fallthrough';
   return runStopGate(lr);
 }

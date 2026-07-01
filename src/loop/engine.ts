@@ -9,12 +9,14 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   assembleSystem,
+  appendTranscript,
   emit,
   runStep,
   stableCacheIndex,
   type LoopRun,
   type LoopState,
 } from './engine-phases.js';
+import { userTurn } from './transcript.js';
 import {
   nudgeCheck,
   neverEditedCheck,
@@ -109,7 +111,10 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   ctx.checkpointSha = await headSha(workdir).catch(() => '');
   const eventsOn = process.env.PROBEVANE_EVENTS !== '0';
   const eventsPath = join(workdir, '.probevane', `events-${runId}.jsonl`);
-  if (eventsOn) mkdirSync(join(workdir, '.probevane'), { recursive: true });
+  // Full transcript log → <workdir>/.probevane/transcript-<runId>.jsonl (PROBEVANE_TRANSCRIPT=0 disables).
+  const transcriptOn = process.env.PROBEVANE_TRANSCRIPT !== '0';
+  const transcriptPath = join(workdir, '.probevane', `transcript-${runId}.jsonl`);
+  if (eventsOn || transcriptOn) mkdirSync(join(workdir, '.probevane'), { recursive: true });
 
   const st: LoopState = {
     brain: opts.brain, tookOver: false, consulted: false, nudges: 0,
@@ -119,7 +124,7 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   };
   return {
     opts, ctx, runes, messages, system, log, st,
-    runId, eventsOn, eventsPath,
+    runId, eventsOn, eventsPath, transcriptOn, transcriptPath,
     maxSteps, forceStopAfter, consultAfter, consultAtStep, nudgeAfter, readBudget: READ_BUDGET,
   };
 }
@@ -160,6 +165,8 @@ async function finalizeRun(lr: LoopRun): Promise<RunOutcome> {
 export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   const lr = await createLoopRun(opts);
   const { ctx } = lr;
+  // Seed the transcript with the task (step 0) so the viewer opens with intent.
+  appendTranscript(lr, userTurn(lr.runId, opts.task));
 
   while (ctx.step < lr.maxSteps) {
     if ((await runStep(lr)) === 'break') break;
