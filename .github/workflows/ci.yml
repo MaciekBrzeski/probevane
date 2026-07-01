@@ -34,6 +34,8 @@ jobs:
         run: ./bin/probevane skill --check
       - name: source-quality gate (dogfood — probevane grades its own source)
         run: ./bin/probevane quality . --strict
+      - name: mutation gate (dogfood — do the tests actually catch bugs?)
+        run: ./bin/probevane mutation . --budget 60 --min-score 0.5
       - name: quality SARIF → code scanning (inline annotations)
         if: always()
         run: ./bin/probevane quality . --sarif > quality.sarif || true
