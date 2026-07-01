@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import type { Rune, RuneDecision } from '../rune.js';
 import { ALLOW, block } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
@@ -17,7 +17,8 @@ const CODE_DENY = [
 ];
 
 function readDoc(ctx: RunCtx, outPath: string): string | null {
-  try { return readFileSync(join(ctx.workdir, outPath), 'utf8'); } catch { return null; }
+  const p = isAbsolute(outPath) ? outPath : join(ctx.workdir, outPath); // join mangles an absolute outPath
+  try { return readFileSync(p, 'utf8'); } catch { return null; }
 }
 
 /** Inject the project digest + a docs-writing rubric (replaces context_inject). */

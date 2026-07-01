@@ -1,4 +1,4 @@
-import { resolve, basename } from 'node:path';
+import { resolve, basename, isAbsolute, relative } from 'node:path';
 import { loadConfig } from '../config.js';
 import { runDocs } from '../loop/run-docs.js';
 
@@ -16,7 +16,15 @@ async function main() {
   const cfg = await loadConfig(dir);
   const name = basename(dir);
 
-  const out = flag(args, '--out') ?? `docs/${name}-guide.md`;
+  // outPath must be RELATIVE to dir: the loop writes it via write_file (workdir-
+  // confined) and the gates read join(dir, outPath). Relativize an absolute --out
+  // (must be inside dir) so both agree — else the gate looks at the wrong path.
+  const outArg = flag(args, '--out') ?? `docs/${name}-guide.md`;
+  const out = isAbsolute(outArg) ? relative(dir, outArg) : outArg;
+  if (out.startsWith('..')) {
+    console.error(`[probevane] docs: --out must be inside <dir> (${dir})`);
+    process.exit(2);
+  }
   const sections = (flag(args, '--sections') ?? DEFAULT_SECTIONS).split(',').map((s) => s.trim()).filter(Boolean);
   const model = flag(args, '--model') ?? cfg.model ?? 'auto';
   const maxSteps = parseInt(flag(args, '--max-steps') ?? String(cfg.maxSteps ?? 24), 10);
