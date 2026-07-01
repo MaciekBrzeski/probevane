@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { brainFor } from '../brain/select.js';
+import { brainFor, isDirectModel } from '../brain/select.js';
 import { routeModels } from './complexity.js';
 import { runLoop, type RunOutcome } from './engine.js';
 import { nullAdapter } from '../adapters/null-adapter.js';
@@ -31,9 +31,7 @@ export async function runDocs(opts: DocsRunOpts): Promise<RunOutcome> {
   // Resolve the model the same way run-path does (pass local:/openai: through,
   // otherwise route — handles 'auto', 'bridge', haiku/sonnet/opus).
   const route = routeModels(opts.model ?? 'auto', false);
-  const brain = brainFor(
-    opts.model?.startsWith('local:') || opts.model?.startsWith('openai:') ? opts.model : route.primary,
-  );
+  const brain = brainFor(isDirectModel(opts.model) ? opts.model : route.primary);
   log(`[probevane] docs model=${brain.model} dir=${opts.dir} -> ${opts.outPath}`);
 
   const task = [

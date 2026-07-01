@@ -1,5 +1,6 @@
 import type { TestTarget } from '../adapters/adapter.js';
 import { buildGraph } from '../mock/graph.js';
+import { isDirectModel } from '../brain/select.js';
 
 // Auto model routing — detect "complex" code and start on a stronger brain
 // instead of waiting for the loop to stall and take over. Signals: big module
@@ -58,6 +59,6 @@ export function routeModels(choice: string, complex: boolean): { primary?: strin
   // OpenAI-compatible / local / cloud (ollama, vLLM, etc.) take over with
   // THEMSELVES — never silently escalate to a paid Anthropic API the run may not
   // even have credits for (would 400 on takeover, as glm-5.2:cloud did).
-  if (choice.startsWith('openai:') || choice.startsWith('local:')) return { primary: choice, takeover: choice };
+  if (isDirectModel(choice)) return { primary: choice, takeover: choice };
   return { primary: choice, takeover: SONNET }; // explicit Anthropic model id
 }

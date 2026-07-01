@@ -9,7 +9,7 @@ import { conventionalSpecPath } from './extract.js';
 import { propertyGuidance } from './property.js';
 import { mockInject } from './runes/mock_inject.js';
 import { buildChain } from '../mock/index.js';
-import { brainFor } from '../brain/select.js';
+import { brainFor, isDirectModel } from '../brain/select.js';
 import { assessComplexity, routeModels } from './complexity.js';
 import { parseGaps, gapsDigest } from '../coverage/gaps.js';
 import type { RunCtx } from './ctx.js';
@@ -79,7 +79,7 @@ async function resolveBrains(
   if (!brain) {
     const cx = await assessComplexity(opts.dir, probedTargets);
     const route = routeModels(opts.model ?? 'auto', cx.complex);
-    const explicitLocal = opts.model?.startsWith('local:') || opts.model?.startsWith('openai:');
+    const explicitLocal = isDirectModel(opts.model);
     brain = brainFor(explicitLocal ? opts.model : route.primary);
     takeoverBrain = takeoverBrain ?? brainFor(route.takeover); // keep an explicit --takeover
     log(`[probevane] model=${brain.model}${cx.complex ? ` (complex: ${cx.reasons.join(', ')})` : ' (simple)'} takeover=${takeoverBrain.model}`);

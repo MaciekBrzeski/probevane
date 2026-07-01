@@ -1,5 +1,5 @@
 import type { StackAdapter } from '../adapters/adapter.js';
-import { brainFor } from '../brain/select.js';
+import { brainFor, isDirectModel } from '../brain/select.js';
 import { assessComplexity, routeModels } from './complexity.js';
 import { profile, type ProfileName, type ProfileOpts } from './profiles.js';
 import { runLoop, type RunOutcome } from './engine.js';
@@ -41,7 +41,7 @@ async function resolveBrains(
 ): Promise<{ brain: Brain; takeoverBrain: Brain }> {
   const cx = await assessComplexity(opts.dir, []);
   const route = routeModels(opts.model ?? 'auto', cx.complex);
-  const brain = brainFor(opts.model?.startsWith('local:') || opts.model?.startsWith('openai:') ? opts.model : route.primary);
+  const brain = brainFor(isDirectModel(opts.model) ? opts.model : route.primary);
   const takeoverBrain = brainFor(route.takeover);
   log(`[probevane] model=${brain.model}${cx.complex ? ` (complex: ${cx.reasons.join(', ')})` : ''} takeover=${takeoverBrain.model}`);
   return { brain, takeoverBrain };
