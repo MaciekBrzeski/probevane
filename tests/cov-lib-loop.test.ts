@@ -454,6 +454,7 @@ function makeLR(over: Partial<LoopRun> = {}, stOver: Partial<LoopState> = {}): L
     maxSteps: 24,
     forceStopAfter: 6,
     consultAfter: 3,
+    consultAtStep: 14,
     nudgeAfter: 5,
     readBudget: 5,
     ...over,
@@ -576,6 +577,35 @@ describe('engine-escalation.consultCheck', () => {
     expect(await consultCheck(lr, true)).toBe(true);
     expect(called).toBe(false);
     expect(messages[0].text).not.toContain('HELP:');
+  });
+
+  // Gate-stall: the edit-happy-thrash blind spot. `barren` stays low (every edit
+  // resets it) but the run keeps failing gates past consultAtStep → escalate.
+  it('GATE-STALL: fires past consultAtStep with gate blocks even when barren is low', async () => {
+    const takeoverBrain = { id: 't', model: 'takeover-model', complete: async () => ({} as BrainResponse) };
+    const { lr, st, messages } = makeLR({ opts: { takeoverBrain } as unknown as RunOptions });
+    lr.ctx.barren = 0; // never idle — edited every turn
+    lr.ctx.step = 14; // == consultAtStep
+    lr.ctx.gateBlocks = 1; // gates are failing
+    expect(await consultCheck(lr, true)).toBe(true);
+    expect(st.tookOver).toBe(true);
+    expect(st.brain.model).toBe('takeover-model');
+    expect(messages[0].text).toContain('gates are still failing');
+    expect(messages[0].text).not.toContain('no productive change');
+  });
+  it('GATE-STALL: no-op before consultAtStep', async () => {
+    const { lr } = makeLR();
+    lr.ctx.barren = 0;
+    lr.ctx.step = 13; // < consultAtStep
+    lr.ctx.gateBlocks = 3;
+    expect(await consultCheck(lr, true)).toBe(false);
+  });
+  it('GATE-STALL: no-op past consultAtStep when no gate has blocked (healthy long run)', async () => {
+    const { lr } = makeLR();
+    lr.ctx.barren = 0;
+    lr.ctx.step = 20; // past consultAtStep
+    lr.ctx.gateBlocks = 0; // never failed a gate — don't disturb it
+    expect(await consultCheck(lr, true)).toBe(false);
   });
 });
 

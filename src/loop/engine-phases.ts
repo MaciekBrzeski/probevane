@@ -66,6 +66,7 @@ export interface LoopRun {
   maxSteps: number;
   forceStopAfter: number;
   consultAfter: number;
+  consultAtStep: number;
   nudgeAfter: number;
   readBudget: number;
 }

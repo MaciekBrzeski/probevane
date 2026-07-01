@@ -55,15 +55,29 @@ export function neverEditedCheck(lr: LoopRun, started: boolean): boolean {
 // Consult ladder: when stalled, escalate once before giving up. Pull extra
 // guidance (e.g. a library exemplar via onConsult), nudge toward finish/cleanup,
 // and — if a stronger brain is supplied — hand it the window (takeover).
+//
+// Two stall shapes trigger it:
+//  - BARREN stall: `barren` non-edit turns (a model that stops editing / over-reads).
+//  - GATE stall: a STARTED run that keeps EDITING but never converges — it passes
+//    consultAtStep while still failing gates (gateBlocks>0). Its `barren` never
+//    grows (every edit resets it), so the barren ladder alone never rescues it;
+//    this is the edit-happy-thrash blind spot (e.g. a cloud model writing tests
+//    with type errors it can't self-fix). Hand the window to the takeover brain.
 export async function consultCheck(lr: LoopRun, started: boolean): Promise<boolean> {
   const { ctx, messages, st, opts, log } = lr;
-  if (!started || ctx.barren < lr.consultAfter || st.consulted) return false;
+  if (!started || st.consulted) return false;
+  const barrenStall = ctx.barren >= lr.consultAfter;
+  const gateStall = ctx.step >= lr.consultAtStep && ctx.gateBlocks > 0;
+  if (!barrenStall && !gateStall) return false;
   st.consulted = true;
   ctx.barren = 0;
-  let msg =
-    `You have made ${lr.consultAfter} turns with no productive change. Re-read the latest gate ` +
-    `feedback above. If you believe the tests are complete, STOP CALLING TOOLS so the gates can ` +
-    `run. If a test file is empty or a leftover, delete_file it. Do not keep reading.`;
+  let msg = barrenStall
+    ? `You have made ${lr.consultAfter} turns with no productive change. Re-read the latest gate ` +
+      `feedback above. If you believe the tests are complete, STOP CALLING TOOLS so the gates can ` +
+      `run. If a test file is empty or a leftover, delete_file it. Do not keep reading.`
+    : `You have edited for ${ctx.step} turns but the gates are still failing (${ctx.gateBlocks} blocks). ` +
+      `Stop churning: re-read the latest gate feedback above and fix the ROOT cause decisively ` +
+      `(e.g. resolve the reported type errors), then STOP CALLING TOOLS so the gates can run.`;
   // Skip the exemplar here if already surfaced on the first block (no blanket
   // re-injection — fourier: blanket retrieval is noise).
   if (!st.exemplarShown) {
