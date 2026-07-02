@@ -130,6 +130,56 @@ details.ok summary { color:var(--ok); }
 }
 .empty-state h3 { font-size: 16px; color: #e6edf3; margin-bottom: 8px; font-style: normal; opacity: 1; }
 
+/* --- Motion layer -----------------------------------------------------------
+   Tasteful, purposeful animation: entrances orient, pulses signal liveness,
+   bumps draw the eye to changed numbers. Everything is disabled under
+   prefers-reduced-motion. (Base hand-written; the design loop iterates on it.) */
+
+@keyframes rise-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+@keyframes fade-in { from { opacity:0; } to { opacity:1; } }
+@keyframes grow-up { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+@keyframes pulse-dot { 0%,100% { box-shadow:0 0 0 0 rgba(63,185,80,.55); } 60% { box-shadow:0 0 0 6px rgba(63,185,80,0); } }
+@keyframes pulse-tag { 0%,100% { opacity:1; } 50% { opacity:.55; } }
+@keyframes stat-bump { 0% { transform:scale(1); } 35% { transform:scale(1.22); color:var(--acc); } 100% { transform:scale(1); } }
+@keyframes shimmer { from { background-position:-200px 0; } to { background-position:200px 0; } }
+
+/* Tab switch: content rises in. */
+section[data-tab].active { animation:fade-in .22s ease-out; }
+
+/* Cards + table rows enter with a soft stagger. */
+.cards .card { animation:rise-in .3s ease-out backwards; }
+.cards .card:nth-child(2) { animation-delay:.04s; } .cards .card:nth-child(3) { animation-delay:.08s; }
+.cards .card:nth-child(4) { animation-delay:.12s; } .cards .card:nth-child(5) { animation-delay:.16s; }
+tbody tr { animation:fade-in .25s ease-out backwards; }
+tbody tr:nth-child(2) { animation-delay:.03s; } tbody tr:nth-child(3) { animation-delay:.06s; }
+tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animation-delay:.12s; }
+
+/* Cost bars grow from the axis, staggered. */
+.bars .bar { transform-origin:bottom; animation:grow-up .45s cubic-bezier(.2,.7,.3,1) backwards; }
+.bars .bar:nth-child(odd) { animation-delay:.05s; } .bars .bar:nth-child(3n) { animation-delay:.1s; }
+.bars .bar:hover { opacity:1; filter:brightness(1.2); transition:filter .15s, opacity .15s; }
+
+/* Liveness: healthy dot breathes; running runs pulse. */
+#healthDot { border-radius:50%; width:8px; height:8px; display:inline-block; }
+#healthDot.live { animation:pulse-dot 2.2s ease-out infinite; }
+.tag.running { animation:pulse-tag 1.6s ease-in-out infinite; }
+
+/* Changed headline numbers pop once. */
+.bump { display:inline-block; animation:stat-bump .5s cubic-bezier(.2,.7,.3,1); }
+
+/* Connecting shimmer on the health text until the first /health lands. */
+#health.connecting { background:linear-gradient(90deg, var(--dim) 25%, #e6edf3 50%, var(--dim) 75%); background-size:200px 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:shimmer 1.4s linear infinite; }
+
+/* Drawer: keep the slide, add a soft settle. */
+.drawer { transition:transform .24s cubic-bezier(.2,.7,.3,1); }
+
+/* Alerts slide in from the left edge. */
+.alert { animation:rise-in .3s ease-out backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation:none !important; transition:none !important; }
+}
+
 </style>
 </head>
 <body>
@@ -180,7 +230,7 @@ details.ok summary { color:var(--ok); }
 
   // src/ui/app/components/Header.tsx
   function Header() {
-    return /* @__PURE__ */ h("header", null, /* @__PURE__ */ h("h1", null, "probevane ", /* @__PURE__ */ h("span", { class: "muted" }, "control center")), /* @__PURE__ */ h("span", { class: "stat" }, /* @__PURE__ */ h("span", { id: "healthDot", class: "dot", style: "background:var(--dim)" }), /* @__PURE__ */ h("span", { id: "health" }, "connecting\u2026")), /* @__PURE__ */ h("span", { class: "stat" }, "cost ", /* @__PURE__ */ h("b", { id: "cost" }, "\u2013"), " \xB7 accept ", /* @__PURE__ */ h("b", { id: "accept" }, "\u2013"), " \xB7 alerts ", /* @__PURE__ */ h("b", { id: "alertN" }, "\u2013")), /* @__PURE__ */ h("span", { class: "spacer" }), /* @__PURE__ */ h("a", { href: "/demo/pipeline", target: "_blank" }, "pipeline \u2197"));
+    return /* @__PURE__ */ h("header", null, /* @__PURE__ */ h("h1", null, "probevane ", /* @__PURE__ */ h("span", { class: "muted" }, "control center")), /* @__PURE__ */ h("span", { class: "stat" }, /* @__PURE__ */ h("span", { id: "healthDot", class: "dot", style: "background:var(--dim)" }), /* @__PURE__ */ h("span", { id: "health", class: "connecting" }, "connecting\u2026")), /* @__PURE__ */ h("span", { class: "stat" }, "cost ", /* @__PURE__ */ h("b", { id: "cost" }, "\u2013"), " \xB7 accept ", /* @__PURE__ */ h("b", { id: "accept" }, "\u2013"), " \xB7 alerts ", /* @__PURE__ */ h("b", { id: "alertN" }, "\u2013")), /* @__PURE__ */ h("span", { class: "spacer" }), /* @__PURE__ */ h("a", { href: "/demo/pipeline", target: "_blank" }, "pipeline \u2197"));
   }
 
   // src/ui/app/components/Tabs.tsx
@@ -485,27 +535,39 @@ details.ok summary { color:var(--ok); }
     } catch {
     }
   }
+  function setStat(id, text) {
+    const n = $(id);
+    if (n.textContent === text) return;
+    n.textContent = text;
+    n.classList.remove("bump");
+    void n.offsetWidth;
+    n.classList.add("bump");
+  }
   async function poll() {
     try {
       const h2 = await j("/health");
       $("health").textContent = `v${h2.version} \xB7 ${h2.ledgers} ledger(s) \xB7 up ${h2.uptimeSec}s`;
+      $("health").classList.remove("connecting");
       $("healthDot").style.background = "var(--ok)";
+      $("healthDot").classList.add("live");
     } catch {
       $("health").textContent = "daemon down";
+      $("health").classList.remove("connecting");
       $("healthDot").style.background = "var(--err)";
+      $("healthDot").classList.remove("live");
     }
     try {
       const a = await j("/aggregate");
       const max = Math.max(1, ...a.daily.map((d) => d.cost));
       $("bars").innerHTML = a.daily.map((d) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} \xB7 ${esc(d.accepted)}/${esc(d.runs)} \xB7 ${esc(d.errors)} err" style="height:${Math.round(d.cost / max * 100)}%"></div>`).join("");
       $("aggMeta").textContent = `${a.totals.runs} runs \xB7 $${a.totals.totalCost} \xB7 accept ${(a.totals.acceptRate * 100).toFixed(0)}%`;
-      $("cost").textContent = "$" + a.totals.totalCost;
-      $("accept").textContent = (a.totals.acceptRate * 100).toFixed(0) + "%";
+      setStat("cost", "$" + a.totals.totalCost);
+      setStat("accept", (a.totals.acceptRate * 100).toFixed(0) + "%");
     } catch {
     }
     try {
       const { alerts } = await j("/alerts");
-      $("alertN").textContent = String(alerts.length);
+      setStat("alertN", String(alerts.length));
       $("alerts").innerHTML = alerts.length ? alerts.map((a) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> \u2014 ${esc(a.message)}</div>`).join("") : '<span class="muted">none</span>';
     } catch {
     }

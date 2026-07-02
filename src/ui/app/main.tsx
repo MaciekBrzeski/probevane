@@ -201,16 +201,35 @@ function switchTab(go: string) { (document.querySelector(`nav.tabs button[data-g
 
 // --- header + cost/alerts/audit polling (kept) ---
 async function loadOps() { try { const { ops } = await j('/ops'); $('op').innerHTML = ops.map((o: string) => `<option>${esc(o)}</option>`).join(''); } catch {} }
+
+// Set a headline stat; when the value CHANGED, replay the .bump pop so the eye
+// lands on what moved. (Class removal + reflow restarts the CSS animation.)
+function setStat(id: string, text: string) {
+  const n = $(id);
+  if (n.textContent === text) return;
+  n.textContent = text;
+  n.classList.remove('bump');
+  void (n as HTMLElement).offsetWidth; // reflow → animation restart
+  n.classList.add('bump');
+}
+
 async function poll() {
-  try { const h = await j('/health'); $('health').textContent = `v${h.version} · ${h.ledgers} ledger(s) · up ${h.uptimeSec}s`; $('healthDot').style.background = 'var(--ok)'; }
-  catch { $('health').textContent = 'daemon down'; $('healthDot').style.background = 'var(--err)'; }
+  try {
+    const h = await j('/health');
+    $('health').textContent = `v${h.version} · ${h.ledgers} ledger(s) · up ${h.uptimeSec}s`;
+    $('health').classList.remove('connecting');
+    $('healthDot').style.background = 'var(--ok)'; $('healthDot').classList.add('live');
+  } catch {
+    $('health').textContent = 'daemon down'; $('health').classList.remove('connecting');
+    $('healthDot').style.background = 'var(--err)'; $('healthDot').classList.remove('live');
+  }
   try {
     const a = await j('/aggregate'); const max = Math.max(1, ...a.daily.map((d: { cost: number }) => d.cost));
     $('bars').innerHTML = a.daily.map((d: { date: string; cost: number; accepted: number; runs: number; errors: number }) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} · ${esc(d.accepted)}/${esc(d.runs)} · ${esc(d.errors)} err" style="height:${Math.round((d.cost / max) * 100)}%"></div>`).join('');
     $('aggMeta').textContent = `${a.totals.runs} runs · $${a.totals.totalCost} · accept ${(a.totals.acceptRate * 100).toFixed(0)}%`;
-    $('cost').textContent = '$' + a.totals.totalCost; $('accept').textContent = (a.totals.acceptRate * 100).toFixed(0) + '%';
+    setStat('cost', '$' + a.totals.totalCost); setStat('accept', (a.totals.acceptRate * 100).toFixed(0) + '%');
   } catch {}
-  try { const { alerts } = await j('/alerts'); $('alertN').textContent = String(alerts.length);
+  try { const { alerts } = await j('/alerts'); setStat('alertN', String(alerts.length));
     $('alerts').innerHTML = alerts.length ? alerts.map((a: { severity: string; kind: string; message: string }) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> — ${esc(a.message)}</div>`).join('') : '<span class="muted">none</span>';
   } catch {}
   try { const { entries } = await j('/audit'); $('audit').textContent = entries.slice(-30).reverse().map((e: { ts: string; action: string; target: string }) => `${e.ts.slice(0, 19)}  ${e.action}  ${e.target}`).join('\n') || 'no library mutations yet'; } catch {}

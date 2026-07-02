@@ -19,7 +19,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepublishOnly": "node scripts/build.mjs",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.ui.json",
+    "typecheck": "tsc --noEmit && tsc -p src/ui",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "eval": "tsx src/cli/eval.ts",
