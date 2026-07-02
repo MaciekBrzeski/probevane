@@ -24,7 +24,7 @@ const VALIDATION_SYSTEM_PROMPT =
   'FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix the FIRST reported failure (shown under "FIX THIS FIRST"), re-run, then the next — one at a time. Do not rewrite the whole file each turn.';
 
 async function validationPrepare(ctx: RunCtx, state: ValidationState): Promise<string | undefined> {
-  const tc = await sh(ctx.adapter.commands().typecheck, ctx.workdir);
+  const tc = await sh(ctx.adapter.commands(ctx.workdir).typecheck, ctx.workdir);
   state.baselineTypecheckOk = tc.ok;
   state.baselineErrors = countTsErrors(tc.stdout + tc.stderr);
   return state.baselineTypecheckOk
@@ -33,7 +33,7 @@ async function validationPrepare(ctx: RunCtx, state: ValidationState): Promise<s
 }
 
 async function validationTypecheckCheck(ctx: RunCtx, state: ValidationState): Promise<RuneDecision | undefined> {
-  const cmds = ctx.adapter.commands();
+  const cmds = ctx.adapter.commands(ctx.workdir);
   const tc = await sh(cmds.typecheck, ctx.workdir);
   const errs = countTsErrors(tc.stdout + tc.stderr);
   if (!tc.ok && errs > state.baselineErrors) {

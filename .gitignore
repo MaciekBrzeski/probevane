@@ -31,3 +31,8 @@ playwright-report/
 .screens/
 .playwright-mcp/
 .covtmp-*
+fixtures/**/.venv/
+fixtures/**/.probevane-jest.json
+fixtures/**/.coverage
+fixtures/**/coverage.json
+fixtures/**/.probevane-pytest.xml

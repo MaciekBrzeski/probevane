@@ -609,7 +609,7 @@ describe('svelteAdapter pure metadata', () => {
     expect(svelteAdapter.id).toBe('svelte-vitest');
     expect(svelteAdapter.guidance('unit')).toMatch(/testing-library\/svelte/);
     expect(Array.isArray(svelteAdapter.auditRules())).toBe(true);
-    const cmds = svelteAdapter.commands();
+    const cmds = svelteAdapter.commands('.');
     expect(cmds.testUnit).toContain('vitest');
     expect(cmds.coverage).toContain('json-summary');
   });

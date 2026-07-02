@@ -67,6 +67,9 @@ async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
   if (live) dir = await prepareLive(c, dir);
 
   const adapter = await selectAdapterOrThrow(dir);
+  // Self-sufficient on a fresh host: bootstrap the fixture's toolchain
+  // (e.g. python .venv). Idempotent; a failure surfaces in the score anyway.
+  await adapter.install(dir).catch((e) => console.error(`[eval] install ${c.fixture}: ${e}`));
   if (live) await liveGenerate(c, dir, adapter, base);
 
   const score = await scoreFixture(dir, adapter, {
@@ -133,7 +136,12 @@ async function setupPathCase(c: PathCase): Promise<string> {
   const src = join(ROOT, 'fixtures', c.fixture);
   const dir = join(ROOT, '.probevane-live', `${c.fixture}-${c.path}`);
   await rm(dir, { recursive: true, force: true }).catch(() => {});
-  await cp(src, dir, { recursive: true, filter: (p) => !p.includes('node_modules') && !p.includes('/coverage') });
+  await cp(src, dir, {
+    recursive: true,
+    // .venv excluded: interpreter/shebang paths bake in the source dir — the
+    // adapter's install() bootstraps a fresh one in the copy instead.
+    filter: (p) => !p.includes('node_modules') && !p.includes('/coverage') && !p.includes('/.venv'),
+  });
   await (await import('node:fs/promises'))
     .symlink(join(src, 'node_modules'), join(dir, 'node_modules'))
     .catch(() => {});
@@ -149,12 +157,14 @@ async function setupPathCase(c: PathCase): Promise<string> {
 interface PathOpts {
   live: boolean;
   record: boolean;
+  model: string;
   stamp: string;
   logPath: string;
 }
 
 async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   const { live, record, stamp, logPath } = opts;
+  const rec = `${join(ROOT, 'eval', 'cassettes', `${c.fixture}.${c.path}.jsonl`)}.rec`;
   const base = JSON.parse(
     await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.path}.json`), 'utf8'),
   ) as Baseline;
@@ -162,10 +172,13 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   const dir = await setupPathCase(c);
 
   const adapter = await selectAdapterOrThrow(dir);
-  const model = live ? 'haiku' : `replay:${cassette}`;
+  await adapter.install(dir).catch((e) => console.error(`[eval] install ${c.fixture}: ${e}`));
+  const model = live ? opts.model : `replay:${cassette}`;
   if (record) {
-    await rm(cassette, { recursive: true, force: true }).catch(() => {});
-    process.env.PROBEVANE_RECORD = cassette;
+    // Record to a sidecar; the committed cassette is only replaced when the
+    // run ACCEPTS — a failed recording must not clobber a working cassette.
+    await rm(rec, { force: true }).catch(() => {});
+    process.env.PROBEVANE_RECORD = rec;
   }
   const { runPath } = await import('../loop/run-path.js');
   console.log(`[eval] ${live ? (record ? 'recording' : 'live') : 'replay'} ${c.fixture}.${c.path}…`);
@@ -182,6 +195,14 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
     return null;
   });
   delete process.env.PROBEVANE_RECORD;
+  if (record) {
+    if (outcome?.accepted) {
+      await (await import('node:fs/promises')).rename(rec, cassette);
+    } else {
+      await rm(rec, { force: true }).catch(() => {});
+      console.error(`[eval] ${c.fixture}.${c.path}: recording did not accept — kept the old cassette`);
+    }
+  }
 
   const score = await scoreFixture(dir, adapter, {
     scope: 'unit',
@@ -200,13 +221,15 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   return ok;
 }
 
-// probevane eval --paths [--live] [--record]
+// probevane eval --paths [--live] [--record] [--model <m>]
 //   Regression-test the refactor/feature/repair PATHS. --live runs the real
-//   loop (needs a key); --record also saves a cassette to eval/cassettes/. With
+//   loop (needs a key, or --model bridge for $0); --record also saves a
+//   cassette to eval/cassettes/ (only replaced when the run accepts). With
 //   neither, each case REPLAYS its cassette → deterministic + credit-free (CI).
 async function runPathCases(args: string[]) {
   const live = args.includes('--live');
   const record = args.includes('--record');
+  const model = flag(args, '--model') ?? 'haiku';
   process.env.PROBEVANE_DETERMINISTIC = '1'; // stable prompts → reproducible cassettes (record + replay)
   const stamp = new Date().toISOString();
   const logPath = join(ROOT, 'eval', 'improvement-log.csv');
@@ -215,7 +238,7 @@ async function runPathCases(args: string[]) {
 
   let pass = 0;
   for (const c of cases) {
-    if (await runOnePathCase(c, { live, record, stamp, logPath })) pass++;
+    if (await runOnePathCase(c, { live, record, model, stamp, logPath })) pass++;
   }
   console.log(`[eval] paths: ${pass}/${cases.length} passed (${live ? 'live' : 'replay'})`);
   if (pass < cases.length) process.exit(1);

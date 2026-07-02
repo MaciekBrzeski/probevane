@@ -71,7 +71,7 @@ async function verifyDraft(o: {
     .run(dir, scope, [specPath])
     .catch(() => ({ green: false, passed: 0, failed: 1, raw: '' } as any));
   const report = await auditFiles([abs], adapter.auditRules()).catch(() => ({ errors: 0 } as any));
-  const tc = await sh(adapter.commands().typecheck, dir).catch(() => ({ stdout: '', stderr: '' } as any));
+  const tc = await sh(adapter.commands(dir).typecheck, dir).catch(() => ({ stdout: '', stderr: '' } as any));
   const tcErrs = (tc.stdout + tc.stderr).split('\n').filter((l: string) => l.includes(specPath) && /error TS/.test(l));
   if (run.green && report.errors === 0 && tcErrs.length === 0) return null;
   const feedback = !run.green
