@@ -209,9 +209,17 @@ describe('runDoctor', () => {
     const d = tmp();
     write(d, 'package.json', JSON.stringify({ files: ['MISSING.md'] }));
     write(d, 'eval/cassettes/x.jsonl.miss.json', '{}');
-    const r = await runDoctor(d);
-    const checks = r.findings.map((f) => f.check).sort();
-    expect(checks).toEqual(['pkg-manifest', 'stale-cassette']);
+    // Pin the env so the credentials check is deterministic (CI has no key).
+    const old = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    try {
+      const r = await runDoctor(d);
+      const checks = r.findings.map((f) => f.check).sort();
+      expect(checks).toEqual(['pkg-manifest', 'stale-cassette']);
+    } finally {
+      if (old === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = old;
+    }
   });
 });
 
