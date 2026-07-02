@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>probevane — loop pipeline (demo)</title>
+<style>
+ :root{--fg:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--bg:#0d1117;--side:#161b22;--border:#30363d;--ok:#3fb950;--warn:#d29922;--shadow:0 1px 3px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.25)}
+ @media(prefers-color-scheme:light){:root{--fg:#1b1f24;--muted:#6a737d;--accent:#2b6cb0;--bg:#fff;--side:#f6f8fa;--border:#e1e4e8;--shadow:0 1px 2px rgba(27,31,36,.06),0 6px 18px rgba(27,31,36,.08)}}
+ *{box-sizing:border-box}
+ body{margin:0;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased}
+ header{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--side);position:sticky;top:0;z-index:30}
+ header b{font-size:15px;letter-spacing:-.01em}header b::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:middle}
+ header span{color:var(--muted);font-size:12.5px}header a{margin-left:auto;color:var(--accent);text-decoration:none;font-size:13px}header a:hover{text-decoration:underline}
+ .wrap{display:grid;grid-template-columns:1fr 300px;min-height:calc(100vh - 49px)}
+ .stage{padding:22px;overflow:auto;display:flex;flex-direction:column}
+ .knobs{border-left:1px solid var(--border);background:var(--side);padding:16px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+ .knob{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+ .knob>span{display:flex;justify-content:space-between}.knob>span b{color:var(--accent)}
+ .knob select,.knob input,.knob textarea{background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;padding:6px 7px;font-size:12.5px}
+ .knob select:focus,.knob input:focus,.knob textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+ .toggles{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px}
+ .toggles label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg)}
+ .toggles input{accent-color:var(--accent)}
+ .row{display:flex;gap:8px}.row button{flex:1;padding:7px;background:transparent;color:var(--accent);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;transition:background .12s,border-color .12s}
+ .row button:hover{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:var(--accent)}
+ h2{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:12px 0 3px;font-weight:700}
+ .meta{color:var(--muted);font-size:12px;margin:0 0 12px;font-variant-numeric:tabular-nums}
+ pre.mermaid{background:var(--side);border:1px solid var(--border);border-radius:10px;padding:18px;overflow:auto;box-shadow:var(--shadow);align-self:stretch;display:flex;justify-content:center}
+ pre.mermaid svg{max-width:none!important;height:auto}
+ pre.cfg{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:11px;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+ .note{font-size:11px;color:var(--muted)}
+ .legend{margin:10px 0;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+ .legend b{color:var(--accent);font-family:ui-monospace,monospace}
+ /* clickable affordance on graph nodes + cluster titles */
+ pre.mermaid .node,pre.mermaid .cluster .cluster-label{cursor:pointer}
+ pre.mermaid .node:hover .label{text-decoration:underline}
+ .toggles .ti{display:flex;align-items:center;gap:6px}
+ .toggles .i{cursor:pointer;color:var(--muted);border:1px solid var(--border);border-radius:50%;width:15px;height:15px;line-height:13px;text-align:center;font-size:10px;flex:0 0 auto}
+ .toggles .i:hover{color:var(--accent);border-color:var(--accent)}
+ .hint{font-size:11px;color:var(--muted);margin:6px 0 0;font-style:italic}
+ /* slide-over drawer */
+ #drawer{position:fixed;top:49px;right:300px;bottom:0;width:380px;max-width:80vw;background:var(--bg);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.35);padding:16px 18px;overflow:auto;transform:translateX(calc(100% + 300px));transition:transform .18s ease;z-index:20}
+ #drawer.open{transform:translateX(0)}
+ #drawer .x{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+ #drawer .x:hover{color:var(--fg)}
+ #drawer h3{margin:0 6px 0 0;font-size:16px;font-family:ui-monospace,monospace}
+ #drawer .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:2px 0 12px}
+ #drawer .badges{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+ #drawer .badge{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)}
+ #drawer .badge.gate{border-color:var(--warn);color:var(--warn)}
+ #drawer .badge.guard{border-color:var(--accent);color:var(--accent)}
+ #drawer .summary{font-size:14px;font-weight:600;margin:0 0 8px}
+ #drawer .detail{font-size:13px;color:var(--fg);margin:0 0 14px}
+ #drawer .sec{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:14px 0 5px}
+ #drawer .hooks{display:flex;flex-direction:column;gap:5px;margin:0}
+ #drawer .hooks div{font-size:12px}#drawer .hooks code{font-size:11.5px}
+ #drawer pre.rule{background:var(--side);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;white-space:pre-wrap;color:var(--fg);margin:0}
+ #drawer ul{margin:4px 0 0;padding-left:18px;font-size:12.5px}#drawer ul li{margin:2px 0}
+ #drawer .members b{font-family:ui-monospace,monospace;color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <b>probevane — Loop pipeline</b>
+  <span>simulated demo: pick a config, see the runes it assembles (pure — no run)</span>
+  <a href="/">← wiki</a>
+</header>
+<div class="wrap">
+  <div class="stage">
+    <p class="meta" id="meta"></p>
+    <pre class="mermaid" id="graph">loading…</pre>
+    <p class="hint">Click any node, group header, or a gate's ⓘ for a plain-English explanation (gates show the actual rule they inject).</p>
+    <div id="legend" class="legend" style="display:none"></div>
+    <h2>equivalent probevane.config.json</h2>
+    <pre class="cfg" id="cfg"></pre>
+  </div>
+  <aside id="drawer" aria-hidden="true"><span class="x" id="drawerX" title="close (Esc)">✕</span><div id="drawerBody"></div></aside>
+  <aside class="knobs">
+    <div class="row"><button id="reset">Reset</button></div>
+    <label class="knob"><span>Profile</span>
+      <select id="profile"></select></label>
+    <label class="knob"><span>Kind</span>
+      <select id="kind"><option value="unit">unit</option><option value="e2e">e2e</option></select></label>
+    <label class="knob"><span>Group by</span>
+      <select id="groupBy"><option value="phase">loop phase</option><option value="subroutine">subroutine</option></select></label>
+    <label class="knob"><span>Model (annotation)</span>
+      <select id="model"><option>auto</option><option>haiku</option><option>sonnet</option><option>opus</option></select></label>
+    <h2>Gates (toggle runes)</h2>
+    <div class="toggles" id="toggles"></div>
+    <h2>Params (annotate only)</h2>
+    <label class="knob"><span>maxSteps<b id="msV">24</b></span><input id="maxSteps" type="range" min="1" max="80" value="24"></label>
+    <label class="knob"><span>minTests</span><input id="minTests" type="number" min="0" placeholder="(unset)"></label>
+    <label class="knob"><span>minCoverage %</span><input id="minCoverage" type="number" min="0" max="100" placeholder="(unset)"></label>
+    <label class="knob"><span>budget (tok)</span><input id="budget" type="number" min="0" placeholder="(unset)"></label>
+    <p class="note">Numeric/model knobs annotate the graph; they don't add or remove runes.</p>
+    <h2>Load config</h2>
+    <textarea id="cfgin" rows="4" placeholder='paste probevane.config.json'></textarea>
+    <div class="row"><button id="apply">Apply config</button></div>
+  </aside>
+</div>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+// Palette tuned to the page chrome so the graph stops looking like a stock
+// mermaid diagram (the default theme's bright-yellow clusters clashed hard).
+const P = dark
+  ? { node:'#1b2330', nodeBorder:'#3a4658', text:'#e6edf3', line:'#586273', cluster:'#11161d', clusterBorder:'#2b333d',
+      gateBg:'#37291a', gateBorder:'#d29922', gateText:'#f1dcae', guardBg:'#16263a', guardBorder:'#58a6ff', guardText:'#bcd9ff' }
+  : { node:'#eef2f7', nodeBorder:'#cbd5e1', text:'#1b2733', line:'#aeb7c2', cluster:'#f6f8fa', clusterBorder:'#e3e8ee',
+      gateBg:'#fcf3da', gateBorder:'#c8961a', gateText:'#7a5b10', guardBg:'#e7f0fb', guardBorder:'#2b6cb0', guardText:'#1d4e80' };
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  themeVariables: {
+    primaryColor: P.node, primaryBorderColor: P.nodeBorder, primaryTextColor: P.text,
+    lineColor: P.line, clusterBkg: P.cluster, clusterBorder: P.clusterBorder,
+    fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif', fontSize: '13px',
+  },
+  flowchart: { padding: 10, nodeSpacing: 28, rankSpacing: 34, curve: 'basis', useMaxWidth: true },
+});
+
+// toggle label -> probevane.config.json key (assertion is numeric: assertMin)
+const TOGGLE_KEY = { quality:'quality', mutation:'mutation', flake:'flakeGuard', assertion:'assertMin', a11y:'a11y', visual:'visual', mfe:'mfe' };
+const DEFAULTS = { profile:'write_tests', kind:'unit', groupBy:'phase', model:'auto', maxSteps:24, minTests:'', minCoverage:'', budget:'' };
+let MODEL = null;
+const state = { ...DEFAULTS, toggles:{} };
+const $ = (id) => document.getElementById(id);
+const nid = (s) => s.replace(/[^a-zA-Z0-9_]/g,'_');
+
+// Build a phase-grouped OR subroutine-grouped flowchart. `groups` is the ordered
+// group metadata (MODEL.phases | MODEL.subroutines); `keyOf` maps a rune to its
+// group id. Node coloring always keys off r.phase so gates/guards read the same
+// in either view.
+function mermaidFor(runes, groups, keyOf){
+  const byGroup = {}; for(const r of runes) (byGroup[keyOf(r)] ??= []).push(r);
+  const byPhase = {}; for(const r of runes) (byPhase[r.phase] ??= []).push(r);
+  const lines = ['flowchart TD']; const anchors = [];
+  for(const grp of groups){
+    const rs = byGroup[grp.id]; if(!rs || !rs.length) continue;
+    lines.push('subgraph '+nid(grp.id)+'["'+grp.label+'"]','direction TB');
+    let prev = '';
+    for(const r of rs){
+      const id = nid(r.name);
+      let lbl = r.requiredBy ? r.name+'\\n(+'+r.requiredBy+')' : r.name;
+      if(r.name==='acceptance_gate' && (state.minTests || state.minCoverage))
+        lbl += '\\n≥'+(state.minTests||'-')+'t / '+(state.minCoverage||'-')+'%';
+      const cls = r.phase==='gate' ? ':::gate' : r.phase==='guard' ? ':::guard' : '';
+      lines.push(id+'["'+lbl+'"]'+cls);
+      if(prev) lines.push(prev+'-->'+id);
+      prev = id;
+    }
+    lines.push('end'); anchors.push(nid(rs[0].name));
+  }
+  for(let i=0;i+1<anchors.length;i++) lines.push(anchors[i]+'-->'+anchors[i+1]);
+  // gates can inject + continue the loop -> a feedback edge back to the guards
+  const g = byPhase.gate, gd = byPhase.guard;
+  if(g && gd) lines.push(nid(g[0].name)+'-. "block: inject + continue" .-> '+nid(gd[0].name));
+  lines.push('classDef gate fill:'+P.gateBg+',stroke:'+P.gateBorder+',color:'+P.gateText+';');
+  lines.push('classDef guard fill:'+P.guardBg+',stroke:'+P.guardBorder+',color:'+P.guardText+';');
+  return lines.join('\n');
+}
+
+function selectedRunes(){
+  const all = MODEL.profiles[state.profile] || [];
+  return all.filter(r => (r.requiredBy===null || state.toggles[r.requiredBy]) && (!r.e2eOnly || state.kind==='e2e'));
+}
+function configJson(){
+  const c = { profile: state.profile, model: state.model, kind: state.kind, maxSteps: Number(state.maxSteps) };
+  if(state.minTests!=='') c.minTests = Number(state.minTests);
+  if(state.minCoverage!=='') c.minCoverage = Number(state.minCoverage);
+  if(state.budget!=='') c.budget = Number(state.budget);
+  for(const [lbl,on] of Object.entries(state.toggles)){
+    if(!on) continue;
+    const key = TOGGLE_KEY[lbl];
+    c[key] = key==='assertMin' ? (Number(state.minTests)||80) : true;
+  }
+  return c;
+}
+
+// ---- click-to-explain drawer ----
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function openDrawer(html){ $('drawerBody').innerHTML = html; $('drawer').classList.add('open'); $('drawer').setAttribute('aria-hidden','false'); }
+function closeDrawer(){ $('drawer').classList.remove('open'); $('drawer').setAttribute('aria-hidden','true'); }
+
+function openRune(name){
+  const r = currentRunes.find(x => x.name === name);
+  if(!r) return;
+  const badges = ['<span class="badge '+r.phase+'">'+r.phase+'</span>',
+    '<span class="badge">'+esc(r.subroutine)+'</span>',
+    r.requiredBy ? '<span class="badge">+'+esc(r.requiredBy)+' toggle</span>' : '',
+    r.e2eOnly ? '<span class="badge">e2e only</span>' : ''].join('');
+  const hooks = (r.hooks||[]).map(h => '<div><code>'+h+'</code> — '+esc(MODEL.hookDescriptions[h]||'')+'</div>').join('') || '<div class="detail">(no hooks)</div>';
+  const ruleSec = r.rule
+    ? '<div class="sec">Rule injected into the model</div><pre class="rule">'+esc(r.rule)+'</pre>'
+    : '<div class="sec">Rule injected into the model</div><div class="detail">— none (pure '+r.phase+' rune)</div>';
+  const gateNote = r.phase==='gate' ? '<p class="hint">On a stop attempt this gate runs; a block injects its message and the loop continues.</p>' : '';
+  openDrawer('<h3>'+esc(r.name)+'</h3><div class="kind">rune</div><div class="badges">'+badges+'</div>'+
+    '<div class="summary">'+esc(r.summary)+'</div><div class="detail">'+esc(r.detail)+'</div>'+
+    '<div class="sec">Hooks</div><div class="hooks">'+hooks+'</div>'+ruleSec+gateNote);
+}
+function openGroup(id){
+  const meta = (state.groupBy==='subroutine' ? MODEL.subroutines : MODEL.phases).find(g => g.id === id);
+  if(!meta) return;
+  const keyOf = state.groupBy==='subroutine' ? (r)=>r.subroutine : (r)=>r.phase;
+  const members = currentRunes.filter(r => keyOf(r)===id).map(r => '<li class="members"><b>'+esc(r.name)+'</b> — '+esc(r.summary)+'</li>').join('');
+  openDrawer('<h3>'+esc(meta.label)+'</h3><div class="kind">'+state.groupBy+'</div>'+
+    '<div class="detail">'+esc(meta.detail)+'</div>'+
+    '<div class="sec">Runes here ('+currentRunes.filter(r=>keyOf(r)===id).length+')</div><ul>'+(members||'<li>(none in this config)</li>')+'</ul>');
+}
+function openToggle(label){
+  const t = MODEL.toggles.find(x => x.label === label);
+  if(!t) return;
+  const adds = [...new Set(Object.values(MODEL.profiles).flat().filter(r => r.requiredBy===label).map(r => r.name))];
+  const on = !!state.toggles[label];
+  openDrawer('<h3>'+esc(label)+'</h3><div class="kind">gate toggle · '+(on?'ON':'off')+'</div>'+
+    '<div class="detail">'+esc(t.detail)+'</div>'+
+    '<div class="sec">Runes it adds</div><ul>'+(adds.map(n=>'<li class="members"><b>'+esc(n)+'</b></li>').join('')||'<li>(none)</li>')+'</ul>');
+}
+
+// delegated clicks on the rendered SVG: a node -> its rune; a cluster title -> its group.
+function wireGraphClicks(){
+  $('graph').addEventListener('click', (e) => {
+    // Node first: a rune box wins over its enclosing cluster. Only a click on the
+    // cluster's own title/background (no .node ancestor) opens the group.
+    const node = e.target.closest('.node');
+    if(!node){
+      const cluster = e.target.closest('.cluster');
+      if(cluster){
+        // the cluster's OWN label (not a child node's) — don't descend into nodes
+        const lbl = cluster.querySelector(':scope > .cluster-label, :scope > foreignObject .cluster-label, .cluster-label');
+        const text = (lbl?.textContent || '').replace(/\s+/g,' ').trim();
+        const meta = (state.groupBy==='subroutine' ? MODEL.subroutines : MODEL.phases).find(g => g.label.replace(/\s+/g,' ') === text);
+        if(meta){ openGroup(meta.id); return; }
+      }
+      closeDrawer(); return;
+    }
+    {
+      const text = (node.querySelector('.nodeLabel')?.textContent || node.textContent || '').replace(/\s+/g,' ').trim();
+      // SVG may concat multi-line labels (name + "(+toggle)" / "≥Nt") — resolve to the
+      // longest rune name that the label starts with.
+      const match = currentRunes
+        .map(r => r.name)
+        .filter(n => text === n || text.startsWith(n))
+        .sort((a,b) => b.length - a.length)[0];
+      if(match) openRune(match);
+      return;
+    }
+    // click on empty graph area closes the drawer
+    closeDrawer();
+  });
+}
+
+function groupingFor(){
+  return state.groupBy==='subroutine'
+    ? { groups: MODEL.subroutines, keyOf: (r)=>r.subroutine }
+    : { groups: MODEL.phases, keyOf: (r)=>r.phase };
+}
+
+let currentRunes = [];
+async function render(){
+  const runes = selectedRunes();
+  currentRunes = runes;
+  $('meta').textContent = state.profile+' · '+state.kind+' · model='+state.model+' · maxSteps='+state.maxSteps+' · '+runes.length+' rune(s)';
+  const { groups, keyOf } = groupingFor();
+  const pre = $('graph'); pre.removeAttribute('data-processed');
+  pre.textContent = runes.length ? mermaidFor(runes, groups, keyOf) : 'flowchart TD\n  empty["(bare — no runes)"]';
+  $('cfg').textContent = JSON.stringify(configJson(), null, 2);
+  // legend: which subroutines this profile uses (in order)
+  if(state.groupBy==='subroutine'){
+    const used = []; for(const r of runes) if(!used.includes(r.subroutine)) used.push(r.subroutine);
+    $('legend').innerHTML = MODEL.subroutines.filter(s=>used.includes(s.id))
+      .map(s=>'<div><b>'+s.id+'</b> — '+s.label+'</div>').join('');
+    $('legend').style.display = '';
+  } else $('legend').style.display = 'none';
+  try { await mermaid.run({ nodes:[pre] }); } catch(e){ pre.textContent = 'mermaid error: '+e; }
+}
+
+function buildToggles(){
+  $('toggles').innerHTML = MODEL.toggles.map(t =>
+    '<div class="ti"><label><input type="checkbox" data-t="'+t.label+'">'+t.label+'</label>'+
+    '<span class="i" data-ti="'+t.label+'" title="what does '+t.label+' add?">ⓘ</span></div>').join('');
+  $('toggles').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
+    state.toggles[cb.dataset.t] = cb.checked; render();
+  }));
+  $('toggles').querySelectorAll('.i').forEach(el => el.addEventListener('click', () => openToggle(el.dataset.ti)));
+}
+function syncKnobsFromState(){
+  $('profile').value = state.profile; $('kind').value = state.kind; $('groupBy').value = state.groupBy; $('model').value = state.model;
+  $('maxSteps').value = state.maxSteps; $('msV').textContent = state.maxSteps;
+  $('minTests').value = state.minTests; $('minCoverage').value = state.minCoverage; $('budget').value = state.budget;
+  $('toggles').querySelectorAll('input').forEach(cb => cb.checked = !!state.toggles[cb.dataset.t]);
+}
+
+function wire(){
+  $('profile').addEventListener('change', e => { state.profile = e.target.value; render(); });
+  $('kind').addEventListener('change', e => { state.kind = e.target.value; render(); });
+  $('groupBy').addEventListener('change', e => { state.groupBy = e.target.value; render(); });
+  $('model').addEventListener('change', e => { state.model = e.target.value; render(); });
+  $('maxSteps').addEventListener('input', e => { state.maxSteps = e.target.value; $('msV').textContent = e.target.value; render(); });
+  for(const k of ['minTests','minCoverage','budget']) $(k).addEventListener('input', e => { state[k] = e.target.value; render(); });
+  $('reset').addEventListener('click', () => { Object.assign(state, DEFAULTS, {toggles:{}}); syncKnobsFromState(); render(); });
+  $('drawerX').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', e => { if(e.key==='Escape') closeDrawer(); });
+  $('apply').addEventListener('click', () => {
+    try{
+      const c = JSON.parse($('cfgin').value);
+      if(c.profile && MODEL.profiles[c.profile]) state.profile = c.profile;
+      if(c.kind) state.kind = c.kind; if(c.model) state.model = c.model;
+      if(c.maxSteps!=null) state.maxSteps = c.maxSteps;
+      state.minTests = c.minTests ?? ''; state.minCoverage = c.minCoverage ?? ''; state.budget = c.budget ?? '';
+      state.toggles = {};
+      for(const [lbl,key] of Object.entries(TOGGLE_KEY)) if(c[key]) state.toggles[lbl] = true;
+      syncKnobsFromState(); render();
+    }catch(err){ alert('bad config JSON: '+err); }
+  });
+}
+
+(async () => {
+  MODEL = await (await fetch('/raw/pipeline-model.json')).json();
+  $('profile').innerHTML = Object.keys(MODEL.profiles).map(p => '<option>'+p+'</option>').join('');
+  buildToggles(); wire(); wireGraphClicks(); syncKnobsFromState(); render();
+})();
+</script>
+</body>
+</html>

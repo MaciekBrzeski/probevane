@@ -35,5 +35,5 @@ export interface BrainResponse {
   text: string;
   toolCalls: ToolCall[];
   stopReason: StopReason;
-  usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number };
+  usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number; costUsd?: number };
 }

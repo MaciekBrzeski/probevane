@@ -30,7 +30,9 @@ export function contextInject(kind: 'unit' | 'e2e'): Rune {
       if (caveats.length)
         parts.push(`CAVEATS from past runs (avoid these gate failures):\n${caveats.join('\n')}`);
 
-      const examples = deterministic ? [] : await retrieveFewShot({ stack: ctx.adapter.id, kind, topK: 3 }).catch(() => []);
+      const examples = deterministic
+        ? []
+        : await retrieveFewShot({ stack: ctx.adapter.id, kind, topK: 3 }).catch(() => []);
       if (examples.length) {
         const blocks = examples
           .map((e, i) => `### Example ${i + 1} — ${e.meta.category} (score ${e.meta.score ?? '?'})\n${e.body}`)

@@ -13,23 +13,36 @@ export class RunCtx {
   adapter: StackAdapter;
   task: string;
 
+  runId = ''; // unique per run (set by the engine); diary/events key on it
+  checkpointSha = ''; // HEAD before this run edited the workdir — revert restores to it
   step = 0;
   toolCalls = 0;
   gateBlocks = 0;
   barren = 0; // consecutive turns with no productive edit / a blocked stop
+  reads = 0; // cumulative read_file/list_dir calls (read-thrash detection)
+  /** Memoized workspace/repo root — reads are allowed anywhere under it (writes stay in workdir). */
+  workspaceRoot?: string;
 
   // Outcome, set by the engine before on_stop hooks run (for diary/harvest).
   accepted = false;
   stopReason = 'unknown';
   /** Distinct gate-block reasons seen this run (caveat_harvest feeds these back). */
   gateBlockReasons: string[] = [];
+  /** RAW (non-deduped) gate-block reasons — the difficulty gate counts repeats here. */
+  gateBlockHistory: string[] = [];
 
   noteBlock(reason: string) {
+    this.gateBlockHistory.push(reason);
     if (!this.gateBlockReasons.includes(reason)) this.gateBlockReasons.push(reason);
   }
 
   plan: PlanRecord | null = null;
   editedFiles = new Set<string>();
+  // Last measured suite signals (set by acceptance_gate when it runs) — surfaced
+  // on the outcome so `generate --report` can record them without a second run.
+  lastRunPassed?: number;
+  lastCoverage?: number; // statement coverage %
+
   lastEditPath: string | null = null;
   validatedSinceEdit = false;
 

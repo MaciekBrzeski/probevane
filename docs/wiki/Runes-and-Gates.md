@@ -30,10 +30,15 @@ The run **cannot finish** while any of these hold:
 - typecheck fails (`adapter.commands().typecheck`);
 - the suite for the scope (unit or e2e) is not green — failures, zero passing, or all-skipped (the qaforge *all-skipped* anti-pattern, promoted to a hard gate).
 
-On block it injects the failing command's tail so the model can repair.
+On block it leads with **FIX THIS FIRST** — the first failing test + its assertion (cross-stack extractor) — then the full tail, so a weak/local model repairs one precise failure per turn instead of drowning in a dump.
 
 ### audit_gate (`shouldStop`)
-No finish with any error-severity audit violation in the touched specs. See [Audit & Library](Audit-and-Library.md).
+No finish with any error-severity audit violation in the touched specs; leads with the first violation. See [Audit & Library](Audit-and-Library.md).
+
+### hermetic_gate (`shouldStop`)
+A test must be **hermetic** — no real network (`fetch`/`axios` without a mock), no real clock/`Math.random` without fake timers. Enforces that synthesized mocks are actually used (the mock maker).
+
+> **Scoping invariant** (dogfood fix): `hermetic_gate` and `audit_gate` scan **only the spec files this run edited** (`ctx.editedFiles`), never the whole suite — a whole-suite scan deadlocks (a pre-existing unrelated test with a URL/violation that `no_regression` forbids fixing would block every run).
 
 ### acceptance_gate (`shouldStop`)
 The deliverable must actually be covered: a minimum passing-test count, a minimum statement-coverage %, and any raw shell checks (exit 0). Ported from runestone `acceptance_gate.rs` — the recurring lesson is that acceptance must cover the *visible* deliverable, not just compile.
@@ -47,17 +52,30 @@ Writes a per-run record (outcome, steps, tool calls, gate blocks + reasons, edit
 ### caveat_harvest (`onStop`)
 Appends the run's distinct gate-block reasons to a shared `caveats.md` (deduped); `context_inject` injects recent caveats into future runs, so the loop learns from its own friction. Empty on a clean run.
 
+### distill_trace + library_promote (`onStop`, opt-in `PROBEVANE_TRACES=1`)
+On an accepted run, `distill_trace` records the (context → accepted spec) pair as a distillation trace, and `library_promote` auto-promotes the spec into the cross-project learning library (content-hash deduped) so `retrieveFewShot` starts hitting — closing the RAG flywheel. See [Brains](Brains.md) for what distillation can/can't learn.
+
+### quality_gate (`shouldStop`, opt-in `--quality` / config `quality:true`)
+A finish condition over the **source the run edited** (not tests — `audit_gate` owns those): file size, function length / **cyclomatic** branch-complexity (error) + **cognitive** nesting-weighted complexity (warn; SonarQube-style, default 15) / nesting / params, long lines, comment-scoped debt markers, import fan-out, maximal-block duplication (the same analyzer as the [`quality`](Commands.md) command). Cyclomatic counts paths (good for an automated gate); cognitive weights nested structures by depth (closer to human readability) — both are reported. Detection is **AST-based** (ts-morph): each function is measured on its own body, so a nested callback/method is its own node and never folded into the parent. The metrics also ignore **literal text** — strings, comments, regex, and (nested) template literals are stripped before counting, and duplication compares literal *content* — so a command table, a config template, or a styled-component `` `${cond ? `…` : x}` `` className isn't mis-read as complex, long, or duplicated. **Baseline-aware**: it compares each edited file against the run's git checkpoint and blocks only when a rule's worst value got *worse* (or a new error appears) — refactoring an already-large file isn't punished, only growing it past where it started is; an improvement passes. New files baseline to zero. Without a git checkpoint it falls back to an absolute check. Opt in on `refactor` / `feature` / `fix` / `repair` (where the loop edits source); on `write_tests` it's effectively a no-op since test files are excluded.
+
+### mfe_gate (`shouldStop`, opt-in `--mfe` / config `mfe:true`)
+Holds a **Module Federation** repo to its architecture standards (the same rules as [`mfe-audit`](Commands.md): no deep cross-remote imports, framework deps shared as singletons, host mounts wrapped in Suspense + an error boundary, typed exposes). **Baseline-aware**: snapshots the repo's error count at run start (`prepare`) and blocks only when the run *increased* it — fixing a pre-existing MFE app isn't punished, regressing it is. No-op on a repo without a federation config. Opt in on source-editing profiles (refactor/feature/fix/repair). The cross-repo shared-version check runs at the fleet level in `factory` (report `mfeVersionAlign`), not per-run.
+
+### Optional + other-profile runes
+Opt-in gates on `write_tests`: **flake_gate** (runs new specs N× — rejects non-deterministic), **mutation_gate** (mutation score), **a11y_gate** (components assert accessibility), **visual_gate** (e2e captures a screenshot checkpoint), **mock_inject** (injects the synthesized mock plan). Other profiles add **behavior_lock** (refactor: every test stays green) and **red_first** (feature: a failing test before the implementation). **quality_gate** (above) is opt-in on any source-editing profile.
+
 ## The `write_tests` profile
 
 An ordered pipeline (runestone's profile idea), in `src/loop/profiles.ts`. beforeToolCall order: `plan_first` → `no_regression`. shouldStop order: `validation` (fast fail) → `audit` (static) → `acceptance` (count/coverage).
 
 ```
 write_tests = [ context_inject(kind), path_guard, plan_first, no_regression,
-                validation_gate(scope), audit_gate, acceptance_gate,
-                session_diary, caveat_harvest ]
+                validation_gate(scope), audit_gate, hermetic_gate, acceptance_gate,
+                …optional: flake/mutation/a11y/visual,
+                session_diary, caveat_harvest, distill_trace, library_promote ]
 ```
 
-When the loop stalls, the **consult ladder** escalates once (extra guidance + optional **takeover** by a stronger brain) before `forceStopAfter` gives up — see [The Loop](The-Loop.md) and [Brains](Brains.md).
+When the loop stalls, the **consult ladder** escalates once (extra guidance + optional **takeover** by a stronger brain); if it then keeps **circling**, the engine-level **difficulty gate** stops early + proposes (see [The Loop](The-Loop.md)). `forceStopAfter` is the final give-up. See also [Brains](Brains.md).
 
 ## Why gates beat instructions
 

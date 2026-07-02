@@ -1,14 +1,19 @@
 import { readRuns, summarize } from '../cost/ledger.js';
+import { aggregateOverTime } from '../observe/aggregate.js';
+import { computeAlerts, shouldHalt } from '../observe/alerts.js';
+import { flag } from './args.js';
 
-// probevane history [--limit N] [--json]
+// probevane history [--limit N] [--json] [--trend [--days N]]
 //
 // Run history + cost ledger: total spend, how much the harness landed on its
 // own vs needed a stronger-model takeover vs needed hand-finishing, and the
 // per-model / per-path breakdown. Reads ~/.local/share/probevane/runs.jsonl.
+// --trend: daily time-series + the daemon's cost/acceptance alerts, in the CLI.
 async function main() {
   const args = process.argv.slice(2);
   const limit = parseInt(flag(args, '--limit') ?? '12', 10);
   const runs = await readRuns();
+  if (args.includes('--trend')) return trend(runs, args);
   if (args.includes('--json')) { console.log(JSON.stringify(summarize(runs), null, 2)); return; }
   if (!runs.length) { console.log('[probevane] no runs recorded yet (PROBEVANE_LEDGER=0 disables; runs append automatically).'); return; }
 
@@ -19,6 +24,7 @@ async function main() {
   console.log(`### 💰 probevane history — ${s.runs} run(s), ${$(s.totalCost)} total`);
   console.log('');
   console.log(`- tokens: ${s.totalTokensIn.toLocaleString()} in / ${s.totalTokensOut.toLocaleString()} out`);
+  if (s.avgDurationMs > 0) console.log(`- avg run duration: ${(s.avgDurationMs / 1000).toFixed(1)}s`);
   console.log(`- accepted: ${s.accepted}/${s.runs} (${pct(s.accepted)})`);
   console.log(`- **by the harness alone**: ${s.harnessOnly} (${pct(s.harnessOnly)}) · **needed takeover**: ${s.withTakeover} (${pct(s.withTakeover)}) · **needed hand**: ${s.needsHand} (${pct(s.needsHand)})`);
   console.log('\n**By model**');
@@ -35,9 +41,33 @@ async function main() {
   }
 }
 
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
+// Daily table + alerts — the daemon's aggregate/alert cores, surfaced in the CLI.
+function trend(runs: Awaited<ReturnType<typeof readRuns>>, args: string[]) {
+  const days = parseInt(flag(args, '--days') ?? '14', 10);
+  const overTime = aggregateOverTime(runs);
+  const daily = overTime.daily.slice(-days);
+  const alerts = computeAlerts(overTime.daily);
+  if (args.includes('--json')) {
+    console.log(JSON.stringify({ overTime: { ...overTime, daily }, alerts, halt: shouldHalt(alerts) }, null, 2));
+    return;
+  }
+  if (!daily.length) { console.log('[probevane] no runs recorded yet.'); return; }
+  console.log(`### 📈 probevane trend — last ${daily.length} day(s)`);
+  console.log('');
+  console.log('  date        runs  accepted   cost      tokens in/out');
+  for (const d of daily) {
+    console.log(
+      `  ${d.date}  ${String(d.runs).padStart(4)}  ${`${d.accepted}/${d.runs}`.padStart(8)}  ` +
+      `$${d.cost.toFixed(2).padStart(7)}  ${d.tokensIn.toLocaleString()}/${d.tokensOut.toLocaleString()}`,
+    );
+  }
+  if (alerts.length) {
+    console.log('\n**Alerts**');
+    for (const a of alerts) console.log(`  ${a.severity === 'error' ? '🛑' : '⚠️'} ${a.kind}: ${a.message}`);
+    if (shouldHalt(alerts)) console.log('  → circuit-breaker: the daemon queue would HALT on this state');
+  } else {
+    console.log('\nno alerts');
+  }
 }
 
 main().catch((e) => { console.error(String(e)); process.exit(1); });

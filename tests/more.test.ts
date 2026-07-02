@@ -116,6 +116,16 @@ describe('distillation dataset', () => {
   it('counts by stack', () => {
     expect(statsByStack([mk('react', 'a'), mk('react', 'b'), mk('go', 'c')])).toEqual({ react: 2, go: 1 });
   });
+  const longSpec = `import { it, expect } from 'vitest';\nit('adds two numbers', () => { expect(add(1,2)).toBe(3); });`;
+  it('threads gate-feedback into the training prompt when present', () => {
+    const withGates: Trace = { ...mk('react', longSpec), gateBlocks: ['audit_gate: conditional-expect', 'validation_gate: unit tests not green'] };
+    const ex = buildExamples([withGates]);
+    expect(ex[0].messages[1].content).toContain('avoid these');
+    expect(ex[0].messages[1].content).toContain('conditional-expect');
+  });
+  it('omits the constraint line when no gate blocks', () => {
+    expect(buildExamples([mk('react', longSpec)])[0].messages[1].content).not.toContain('avoid these');
+  });
 });
 
 describe('cpu base bake-off helpers', () => {
@@ -257,6 +267,7 @@ describe('validation_gate tsc error counting', () => {
 
 describe('playwright-test-import audit rule', () => {
   it('flags bare playwright/test, allows @playwright/test', () => {
+    // probevane-allow: playwright-test-import — fixture string, not a real call
     const bad = auditSource('e2e/a.spec.ts', `import { test } from 'playwright/test';`, jsAuditRules());
     expect(bad.map((v) => v.rule)).toContain('playwright-test-import');
     const ok = auditSource('e2e/a.spec.ts', `import { test } from '@playwright/test';`, jsAuditRules());

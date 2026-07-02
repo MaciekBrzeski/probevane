@@ -47,7 +47,9 @@ export const rustAdapter: StackAdapter = {
     );
     const lines = [`GROUND TRUTH for ${target.sourcePath} (crate \`${crate}\`):`];
     if (fns.length) lines.push(`- pub fns: ${fns.join('; ')}`);
-    lines.push(`- write an integration test at tests/<name>.rs: \`use ${crate}::*;\` then #[test] fns with assert_eq!/assert!.`);
+    lines.push(
+      `- write an integration test at tests/<name>.rs: \`use ${crate}::*;\` then #[test] fns with assert_eq!/assert!.`,
+    );
     const ok = fns.length > 0;
     return { target, facts: { crate, fns }, digest: lines.join('\n'), ok, error: ok ? undefined : 'no pub fns' };
   },
@@ -59,12 +61,23 @@ export const rustAdapter: StackAdapter = {
       passed += parseInt(m[1], 10);
       failed += parseInt(m[2], 10);
     }
-    return { passed, failed, skipped: 0, green: r.ok && failed === 0 && passed > 0, raw: (r.stdout + r.stderr).slice(-4000) };
+    return {
+      passed,
+      failed,
+      skipped: 0,
+      green: r.ok && failed === 0 && passed > 0,
+      raw: (r.stdout + r.stderr).slice(-4000),
+    };
   },
 
-  async coverage(_dir: string): Promise<CoverageResult> {
-    // No built-in coverage (would need cargo-llvm-cov/tarpaulin). Report n/a.
-    return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false };
+  async coverage(dir: string): Promise<CoverageResult> {
+    // Real coverage when cargo-llvm-cov is installed; n/a otherwise
+    // (`cargo install cargo-llvm-cov` to enable — not assumed on CI runners).
+    const probe = await sh('cargo llvm-cov --version', dir);
+    if (!probe.ok) return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false };
+    const r = await sh('cargo llvm-cov --json --summary-only --quiet', dir, 300_000);
+    if (!r.ok) return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false, raw: r.stderr.slice(-1500) };
+    return parseLlvmCovSummary(r.stdout);
   },
 
   async specFiles(dir: string): Promise<string[]> {
@@ -83,9 +96,34 @@ export const rustAdapter: StackAdapter = {
     return rustAuditRules();
   },
   commands(): AdapterCommands {
-    return { typecheck: 'cargo build --quiet', lint: 'cargo fmt --check || true', testUnit: 'cargo test --quiet', testE2e: 'true', coverage: 'true' };
+    return {
+      typecheck: 'cargo build --quiet',
+      lint: 'cargo fmt --check || true',
+      testUnit: 'cargo test --quiet',
+      testE2e: 'true',
+      coverage: 'true',
+    };
   },
 };
+
+/** Parse `cargo llvm-cov --json --summary-only` output into a CoverageResult. */
+export function parseLlvmCovSummary(jsonText: string): CoverageResult {
+  try {
+    const j = JSON.parse(jsonText);
+    const t = j.data?.[0]?.totals;
+    if (!t) throw new Error('no totals');
+    const pct = (k: string) => Math.round((t[k]?.percent ?? 0) * 100) / 100;
+    return {
+      statements: pct('regions'),
+      branches: pct('branches'),
+      functions: pct('functions'),
+      lines: pct('lines'),
+      ok: true,
+    };
+  } catch {
+    return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false };
+  }
+}
 
 async function crateName(dir: string): Promise<string> {
   const toml = await readFile(join(dir, 'Cargo.toml'), 'utf8').catch(() => '');

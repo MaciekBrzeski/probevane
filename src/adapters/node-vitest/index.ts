@@ -1,4 +1,4 @@
-import { readFile, readdir, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type {
   StackAdapter,
@@ -15,6 +15,8 @@ import { findSpecFiles } from '../../util/specfiles.js';
 import { loadPrompt } from '../../library/prompt.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { astExtract } from '../ast-probe.js';
+import { readPackageDeps } from '../pkg-deps.js';
+import { walkFiles } from '../walk.js';
 
 // node-vitest — generic TS/JS library stack (vitest, no UI framework). Lets
 // probevane test plain Node libraries — including ITSELF. Detect scores below
@@ -25,13 +27,7 @@ export const nodeAdapter: StackAdapter = {
   id: 'node-vitest',
 
   async detect(dir: string): Promise<number> {
-    let pkg: any;
-    try {
-      pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
-    } catch {
-      return 0;
-    }
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;
+    const deps = await readPackageDeps(dir);
     if (deps.react || deps.vue || deps.svelte || deps['@angular/core']) return 0; // a framework adapter owns it
     let score = 0;
     if (deps.vitest) score += 0.4;
@@ -61,7 +57,7 @@ export default defineConfig({ test: {
   },
 
   async discover(dir: string, _kind: TestKind): Promise<TestTarget[]> {
-    const files = (await walk(join(dir, 'src')).catch(() => [])) as string[];
+    const files = (await walkFiles(join(dir, 'src')).catch(() => [])) as string[];
     return files
       .filter((f) => /\.[tj]s$/.test(f) && !/\.(test|spec|d)\.[tj]s$/.test(f) && !/(^|\/)(index|main)\.[tj]s$/.test(f))
       .map((f) => ({ kind: 'unit', sourcePath: relative(dir, f), name: f.split('/').pop()!.replace(/\.[tj]s$/, '') }));
@@ -96,14 +92,3 @@ export default defineConfig({ test: {
     return { typecheck: 'npx tsc --noEmit', lint: 'true', testUnit: 'npx vitest run', testE2e: 'true', coverage: 'npx vitest run --coverage --coverage.reporter=json-summary' };
   },
 };
-
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (['node_modules', 'dist', 'coverage'].includes(e.name)) continue;
-      out.push(...(await walk(join(dir, e.name))));
-    } else out.push(join(dir, e.name));
-  }
-  return out;
-}

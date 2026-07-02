@@ -47,7 +47,13 @@ export function replayBrain(cassettePath: string, model = 'replay'): Brain {
     async complete(req: BrainRequest): Promise<BrainResponse> {
       const t = await load();
       const hit = t.get(hashRequest(req));
-      if (!hit) throw new Error(`replay: no cassette entry for this request (${cassettePath}) — re-record`);
+      if (!hit) {
+        // Dump the unmatched request so a stale cassette can be diagnosed
+        // (env-sensitive gate feedback is the usual culprit) before re-recording.
+        const missPath = `${cassettePath}.miss.json`;
+        await appendFile(missPath, JSON.stringify({ hash: hashRequest(req), req }, null, 2) + '\n').catch(() => {});
+        throw new Error(`replay: no cassette entry for this request (${cassettePath}) — re-record; unmatched request dumped to ${missPath}`);
+      }
       return hit;
     },
   };

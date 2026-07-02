@@ -1,7 +1,8 @@
-import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { mkdir, appendFile, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import type { RunCtx } from '../loop/ctx.js';
+import { statePath } from '../util/state.js';
+import { appendJsonl, readJsonl } from '../util/jsonl.js';
 
 // A test/spec file across every supported stack (js/ts, python, go, rust).
 const TEST_RE = /(\.(test|spec)\.[tj]sx?$)|(test_\w+\.py$)|(_test\.py$)|(_test\.go$)|(tests\/.*\.rs$)/;
@@ -34,7 +35,7 @@ export function redact(text: string): string {
 // input context (stack + task) with the accepted spec it produced — the
 // transformation we want a local model to learn (the DISCIPLINE; facts stay in
 // RAG/context per the RAG-beats-distill lesson). Opt-in via PROBEVANE_TRACES=1.
-export const TRACES_PATH = join(homedir(), '.local/share/probevane/traces/traces.jsonl');
+export const TRACES_PATH = statePath('traces', 'traces.jsonl');
 
 export interface Trace {
   ts: string;
@@ -42,28 +43,29 @@ export interface Trace {
   task: string;
   specPath: string;
   spec: string;
+  /** Distinct gate-block reasons this run hit before the accepted spec — the
+   *  failed→fixed signal. The completion (spec) is the version that satisfies
+   *  them, so the dataset teaches the model to pre-empt these gates. */
+  gateBlocks?: string[];
 }
 
 /** Append one trace per accepted spec file. `now` is injected for testability. */
 export async function recordTrace(ctx: RunCtx, now: string): Promise<number> {
   let n = 0;
-  await mkdir(join(homedir(), '.local/share/probevane/traces'), { recursive: true }).catch(() => {});
   for (const rel of ctx.editedFiles) {
     if (!TEST_RE.test(rel)) continue;
     const spec = await readFile(join(ctx.workdir, rel), 'utf8').catch(() => '');
     if (!spec.trim()) continue;
-    const trace: Trace = { ts: now, stack: ctx.adapter.id, task: redact(ctx.task), specPath: rel, spec };
-    await appendFile(TRACES_PATH, JSON.stringify(trace) + '\n');
+    const trace: Trace = {
+      ts: now, stack: ctx.adapter.id, task: redact(ctx.task), specPath: rel, spec,
+      gateBlocks: ctx.gateBlockReasons.length ? ctx.gateBlockReasons.map(redact) : undefined,
+    };
+    await appendJsonl(TRACES_PATH, trace);
     n++;
   }
   return n;
 }
 
 export async function readTraces(path = TRACES_PATH): Promise<Trace[]> {
-  const txt = await readFile(path, 'utf8').catch(() => '');
-  return txt
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((l) => JSON.parse(l) as Trace);
+  return readJsonl<Trace>(path);
 }

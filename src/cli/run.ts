@@ -1,11 +1,11 @@
-import { resolve } from 'node:path';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import type { RunScope } from '../adapters/adapter.js';
+import { flag, dirArg } from './args.js';
 
 // probevane run <dir> [--scope unit|e2e|all]
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const scope = (flag(args, '--scope') as RunScope) ?? 'unit';
 
   const adapter = await selectAdapterOrThrow(dir);
@@ -18,11 +18,6 @@ async function main() {
     console.error(r.raw.slice(-2000));
     process.exit(1);
   }
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {

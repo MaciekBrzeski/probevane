@@ -1,7 +1,8 @@
-import { resolve, join } from 'node:path';
+import { join } from 'node:path';
 import { appendFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { auditFiles } from '../audit/core.js';
+import { flag, dirArg } from './args.js';
 
 // probevane review <dir> [--flake N] [--mutation]
 //
@@ -10,7 +11,7 @@ import { auditFiles } from '../audit/core.js';
 // No generation — works on any repo today.
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const flakeRuns = parseInt(flag(args, '--flake') ?? '3', 10);
   const adapter = await selectAdapterOrThrow(dir);
 
@@ -63,10 +64,6 @@ async function emit(md: string): Promise<void> {
   console.log(md);
   const s = process.env.GITHUB_STEP_SUMMARY;
   if (s) await appendFile(s, md + '\n').catch(() => {});
-}
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {

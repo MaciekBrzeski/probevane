@@ -1,9 +1,10 @@
-import { resolve, join, relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { watch } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { loadConfig } from '../config.js';
 import { isSourceFile, specCandidatesFor } from '../git.js';
+import { flag, dirArg } from './args.js';
 
 // probevane watch <dir> [--run] [--debounce 800]
 //
@@ -12,7 +13,7 @@ import { isSourceFile, specCandidatesFor } from '../git.js';
 // `--run` actually triggers the gated loop (needs credits).
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const cfg = await loadConfig(dir);
   const run = args.includes('--run');
   const debounce = parseInt(flag(args, '--debounce') ?? '800', 10);
@@ -40,18 +41,21 @@ async function main() {
     const { runPath } = await import('../loop/run-path.js');
     const { generateTests } = await import('../loop/run-generation.js');
     if (action === 'repair') {
-      await runPath({ dir, adapter, profileName: 'repair', task: `The source file ${rel} changed; update its affected tests so the suite is green.`, model: cfg.model ?? 'auto', budget: cfg.budget, log: (l) => console.error(l) }).catch((e) => console.error(String(e)));
+      await runPath({
+        dir, adapter, profileName: 'repair',
+        task: `The source file ${rel} changed; update its affected tests so the suite is green.`,
+        model: cfg.model ?? 'auto', budget: cfg.budget, log: (l) => console.error(l),
+      }).catch((e) => console.error(String(e)));
     } else {
-      await generateTests({ dir, kind: 'unit', adapter, model: cfg.model ?? 'auto', only: rel, maxTargets: 1, budget: cfg.budget, log: (l) => console.error(l) }).catch((e) => console.error(String(e)));
+      await generateTests({
+        dir, kind: 'unit', adapter, model: cfg.model ?? 'auto',
+        only: rel, maxTargets: 1, budget: cfg.budget, log: (l) => console.error(l),
+      }).catch((e) => console.error(String(e)));
     }
   }
 }
 
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 main().catch((e) => {
   console.error(String(e));

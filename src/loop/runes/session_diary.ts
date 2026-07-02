@@ -6,8 +6,6 @@ import type { RunCtx } from '../ctx.js';
 // session_diary — ported from runestone's session_diary rune. On stop, write a
 // per-run record (metrics + outcome) under <workdir>/.probevane/diary/. Gives
 // overwatch of every run without coupling to the eval harness.
-let counter = 0;
-
 export const sessionDiary: Rune = {
   name: 'session_diary',
 
@@ -15,6 +13,8 @@ export const sessionDiary: Rune = {
     const dir = join(ctx.workdir, '.probevane', 'diary');
     await mkdir(dir, { recursive: true }).catch(() => {});
     const record = {
+      runId: ctx.runId,
+      checkpointSha: ctx.checkpointSha, // for `probevane revert <runId>`
       task: ctx.task.slice(0, 200),
       accepted: ctx.accepted,
       stopReason: ctx.stopReason,
@@ -25,8 +25,8 @@ export const sessionDiary: Rune = {
       editedFiles: [...ctx.editedFiles],
       hadPlan: !!ctx.plan,
     };
-    // No Date.now in some sandboxes is fine here (real run); use a monotonic id.
-    const name = `run-${ctx.step}-${counter++}.json`;
+    // Key on the unique runId — no cross-run collision (was a module-static counter).
+    const name = `${ctx.runId || `run-${ctx.step}`}.json`;
     await writeFile(join(dir, name), JSON.stringify(record, null, 2) + '\n').catch(() => {});
   },
 };

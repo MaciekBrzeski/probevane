@@ -24,19 +24,36 @@ jobs:
           go-version: '1.22'
       - run: pip install pytest pytest-cov
       - run: npm ci || npm install
+      - name: install fixture deps
+        # BEFORE the self-tests: real-fixture tests (passk.scoreSuite over
+        # react-todo) execute the fixture suite, which needs its node_modules.
+        run: |
+          for f in fixtures/*/; do if [ -f "$f/package.json" ]; then (cd "$f" && npm install --no-fund --no-audit --legacy-peer-deps); fi; done
       - name: typecheck
         run: npm run typecheck
-      - name: probevane self-tests
-        run: npx vitest run
+      - name: probevane self-tests + coverage floor
+        run: npm run coverage
+      - name: dist build (packaging gate — must compile + copy ui)
+        run: npm run build
       - name: skill + wiki in sync (drift gate)
         run: ./bin/probevane skill --check
+      - name: source-quality gate (dogfood — probevane grades its own source)
+        run: ./bin/probevane quality . --strict
+      - name: mutation gate (dogfood — do the tests actually catch bugs?)
+        run: ./bin/probevane mutation . --budget 60 --min-score 0.6
+      - name: quality SARIF → code scanning (inline annotations)
+        if: always()
+        run: ./bin/probevane quality . --sarif > quality.sarif || true
+      - name: upload quality SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: quality.sarif
       - name: regenerate probevane's own wiki spec (dogfood, keeps it fresh)
         run: ./bin/probevane spec . --wiki && test -f docs/wiki/project-probevane.md
       - name: dashboard e2e (real browser + visual regression)
         run: npx playwright install --with-deps chromium && npm run test:e2e
-      - name: install fixture deps
-        run: |
-          for f in fixtures/*/; do [ -f "$f/package.json" ] && (cd "$f" && npm install --no-fund --no-audit) || true; done
       - name: fixture eval (no LLM)
         run: ./bin/probevane eval
       - name: path eval — refactor/feature/repair (replay cassettes, no LLM)

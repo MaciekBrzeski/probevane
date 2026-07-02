@@ -22,22 +22,33 @@ export interface ExecResult {
 /** Run a shell command in `cwd`, capturing output. Never throws on non-zero. */
 export function sh(cmd: string, cwd: string, timeoutMs = 180_000): Promise<ExecResult> {
   return new Promise((resolve) => {
-    const child = spawn('bash', ['-lc', cmd], { cwd, env: process.env });
+    // detached → own process GROUP, so the timeout can kill the whole tree.
+    // Killing only bash orphans its grandchildren (vitest/pytest workers keep
+    // the stdio pipes open → `close` never fires → this promise hangs forever
+    // while the orphans spin). Bit for real: a mutant-induced infinite loop
+    // outlived the 3-minute timeout by hours.
+    const child = spawn('bash', ['-lc', cmd], { cwd, env: process.env, detached: true });
     let stdout = '';
     let stderr = '';
+    let done = false;
+    const finish = (code: number, extraErr = '') => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve({ code, stdout, stderr: stderr + extraErr, ok: code === 0 });
+    };
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      try {
+        process.kill(-child.pid!, 'SIGKILL'); // whole group
+      } catch {
+        child.kill('SIGKILL');
+      }
+      // Belt + braces: resolve even if a survivor still holds the pipes open.
+      setTimeout(() => finish(124, `\nprobevane: killed after ${timeoutMs}ms timeout`), 2_000);
     }, timeoutMs);
     child.stdout.on('data', (d) => (stdout += d.toString()));
     child.stderr.on('data', (d) => (stderr += d.toString()));
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      const c = code ?? 1;
-      resolve({ code: c, stdout, stderr, ok: c === 0 });
-    });
-    child.on('error', (err) => {
-      clearTimeout(timer);
-      resolve({ code: 1, stdout, stderr: stderr + String(err), ok: false });
-    });
+    child.on('close', (code) => finish(code ?? 1));
+    child.on('error', (err) => finish(1, String(err)));
   });
 }

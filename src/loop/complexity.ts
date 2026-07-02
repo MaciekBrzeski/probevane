@@ -1,5 +1,6 @@
 import type { TestTarget } from '../adapters/adapter.js';
 import { buildGraph } from '../mock/graph.js';
+import { isDirectModel } from '../brain/select.js';
 
 // Auto model routing — detect "complex" code and start on a stronger brain
 // instead of waiting for the loop to stall and take over. Signals: big module
@@ -50,5 +51,14 @@ export function routeModels(choice: string, complex: boolean): { primary?: strin
   if (choice === 'haiku') return { primary: HAIKU, takeover: SONNET };
   if (choice === 'sonnet') return { primary: SONNET, takeover: SONNET };
   if (choice === 'opus') return { primary: OPUS, takeover: OPUS };
-  return { primary: choice, takeover: SONNET }; // explicit model id
+  // Host-serviced / CLI brains stay on themselves — never silently fall back to a
+  // paid API takeover (would break the $0 guarantee of a bridge run).
+  if (choice === 'bridge') return { primary: 'bridge', takeover: 'bridge' };
+  if (choice === 'claude-code') return { primary: 'claude-code', takeover: 'claude-code' };
+  if (choice.startsWith('cc:')) return { primary: choice, takeover: choice };
+  // OpenAI-compatible / local / cloud (ollama, vLLM, etc.) take over with
+  // THEMSELVES — never silently escalate to a paid Anthropic API the run may not
+  // even have credits for (would 400 on takeover, as glm-5.2:cloud did).
+  if (isDirectModel(choice)) return { primary: choice, takeover: choice };
+  return { primary: choice, takeover: SONNET }; // explicit Anthropic model id
 }

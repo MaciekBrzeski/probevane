@@ -1,0 +1,288 @@
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { RunRecord } from '../cost/ledger.js';
+import { appendJsonl, readJsonl } from '../util/jsonl.js';
+import { backoffMs } from '../observe/quarantine.js';
+import { reduceJobs, jobsToEvict, itemFromPlan, type PersistedJob } from '../observe/jobs.js';
+import { reduceQueue, nextReady, mark, type QueueItem } from '../observe/queue.js';
+import { validateLaunch } from '../observe/launch.js';
+import { overCap } from '../cost/budget.js';
+import { shipRun, latestDiary } from '../ship/ship.js';
+import { tailFrom, sseFrame } from '../loop/observe.js';
+
+// Control center for the daemon (Pillar B): launch + track loop runs, plus the
+// supervisor queue. Split out of daemon.ts so each file/function stays under the
+// project's own quality bar. State is module-level (one daemon process); daemon.ts
+// wires its config + helpers in via initControl().
+
+export interface Job extends PersistedJob {
+  proc?: ChildProcess; // runtime handle (not persisted) — for /cancel
+}
+
+export interface ControlCtx {
+  BIN: string;
+  JOBS_PATH: string;
+  QUEUE_PATH: string;
+  JOB_TAIL: number;
+  MAX_JOBS: number;
+  MAX_BODY: number;
+  QUEUE_ON: boolean;
+  SHIP_ON: boolean;
+  QUARANTINE: number;
+  BUDGET_CAP: number;
+  BUDGET_WINDOW: number;
+  log: (level: string, event: string, data?: Record<string, unknown>) => Promise<void>;
+  sendJson: (res: ServerResponse, code: number, body: unknown) => void;
+  scanRuns: () => Promise<{ records: RunRecord[]; ledgers: number }>;
+}
+
+let CTX: ControlCtx;
+export const jobs = new Map<string, Job>();
+let queue: QueueItem[] = [];
+let paused = false; // safety: set by Pillar C alert-halt / budget cap
+let supervising = false; // one in-flight dispatch at a time
+
+export function initControl(ctx: ControlCtx): void {
+  CTX = ctx;
+}
+
+export const getQueue = (): QueueItem[] => queue;
+export const isPaused = (): boolean => paused;
+export const setPaused = (v: boolean): void => {
+  paused = v;
+};
+
+/** Persisted snapshot of a job (no runtime handle / capped tail). */
+export function snapshot(j: Job): Omit<Job, 'proc'> {
+  const { proc, ...rest } = j;
+  return { ...rest, tail: j.tail.slice(-CTX.JOB_TAIL) };
+}
+
+/** Append the job's current state; jobs.jsonl is reduced last-wins on load. */
+async function persistJob(j: Job) {
+  await appendJsonl(CTX.JOBS_PATH, snapshot(j)).catch(() => {});
+}
+
+/** Rebuild the jobs map from disk on startup (last-wins; orphaned 'running' →
+ *  'error') via the pure reducer. */
+export async function loadJobs() {
+  const rows = await readJsonl<PersistedJob>(CTX.JOBS_PATH).catch(() => [] as PersistedJob[]);
+  for (const j of reduceJobs(rows)) jobs.set(j.id, { ...j, tail: j.tail ?? [] });
+}
+
+/** Keep the in-memory map bounded: evict the oldest finished jobs past MAX_JOBS. */
+function evictOldJobs() {
+  for (const id of jobsToEvict([...jobs.values()], CTX.MAX_JOBS)) jobs.delete(id);
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((res) => {
+    let data = '';
+    req.on('data', (c) => {
+      data += c;
+      if (data.length > CTX.MAX_BODY) req.destroy(); // cap
+    });
+    req.on('end', () => res(data));
+    req.on('error', () => res(data));
+  });
+}
+
+/** Spawn the child for a launched job and wire its output + lifecycle. */
+function startJobProcess(job: Job) {
+  // No shell — arg array. Child writes its own event log under <dir>/.probevane.
+  const child = spawn(CTX.BIN, [job.op, job.dir, ...job.flags], { stdio: ['ignore', 'pipe', 'pipe'] });
+  job.pid = child.pid;
+  job.proc = child;
+  const onOut = (buf: Buffer) =>
+    String(buf)
+      .split('\n')
+      .filter(Boolean)
+      .forEach((l) => {
+        job.tail.push(l);
+        if (job.tail.length > CTX.JOB_TAIL) job.tail.shift();
+      });
+  child.stdout.on('data', onOut);
+  child.stderr.on('data', onOut);
+  child.on('close', (code) => {
+    if (job.status !== 'cancelled') job.status = code === 0 ? 'done' : 'error';
+    job.exitCode = code ?? 1;
+    job.endedAt = new Date().toISOString();
+    job.proc = undefined;
+    void CTX.log('info', 'job_done', { id: job.id, op: job.op, status: job.status, exitCode: job.exitCode });
+    void persistJob(job);
+  });
+}
+
+export async function launch(req: IncomingMessage, res: ServerResponse) {
+  let body: unknown;
+  try {
+    body = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    return CTX.sendJson(res, 400, { error: 'invalid JSON body' });
+  }
+  const v = validateLaunch(body);
+  if (!v.ok) return CTX.sendJson(res, 400, { error: v.error });
+  const dir = resolve(v.plan.dir);
+  if (!(await stat(dir).then((s) => s.isDirectory()).catch(() => false)))
+    return CTX.sendJson(res, 400, { error: `dir not found: ${dir}` });
+
+  const id = randomUUID().slice(0, 8);
+  const job: Job = {
+    id,
+    op: v.plan.op,
+    dir,
+    flags: v.plan.flags,
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    tail: [],
+  };
+  jobs.set(id, job);
+  evictOldJobs();
+  startJobProcess(job);
+  await CTX.log('info', 'job_start', { id, op: job.op, dir, flags: job.flags });
+  await persistJob(job);
+  return CTX.sendJson(res, 200, { id, status: job.status });
+}
+
+/** Cancel a running job by killing its child process. */
+export function cancelJob(id: string, res: ServerResponse) {
+  const job = jobs.get(id);
+  if (!job) return CTX.sendJson(res, 404, { error: `no job ${id}` });
+  if (job.status !== 'running' || !job.proc) return CTX.sendJson(res, 409, { error: `job ${id} not running` });
+  job.status = 'cancelled';
+  job.proc.kill('SIGTERM');
+  void CTX.log('info', 'job_cancel', { id, op: job.op });
+  return CTX.sendJson(res, 200, { id, status: 'cancelled' });
+}
+
+export async function loadQueue() {
+  queue = reduceQueue(await readJsonl<QueueItem>(CTX.QUEUE_PATH).catch(() => []));
+}
+
+async function persistItem(item: QueueItem) {
+  const i = queue.findIndex((q) => q.id === item.id);
+  if (i >= 0) queue[i] = item;
+  else queue.push(item);
+  await appendJsonl(CTX.QUEUE_PATH, item).catch(() => {});
+}
+
+export async function enqueue(req: IncomingMessage, res: ServerResponse) {
+  let body: unknown;
+  try {
+    body = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    return CTX.sendJson(res, 400, { error: 'invalid JSON body' });
+  }
+  const v = validateLaunch(body);
+  if (!v.ok) return CTX.sendJson(res, 400, { error: v.error });
+  const item = itemFromPlan(v.plan);
+  await persistItem(item);
+  await CTX.log('info', 'enqueue', { id: item.id, op: item.op, dir: item.dir });
+  return CTX.sendJson(res, 200, { id: item.id, status: 'queued' });
+}
+
+/** Ship a dispatched item on accept (best-effort). */
+async function shipDispatched(item: QueueItem) {
+  if (!CTX.SHIP_ON) return;
+  const diary = await latestDiary(item.dir);
+  if (!diary) return;
+  const r = await shipRun(
+    item.dir,
+    diary,
+    { op: item.op, repo: item.dir },
+    (l) => void CTX.log('info', 'ship', { line: l }),
+  ).catch(() => null);
+  await CTX.log('info', 'queue_ship', { id: item.id, shipped: !!r?.shipped, pr: r?.prUrl });
+}
+
+/** Dispatch one queued item: spawn the op, mark it, ship on accept. */
+async function dispatch(item: QueueItem) {
+  await persistItem(mark(item, 'running'));
+  await CTX.log('info', 'queue_run', { id: item.id, op: item.op, dir: item.dir });
+  const code: number = await new Promise((res) => {
+    const child = spawn(CTX.BIN, [item.op, item.dir, ...item.flags], { stdio: ['ignore', 'ignore', 'ignore'] });
+    child.on('close', (c) => res(c ?? 1));
+    child.on('error', () => res(1));
+  });
+  const accepted = code === 0;
+  const ran = queue.find((q) => q.id === item.id)!; // has the bumped attempts
+  if (accepted) {
+    await persistItem(mark(ran, 'done', { exitCode: code, endedAt: new Date().toISOString() }));
+  } else if (ran.attempts < CTX.QUARANTINE) {
+    // Re-queue with exponential backoff (cross-run recovery).
+    const nextAt = Date.now() + backoffMs(ran.attempts);
+    await persistItem(mark(ran, 'queued', { exitCode: code, nextAt }));
+    await CTX.log('info', 'queue_retry', { id: item.id, attempts: ran.attempts, backoffMs: backoffMs(ran.attempts) });
+  } else {
+    // Quarantine: stop retrying a poisoned target.
+    await persistItem(mark(ran, 'error', { exitCode: code, endedAt: new Date().toISOString() }));
+    await CTX.log('error', 'queue_quarantine', { id: item.id, attempts: ran.attempts });
+  }
+  await CTX.log(accepted ? 'info' : 'error', 'queue_done', { id: item.id, exitCode: code });
+  if (accepted) await shipDispatched(ran);
+}
+
+/** Supervisor tick: pull the next ready item and run it (one at a time). */
+export async function supervise() {
+  if (!CTX.QUEUE_ON || supervising || paused) return;
+  // Global budget ceiling: over the cap → pause the line (keep serving).
+  if (CTX.BUDGET_CAP > 0) {
+    const { records } = await CTX.scanRuns();
+    if (overCap(records, CTX.BUDGET_CAP, CTX.BUDGET_WINDOW, Date.now())) {
+      paused = true;
+      await CTX.log('error', 'budget_halt', { capUsd: CTX.BUDGET_CAP, windowHrs: CTX.BUDGET_WINDOW });
+      return;
+    }
+  }
+  await loadQueue(); // pick up items enqueued externally (CLI / other writers)
+  const item = nextReady(queue, Date.now());
+  if (!item) return;
+  supervising = true;
+  try {
+    await dispatch(item);
+  } catch (e: any) {
+    await CTX.log('error', 'supervise_error', { error: String(e?.message ?? e) });
+  } finally {
+    supervising = false;
+  }
+}
+
+// SSE tail of a launched run's event log (<dir>/.probevane/events-*.jsonl).
+// SSE-tail every file in <dir>/.probevane matching `pattern`, rebroadcasting new
+// lines as they're appended. Shared by /stream (events-*) and
+// /transcript?follow=1 (transcript-<runId>).
+export async function streamFiles(
+  dir: string,
+  pattern: RegExp,
+  res: ServerResponse,
+  req: IncomingMessage,
+) {
+  res.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive',
+  });
+  res.write('retry: 1000\n\n');
+  const evDir = join(resolve(dir), '.probevane');
+  const offsets = new Map<string, number>();
+  let alive = true;
+  req.on('close', () => (alive = false));
+  while (alive) {
+    const files = (await readdir(evDir).catch(() => [])).filter((f) => pattern.test(f));
+    for (const f of files.sort()) {
+      const p = join(evDir, f);
+      const content = await readFile(p, 'utf8').catch(() => '');
+      const { lines, offset } = tailFrom(content, offsets.get(p) ?? 0);
+      offsets.set(p, offset);
+      for (const ln of lines) res.write(sseFrame(ln));
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+export async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
+  return streamFiles(dir, /^events-.*\.jsonl$/, res, req);
+}

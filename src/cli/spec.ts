@@ -1,16 +1,18 @@
 import { resolve, join, basename } from 'node:path';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { anthropicBrain } from '../brain/anthropic-sdk.js';
+import { brainFor } from '../brain/select.js';
 import { buildSpec } from '../spec/build.js';
+import { flag, dirArg } from './args.js';
 
-// probevane spec <dir> [--narrate] [--out <file>] [--wiki]
+// probevane spec <dir> [--narrate] [--model <id>] [--out <file>] [--wiki]
 //   Generate a project specification (module graph, responsibilities, API
-//   surface, coverage). --narrate adds an LLM one-liner per module.
+//   surface, coverage). --narrate adds an LLM one-liner per module (any brain via
+//   --model, e.g. openai:<model> / local:<model> / bridge; default Anthropic).
 //   --wiki publishes it to the probevane wiki as a "Projects" page.
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const narrate = args.includes('--narrate');
   const toWiki = args.includes('--wiki');
   const outFlag = flag(args, '--out');
@@ -19,7 +21,7 @@ async function main() {
   const md = await buildSpec({
     dir,
     adapter,
-    brain: narrate ? anthropicBrain() : undefined,
+    brain: narrate ? brainFor(flag(args, '--model')) : undefined,
     stamp: new Date().toISOString().slice(0, 10),
   });
 
@@ -32,11 +34,6 @@ async function main() {
   }
   await writeFile(out, md);
   console.log(`[probevane] wrote ${out} (${md.split('\n').length} lines${narrate ? ', narrated' : ''})`);
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {

@@ -1,14 +1,20 @@
 # dependencies
-node_modules/
+node_modules
 fixtures/**/node_modules/
 fixtures/**/package-lock.json
 
 # build / coverage / test artifacts
 dist/
-coverage/
+# stray in-place compiled JS (src/eval are .ts only — guards a mis-built tsc)
+src/**/*.js
+eval/**/*.js
+/coverage/
 fixtures/**/coverage/
 fixtures/**/test-fixtures/
 fixtures/**/src/mocks/
+# react-shop's mock-chained suite IS the fixture (eval input), not regenerable output
+!fixtures/react-shop/test-fixtures/
+!fixtures/react-shop/src/mocks/
 **/.probevane-vitest.json
 **/.probevane-pytest.xml
 **/.probevane-cover.out
@@ -25,3 +31,14 @@ SPEC.md
 .probevane-live/
 test-results/
 playwright-report/
+.screens/
+.playwright-mcp/
+.covtmp-*
+fixtures/**/.venv/
+fixtures/**/.probevane-jest.json
+fixtures/**/.coverage
+fixtures/**/coverage.json
+fixtures/**/.probevane-pytest.xml
+
+# generated test artifacts (probevane doctor)
+**/__pycache__/

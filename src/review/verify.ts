@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Brain } from '../brain/brain.js';
+import { extractJsonStrict } from '../util/json.js';
 import type { Finding } from './diff-review.js';
 
 // Gate issue-discovery: a finding is not acted on until VERIFIED. Two gates —
@@ -45,15 +46,9 @@ export async function verifyFindings(findings: Finding[], diff: string, brain: B
 
 export function parseVerdicts(text: string): Map<number, boolean> {
   const out = new Map<number, boolean>();
-  const s = text.indexOf('[');
-  const e = text.lastIndexOf(']');
-  if (s === -1 || e === -1) return out;
-  try {
-    for (const v of JSON.parse(text.slice(s, e + 1))) {
-      if (typeof v?.index === 'number') out.set(v.index, v.real === true);
-    }
-  } catch {
-    /* ignore */
+  const arr = extractJsonStrict(text, (x): x is any[] => Array.isArray(x));
+  for (const v of arr ?? []) {
+    if (typeof v?.index === 'number') out.set(v.index, v.real === true);
   }
   return out;
 }

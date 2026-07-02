@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { appendLog } from '../library/improvement-log.js';
 import { scoreFixture, judge, type Baseline } from '../../eval/scorer.js';
+import { flag } from './args.js';
 
 // probevane eval [--live] [--flake N]
 //
@@ -18,9 +19,111 @@ import { scoreFixture, judge, type Baseline } from '../../eval/scorer.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
 
+type Adapter = Awaited<ReturnType<typeof selectAdapterOrThrow>>;
+
 interface EvalCase {
   fixture: string;
   kind: 'unit' | 'e2e';
+}
+
+// Live mode: regenerate the fixture suite from zero before scoring. Returns
+// the run's cost/token footprint so the improvement-log can join quality × $.
+interface LiveStats { costUsd: number; tokensIn: number; tokensOut: number }
+async function liveGenerate(c: EvalCase, dir: string, adapter: Adapter, base: Baseline): Promise<LiveStats | null> {
+  const { anthropicBrain } = await import('../brain/anthropic-sdk.js');
+  const { generateTests } = await import('../loop/run-generation.js');
+  const brain = anthropicBrain();
+  console.log(`[eval] live generating ${c.fixture}.${c.kind}…`);
+  const outcome = await generateTests({
+    dir,
+    kind: c.kind,
+    adapter,
+    brain,
+    minTests: base.minTests,
+    minCoverage: base.minCoverage,
+    // Strict: CI enforces the correctness floor (mutation gate) + proactively
+    // steers the model to kill surviving mutants. Self-eval is where default-on
+    // bites — every fixture must prove its suite catches bugs, not just runs green.
+    mutation: true,
+    mutationTarget: true,
+    log: (l) => console.error(l),
+  }).catch((e) => {
+    console.error(`[eval] generation failed: ${e}`);
+    return null;
+  });
+  if (!outcome?.accepted) console.log(`[eval] ${c.fixture}.${c.kind}: generation did not accept`);
+  if (!outcome) return null;
+  const { costOf } = await import('../cost/pricing.js');
+  return {
+    costUsd: costOf(brain.model, { input: outcome.tokensIn, output: outcome.tokensOut, cacheRead: outcome.cacheRead }),
+    tokensIn: outcome.tokensIn,
+    tokensOut: outcome.tokensOut,
+  };
+}
+
+interface EvalOpts {
+  live: boolean;
+  flakeRuns: number;
+  stamp: string;
+  logPath: string;
+}
+
+// Live runs also grade correctness: does the fresh suite actually kill
+// mutants? Budget-capped, best-effort — a mutation failure never blocks eval.
+async function liveMutationScore(dir: string, adapter: Adapter): Promise<number | undefined> {
+  const { mutationScore } = await import('../loop/mutation.js');
+  return mutationScore(dir, adapter, 5, 3, { budgetMs: 60_000 })
+    .then((m) => (m.total > 0 ? Math.round((m.killed / m.total) * 100) / 100 : undefined))
+    .catch(() => undefined);
+}
+
+async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
+  const { live, flakeRuns, stamp, logPath } = opts;
+  const base = JSON.parse(
+    await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.kind}.json`), 'utf8'),
+  ) as Baseline;
+
+  let dir = join(ROOT, 'fixtures', c.fixture);
+  if (live) dir = await prepareLive(c, dir);
+
+  const adapter = await selectAdapterOrThrow(dir);
+  // Self-sufficient on a fresh host: bootstrap the fixture's toolchain
+  // (e.g. python .venv). Idempotent; a failure surfaces in the score anyway.
+  await adapter.install(dir).catch((e) => console.error(`[eval] install ${c.fixture}: ${e}`));
+  const stats = live ? await liveGenerate(c, dir, adapter, base) : null;
+
+  const score = await scoreFixture(dir, adapter, {
+    scope: c.kind,
+    flakeRuns,
+    oracleAssertions: base.oracleAssertions,
+  });
+  const verdict = judge(score, base);
+
+  const mutation = live ? await liveMutationScore(dir, adapter) : undefined;
+
+  await appendLog(logPath, {
+    timestamp: stamp,
+    target: c.fixture,
+    kind: c.kind,
+    pass: verdict.pass ? 1 : 0,
+    audit_score: score.auditScore,
+    tests: score.tests,
+    coverage: score.coverage,
+    flake: score.flake,
+    note: live ? 'live' : 'ci-baseline',
+    mutation,
+    cost_usd: stats ? Math.round(stats.costUsd * 1e4) / 1e4 : undefined,
+    tokens_in: stats?.tokensIn,
+    tokens_out: stats?.tokensOut,
+  });
+
+  const tag = verdict.pass ? 'PASS' : `FAIL (${verdict.reasons.join('; ')})`;
+  console.log(
+    `[eval] ${c.fixture}.${c.kind}: ${tag} — tests=${score.tests} cov=${score.coverage}% ` +
+      `audit=${score.auditScore}/5 flake=${score.flake} oracle=${score.oracleHit}/${score.oracleTotal}`,
+  );
+  if (live) await rm(dir, { recursive: true, force: true }).catch(() => {});
+  return verdict.pass;
 }
 
 async function main() {
@@ -39,60 +142,7 @@ async function main() {
 
   let pass = 0;
   for (const c of cases) {
-    const base = JSON.parse(
-      await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.kind}.json`), 'utf8'),
-    ) as Baseline;
-
-    let dir = join(ROOT, 'fixtures', c.fixture);
-    if (live) dir = await prepareLive(c, dir);
-
-    const adapter = await selectAdapterOrThrow(dir);
-
-    if (live) {
-      const { anthropicBrain } = await import('../brain/anthropic-sdk.js');
-      const { generateTests } = await import('../loop/run-generation.js');
-      console.log(`[eval] live generating ${c.fixture}.${c.kind}…`);
-      const outcome = await generateTests({
-        dir,
-        kind: c.kind,
-        adapter,
-        brain: anthropicBrain(),
-        minTests: base.minTests,
-        minCoverage: base.minCoverage,
-        log: (l) => console.error(l),
-      }).catch((e) => {
-        console.error(`[eval] generation failed: ${e}`);
-        return null;
-      });
-      if (!outcome?.accepted) console.log(`[eval] ${c.fixture}.${c.kind}: generation did not accept`);
-    }
-
-    const score = await scoreFixture(dir, adapter, {
-      scope: c.kind,
-      flakeRuns,
-      oracleAssertions: base.oracleAssertions,
-    });
-    const verdict = judge(score, base);
-    if (verdict.pass) pass++;
-
-    await appendLog(logPath, {
-      timestamp: stamp,
-      target: c.fixture,
-      kind: c.kind,
-      pass: verdict.pass ? 1 : 0,
-      audit_score: score.auditScore,
-      tests: score.tests,
-      coverage: score.coverage,
-      flake: score.flake,
-      note: live ? 'live' : 'ci-baseline',
-    });
-
-    const tag = verdict.pass ? 'PASS' : `FAIL (${verdict.reasons.join('; ')})`;
-    console.log(
-      `[eval] ${c.fixture}.${c.kind}: ${tag} — tests=${score.tests} cov=${score.coverage}% ` +
-        `audit=${score.auditScore}/5 flake=${score.flake} oracle=${score.oracleHit}/${score.oracleTotal}`,
-    );
-    if (live) await rm(dir, { recursive: true, force: true }).catch(() => {});
+    if (await runEvalCase(c, { live, flakeRuns, stamp, logPath })) pass++;
   }
 
   console.log(`[eval] ${pass}/${cases.length} cases passed (${live ? 'live' : 'ci-baseline'}) → ${logPath}`);
@@ -106,59 +156,122 @@ interface PathCase {
   mutate?: { file: string; from: string; to: string };
 }
 
-// probevane eval --paths [--live] [--record]
+// Setup: copy fixture (keep golden tests — they protect behavior), then for
+// repair break a test by mutating the source.
+async function setupPathCase(c: PathCase): Promise<string> {
+  const src = join(ROOT, 'fixtures', c.fixture);
+  const dir = join(ROOT, '.probevane-live', `${c.fixture}-${c.path}`);
+  await rm(dir, { recursive: true, force: true }).catch(() => {});
+  await cp(src, dir, {
+    recursive: true,
+    // .venv excluded: interpreter/shebang paths bake in the source dir — the
+    // adapter's install() bootstraps a fresh one in the copy instead.
+    filter: (p) => !p.includes('node_modules') && !p.includes('/coverage') && !p.includes('/.venv'),
+  });
+  await (await import('node:fs/promises'))
+    .symlink(join(src, 'node_modules'), join(dir, 'node_modules'))
+    .catch(() => {});
+  if (c.mutate) {
+    const { writeFile } = await import('node:fs/promises');
+    const f = join(dir, c.mutate.file);
+    const txt = await readFile(f, 'utf8');
+    await writeFile(f, txt.replace(c.mutate.from, c.mutate.to));
+  }
+  return dir;
+}
+
+interface PathOpts {
+  live: boolean;
+  record: boolean;
+  model: string;
+  stamp: string;
+  logPath: string;
+}
+
+// Record to a sidecar; the committed cassette is only replaced when the run
+// ACCEPTS — a failed recording must not clobber a working cassette.
+async function startRecording(cassette: string): Promise<string> {
+  const rec = `${cassette}.rec`;
+  await rm(rec, { force: true }).catch(() => {});
+  process.env.PROBEVANE_RECORD = rec;
+  return rec;
+}
+
+async function finishRecording(rec: string, cassette: string, accepted: boolean, label: string): Promise<void> {
+  delete process.env.PROBEVANE_RECORD;
+  if (accepted) {
+    await (await import('node:fs/promises')).rename(rec, cassette);
+  } else {
+    await rm(rec, { force: true }).catch(() => {});
+    console.error(`[eval] ${label}: recording did not accept — kept the old cassette`);
+  }
+}
+
+async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
+  const { live, record, stamp, logPath } = opts;
+  const base = JSON.parse(
+    await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.path}.json`), 'utf8'),
+  ) as Baseline;
+  const cassette = join(ROOT, 'eval', 'cassettes', `${c.fixture}.${c.path}.jsonl`);
+  const dir = await setupPathCase(c);
+
+  const adapter = await selectAdapterOrThrow(dir);
+  await adapter.install(dir).catch((e) => console.error(`[eval] install ${c.fixture}: ${e}`));
+  const model = live ? opts.model : `replay:${cassette}`;
+  const rec = record ? await startRecording(cassette) : '';
+  const { runPath } = await import('../loop/run-path.js');
+  console.log(`[eval] ${live ? (record ? 'recording' : 'live') : 'replay'} ${c.fixture}.${c.path}…`);
+  const outcome = await runPath({
+    dir,
+    adapter,
+    profileName: c.path,
+    task: c.task,
+    model,
+    budget: 16000,
+    log: (l) => console.error(l),
+  }).catch((e) => {
+    console.error(`[eval] ${c.path} failed: ${e}`);
+    return null;
+  });
+  delete process.env.PROBEVANE_RECORD;
+  if (record) await finishRecording(rec, cassette, !!outcome?.accepted, `${c.fixture}.${c.path}`);
+
+  const score = await scoreFixture(dir, adapter, {
+    scope: 'unit',
+    flakeRuns: 1,
+    oracleAssertions: base.oracleAssertions,
+  });
+  const verdict = judge(score, base);
+  const ok = !!outcome?.accepted && verdict.pass;
+  await appendLog(logPath, {
+    timestamp: stamp, target: c.fixture, kind: c.path, pass: ok ? 1 : 0,
+    audit_score: score.auditScore, tests: score.tests, coverage: score.coverage,
+    flake: score.flake, note: live ? (record ? 'path-record' : 'path-live') : 'path-replay',
+    tokens_in: outcome?.tokensIn, tokens_out: outcome?.tokensOut,
+  });
+  console.log(`[eval] ${c.fixture}.${c.path}: ${ok ? 'PASS' : `FAIL (${outcome?.accepted ? verdict.reasons.join('; ') : 'did not accept'})`} — tests=${score.tests} green=${score.green} audit=${score.auditScore}/5`);
+  await rm(dir, { recursive: true, force: true }).catch(() => {});
+  return ok;
+}
+
+// probevane eval --paths [--live] [--record] [--model <m>]
 //   Regression-test the refactor/feature/repair PATHS. --live runs the real
-//   loop (needs a key); --record also saves a cassette to eval/cassettes/. With
+//   loop (needs a key, or --model bridge for $0); --record also saves a
+//   cassette to eval/cassettes/ (only replaced when the run accepts). With
 //   neither, each case REPLAYS its cassette → deterministic + credit-free (CI).
 async function runPathCases(args: string[]) {
   const live = args.includes('--live');
   const record = args.includes('--record');
+  const model = flag(args, '--model') ?? 'haiku';
   process.env.PROBEVANE_DETERMINISTIC = '1'; // stable prompts → reproducible cassettes (record + replay)
   const stamp = new Date().toISOString();
   const logPath = join(ROOT, 'eval', 'improvement-log.csv');
   const cases: PathCase[] = (await readFile(join(ROOT, 'eval', 'path-cases.jsonl'), 'utf8'))
     .trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
-  const { runPath } = await import('../loop/run-path.js');
-  const { writeFile } = await import('node:fs/promises');
 
   let pass = 0;
   for (const c of cases) {
-    const base = JSON.parse(await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.path}.json`), 'utf8')) as Baseline;
-    const cassette = join(ROOT, 'eval', 'cassettes', `${c.fixture}.${c.path}.jsonl`);
-
-    // Setup: copy fixture (keep golden tests — they protect behavior), then for
-    // repair break a test by mutating the source.
-    const src = join(ROOT, 'fixtures', c.fixture);
-    const dir = join(ROOT, '.probevane-live', `${c.fixture}-${c.path}`);
-    await rm(dir, { recursive: true, force: true }).catch(() => {});
-    await cp(src, dir, { recursive: true, filter: (p) => !p.includes('node_modules') && !p.includes('/coverage') });
-    await (await import('node:fs/promises')).symlink(join(src, 'node_modules'), join(dir, 'node_modules')).catch(() => {});
-    if (c.mutate) {
-      const f = join(dir, c.mutate.file);
-      const txt = await readFile(f, 'utf8');
-      await writeFile(f, txt.replace(c.mutate.from, c.mutate.to));
-    }
-
-    const adapter = await selectAdapterOrThrow(dir);
-    const model = live ? 'haiku' : `replay:${cassette}`;
-    if (record) {
-      await rm(cassette, { recursive: true, force: true }).catch(() => {});
-      process.env.PROBEVANE_RECORD = cassette;
-    }
-    console.log(`[eval] ${live ? (record ? 'recording' : 'live') : 'replay'} ${c.fixture}.${c.path}…`);
-    const outcome = await runPath({ dir, adapter, profileName: c.path, task: c.task, model, budget: 16000, log: (l) => console.error(l) }).catch((e) => {
-      console.error(`[eval] ${c.path} failed: ${e}`);
-      return null;
-    });
-    delete process.env.PROBEVANE_RECORD;
-
-    const score = await scoreFixture(dir, adapter, { scope: 'unit', flakeRuns: 1, oracleAssertions: base.oracleAssertions });
-    const verdict = judge(score, base);
-    const ok = !!outcome?.accepted && verdict.pass;
-    if (ok) pass++;
-    await appendLog(logPath, { timestamp: stamp, target: c.fixture, kind: c.path, pass: ok ? 1 : 0, audit_score: score.auditScore, tests: score.tests, coverage: score.coverage, flake: score.flake, note: live ? (record ? 'path-record' : 'path-live') : 'path-replay' });
-    console.log(`[eval] ${c.fixture}.${c.path}: ${ok ? 'PASS' : `FAIL (${outcome?.accepted ? verdict.reasons.join('; ') : 'did not accept'})`} — tests=${score.tests} green=${score.green} audit=${score.auditScore}/5`);
-    await rm(dir, { recursive: true, force: true }).catch(() => {});
+    if (await runOnePathCase(c, { live, record, model, stamp, logPath })) pass++;
   }
   console.log(`[eval] paths: ${pass}/${cases.length} passed (${live ? 'live' : 'replay'})`);
   if (pass < cases.length) process.exit(1);
@@ -176,11 +289,6 @@ async function prepareLive(c: EvalCase, src: string): Promise<string> {
   const adapter = await selectAdapterOrThrow(dst);
   for (const spec of await adapter.specFiles(dst)) await rm(join(dst, spec)).catch(() => {});
   return dst;
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {

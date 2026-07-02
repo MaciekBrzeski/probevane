@@ -1,0 +1,1180 @@
+{
+  "profiles": {
+    "write_tests": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "subroutine": "preamble",
+        "summary": "Seeds the prompt with project context.",
+        "detail": "Before the run it appends ground-truth context — learned few-shot exemplars from the cross-project library and target-specific patterns — so the model writes to the real API instead of guessing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Keeps edits inside the source tree.",
+        "detail": "A per-turn guard that vetoes any write outside project source (node_modules, build output, lockfiles, tooling). Prevents a stuck model from \"fixing\" its toolchain — e.g. overwriting node_modules/.bin/tsc.",
+        "rule": "SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Forces a plan before any edit.",
+        "detail": "Blocks write_file/edit_file until the model has called the plan tool exactly once, naming targets, behaviors, and concrete assertions. Stops the model from coding before it has read and thought.",
+        "rule": "PLANNING DISCIPLINE: You MUST call the `plan` tool exactly once before any write_file or edit_file. The plan must name the target(s), the behaviors to cover, and the concrete assertions each test will make. Writing a test file before planning is blocked.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "no_regression",
+        "hooks": [
+          "prepare",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Protects the existing test suite.",
+        "detail": "Forbids modifying or deleting any pre-existing test file; only new test files may be added. Guarantees the run cannot \"pass\" by quietly weakening the contract that already protects the code.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typecheck clean + new tests green.",
+        "detail": "On a stop attempt, runs the scoped tests and a typecheck. Blocks finishing unless the change adds no new type errors and the new tests run green (not all-skipped) — reporting the first failure to fix.",
+        "rule": "FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix the FIRST reported failure (shown under \"FIX THIS FIRST\"), re-run, then the next — one at a time. Do not rewrite the whole file each turn.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: test-quality rules.",
+        "detail": "Static-audits the written specs for anti-patterns — assertion-free / render-only tests, .only, waitForTimeout, unasserted API mutations — and blocks until they are clean, so green tests are also meaningful.",
+        "rule": "QUALITY RULES (enforced by an audit gate): every test must make real assertions (no assertion-free or render-only tests); no .only; no waitForTimeout; API mutations in e2e must assert a status. If the audit gate reports a violation, fix it before finishing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: no real network/clock/random.",
+        "detail": "Scans the specs this run wrote and rejects any that hit a live URL or use Date.now()/Math.random() unmocked — tests must route through mocks and control time/seed, so they are deterministic and not flaky.",
+        "rule": "HERMETIC: tests must not hit a real network or real clock/random. Route all network through the provided mocks (MSW handlers / vi.mock / page.route), and control time/random with fake timers or seeds. A test that calls fetch/axios directly or uses Date.now()/Math.random() unmocked is rejected.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "acceptance_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: enough tests / coverage.",
+        "detail": "The run is not done until the acceptance bar is met — a minimum number of passing tests (and optionally coverage and shell checks). Stops the loop from accepting a token-effort result.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "flake_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: new specs are stable.",
+        "detail": "Opt-in. Runs the new specs several times and rejects nondeterminism (a spec that passes then fails), allowing only a configured tolerance — catches order- or timing-dependent flake before it lands.",
+        "rule": "DETERMINISM: the new tests must pass identically every run. No uncontrolled time/random/order; await async work; the flake gate runs them several times and rejects non-determinism.",
+        "requiredBy": "flake",
+        "e2eOnly": false
+      },
+      {
+        "name": "assertion_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: assertion-quality floor.",
+        "detail": "Opt-in. Scores the assertion strength of the new tests and feeds a floor back into the loop, pushing the model past shallow truthiness checks toward concrete value assertions.",
+        "rule": "ASSERTION QUALITY (enforced, min 80/100): assert concrete VALUES — avoid toBeDefined/toBeTruthy, snapshot-only tests, bare not.toThrow(), and tautologies (expect(1).toBe(1)). Pin real expected output.",
+        "requiredBy": "assertion",
+        "e2eOnly": false
+      },
+      {
+        "name": "mutation_gate",
+        "hooks": [
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: tests catch real mutations.",
+        "detail": "Opt-in (slow). Mutates the source and checks the new tests fail on the mutants — proves the suite actually detects regressions instead of just executing code for coverage.",
+        "requiredBy": "mutation",
+        "e2eOnly": false
+      },
+      {
+        "name": "a11y_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: accessibility assertions.",
+        "detail": "Opt-in. Requires component/e2e specs to assert accessibility (roles, labels, or an axe check) so generated UI tests cover a11y rather than only happy-path rendering.",
+        "rule": "ACCESSIBILITY: any test that renders a component must assert accessibility — either `expect(await axe(container)).toHaveNoViolations()` (jest-axe) or query by role/label (getByRole / getByLabelText). A component test with no a11y assertion is rejected.",
+        "requiredBy": "a11y",
+        "e2eOnly": false
+      },
+      {
+        "name": "visual_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: e2e visual checkpoint.",
+        "detail": "Opt-in, e2e only. Requires e2e specs to capture a screenshot checkpoint, adding a visual-regression anchor to the generated end-to-end coverage.",
+        "rule": "VISUAL REGRESSION: each e2e spec MUST capture a visual checkpoint — `import { checkpoint } from './checkpoint'` then `await checkpoint(page, '<state-name>')` at each key UI state (mask dynamic regions). A spec with no screenshot assertion is rejected.",
+        "requiredBy": "visual",
+        "e2eOnly": true
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: edited source must not regress.",
+        "detail": "Opt-in. Runs a source-quality analysis on the files the model edited and blocks if quality regresses (e.g. oversized files/functions), keeping the change clean, not just green.",
+        "rule": "CODE QUALITY (enforced by a quality gate on the source you edit): keep files under 300 lines and functions under 50 lines / complexity 12 / nesting 4. Do not let an edited file regress past its starting quality; extract helpers instead of growing one file.",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Records a run summary on stop.",
+        "detail": "A harvest rune (no rule injected): on termination it writes a short diary entry of what the run did and how it ended, feeding the cross-session history.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Captures gotchas for next time.",
+        "detail": "A harvest rune: on stop it extracts caveats hit during the run (gate blocks, dead ends) into the learning library so future runs are pre-warned.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Saves an accepted run as a training trace.",
+        "detail": "A harvest rune, opt-in via PROBEVANE_TRACES=1: on an accepted run it records the task + accepted spec as a distillation trace for later local-model fine-tuning.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Promotes good specs to the library.",
+        "detail": "A harvest rune: on acceptance it promotes the strongest new specs into the cross-project learning library so they can seed future generations as few-shot exemplars.",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "feature": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "subroutine": "preamble",
+        "summary": "Seeds the prompt with project context.",
+        "detail": "Before the run it appends ground-truth context — learned few-shot exemplars from the cross-project library and target-specific patterns — so the model writes to the real API instead of guessing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Keeps edits inside the source tree.",
+        "detail": "A per-turn guard that vetoes any write outside project source (node_modules, build output, lockfiles, tooling). Prevents a stuck model from \"fixing\" its toolchain — e.g. overwriting node_modules/.bin/tsc.",
+        "rule": "SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "red_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall",
+          "afterToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "TDD: a failing test must come first.",
+        "detail": "For the feature path. Vetoes editing any source file until a NEW test exists and FAILS against the current code, then requires the implementation to make it pass without weakening the test — real red→green.",
+        "rule": "TDD (red-first): FIRST write a new test that specifies the feature and FAILS against the current code — you may not edit any source file until a new test is failing. Then implement the feature in source until that test passes. Do not weaken the test to make it pass.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Forces a plan before any edit.",
+        "detail": "Blocks write_file/edit_file until the model has called the plan tool exactly once, naming targets, behaviors, and concrete assertions. Stops the model from coding before it has read and thought.",
+        "rule": "PLANNING DISCIPLINE: You MUST call the `plan` tool exactly once before any write_file or edit_file. The plan must name the target(s), the behaviors to cover, and the concrete assertions each test will make. Writing a test file before planning is blocked.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "no_regression",
+        "hooks": [
+          "prepare",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Protects the existing test suite.",
+        "detail": "Forbids modifying or deleting any pre-existing test file; only new test files may be added. Guarantees the run cannot \"pass\" by quietly weakening the contract that already protects the code.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typecheck clean + new tests green.",
+        "detail": "On a stop attempt, runs the scoped tests and a typecheck. Blocks finishing unless the change adds no new type errors and the new tests run green (not all-skipped) — reporting the first failure to fix.",
+        "rule": "FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix the FIRST reported failure (shown under \"FIX THIS FIRST\"), re-run, then the next — one at a time. Do not rewrite the whole file each turn.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: test-quality rules.",
+        "detail": "Static-audits the written specs for anti-patterns — assertion-free / render-only tests, .only, waitForTimeout, unasserted API mutations — and blocks until they are clean, so green tests are also meaningful.",
+        "rule": "QUALITY RULES (enforced by an audit gate): every test must make real assertions (no assertion-free or render-only tests); no .only; no waitForTimeout; API mutations in e2e must assert a status. If the audit gate reports a violation, fix it before finishing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: no real network/clock/random.",
+        "detail": "Scans the specs this run wrote and rejects any that hit a live URL or use Date.now()/Math.random() unmocked — tests must route through mocks and control time/seed, so they are deterministic and not flaky.",
+        "rule": "HERMETIC: tests must not hit a real network or real clock/random. Route all network through the provided mocks (MSW handlers / vi.mock / page.route), and control time/random with fake timers or seeds. A test that calls fetch/axios directly or uses Date.now()/Math.random() unmocked is rejected.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "acceptance_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: enough tests / coverage.",
+        "detail": "The run is not done until the acceptance bar is met — a minimum number of passing tests (and optionally coverage and shell checks). Stops the loop from accepting a token-effort result.",
+        "rule": "ACCEPTANCE: the run is not done until there are at least 1 passing tests.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: edited source must not regress.",
+        "detail": "Opt-in. Runs a source-quality analysis on the files the model edited and blocks if quality regresses (e.g. oversized files/functions), keeping the change clean, not just green.",
+        "rule": "CODE QUALITY (enforced by a quality gate on the source you edit): keep files under 300 lines and functions under 50 lines / complexity 12 / nesting 4. Do not let an edited file regress past its starting quality; extract helpers instead of growing one file.",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: micro-frontend standards.",
+        "detail": "Opt-in. Enforces Module Federation conventions on a micro-frontend project; a no-op off-federation, so it is safe to leave enabled.",
+        "rule": "MICRO-FRONTEND STANDARDS (Module Federation, enforced by a gate): no deep imports past a remote's exposed API; framework deps shared as singletons; host remote-mounts wrapped in Suspense + an error boundary; exposed modules typed (.ts/.tsx). Don't regress these in the files you edit.",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Records a run summary on stop.",
+        "detail": "A harvest rune (no rule injected): on termination it writes a short diary entry of what the run did and how it ended, feeding the cross-session history.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Captures gotchas for next time.",
+        "detail": "A harvest rune: on stop it extracts caveats hit during the run (gate blocks, dead ends) into the learning library so future runs are pre-warned.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Saves an accepted run as a training trace.",
+        "detail": "A harvest rune, opt-in via PROBEVANE_TRACES=1: on an accepted run it records the task + accepted spec as a distillation trace for later local-model fine-tuning.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Promotes good specs to the library.",
+        "detail": "A harvest rune: on acceptance it promotes the strongest new specs into the cross-project learning library so they can seed future generations as few-shot exemplars.",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "refactor": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "subroutine": "preamble",
+        "summary": "Seeds the prompt with project context.",
+        "detail": "Before the run it appends ground-truth context — learned few-shot exemplars from the cross-project library and target-specific patterns — so the model writes to the real API instead of guessing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Keeps edits inside the source tree.",
+        "detail": "A per-turn guard that vetoes any write outside project source (node_modules, build output, lockfiles, tooling). Prevents a stuck model from \"fixing\" its toolchain — e.g. overwriting node_modules/.bin/tsc.",
+        "rule": "SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Forces a plan before any edit.",
+        "detail": "Blocks write_file/edit_file until the model has called the plan tool exactly once, naming targets, behaviors, and concrete assertions. Stops the model from coding before it has read and thought.",
+        "rule": "PLANNING DISCIPLINE: You MUST call the `plan` tool exactly once before any write_file or edit_file. The plan must name the target(s), the behaviors to cover, and the concrete assertions each test will make. Writing a test file before planning is blocked.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "behavior_lock",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "beforeToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "subroutine": "safety-net",
+        "summary": "Characterization lock: tests are the contract.",
+        "detail": "For refactor/migrate/document. Snapshots the green suite and blocks test edits so only source changes — the unchanged tests then prove behavior was preserved across the change.",
+        "rule": "REFACTOR RULES: change the SOURCE only — do not edit, add, or delete any test file (the tests are the behavior contract). Every test that passes now must still pass when you finish, and you must actually change the source. If a test goes red, your refactor changed behavior — fix the source, not the test.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: edited source must not regress.",
+        "detail": "Opt-in. Runs a source-quality analysis on the files the model edited and blocks if quality regresses (e.g. oversized files/functions), keeping the change clean, not just green.",
+        "rule": "CODE QUALITY (enforced by a quality gate on the source you edit): keep files under 300 lines and functions under 50 lines / complexity 12 / nesting 4. Do not let an edited file regress past its starting quality; extract helpers instead of growing one file.",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: micro-frontend standards.",
+        "detail": "Opt-in. Enforces Module Federation conventions on a micro-frontend project; a no-op off-federation, so it is safe to leave enabled.",
+        "rule": "MICRO-FRONTEND STANDARDS (Module Federation, enforced by a gate): no deep imports past a remote's exposed API; framework deps shared as singletons; host remote-mounts wrapped in Suspense + an error boundary; exposed modules typed (.ts/.tsx). Don't regress these in the files you edit.",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Records a run summary on stop.",
+        "detail": "A harvest rune (no rule injected): on termination it writes a short diary entry of what the run did and how it ended, feeding the cross-session history.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Captures gotchas for next time.",
+        "detail": "A harvest rune: on stop it extracts caveats hit during the run (gate blocks, dead ends) into the learning library so future runs are pre-warned.",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "repair": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "subroutine": "preamble",
+        "summary": "Seeds the prompt with project context.",
+        "detail": "Before the run it appends ground-truth context — learned few-shot exemplars from the cross-project library and target-specific patterns — so the model writes to the real API instead of guessing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Keeps edits inside the source tree.",
+        "detail": "A per-turn guard that vetoes any write outside project source (node_modules, build output, lockfiles, tooling). Prevents a stuck model from \"fixing\" its toolchain — e.g. overwriting node_modules/.bin/tsc.",
+        "rule": "SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Forces a plan before any edit.",
+        "detail": "Blocks write_file/edit_file until the model has called the plan tool exactly once, naming targets, behaviors, and concrete assertions. Stops the model from coding before it has read and thought.",
+        "rule": "PLANNING DISCIPLINE: You MUST call the `plan` tool exactly once before any write_file or edit_file. The plan must name the target(s), the behaviors to cover, and the concrete assertions each test will make. Writing a test file before planning is blocked.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typecheck clean + new tests green.",
+        "detail": "On a stop attempt, runs the scoped tests and a typecheck. Blocks finishing unless the change adds no new type errors and the new tests run green (not all-skipped) — reporting the first failure to fix.",
+        "rule": "FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix the FIRST reported failure (shown under \"FIX THIS FIRST\"), re-run, then the next — one at a time. Do not rewrite the whole file each turn.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: test-quality rules.",
+        "detail": "Static-audits the written specs for anti-patterns — assertion-free / render-only tests, .only, waitForTimeout, unasserted API mutations — and blocks until they are clean, so green tests are also meaningful.",
+        "rule": "QUALITY RULES (enforced by an audit gate): every test must make real assertions (no assertion-free or render-only tests); no .only; no waitForTimeout; API mutations in e2e must assert a status. If the audit gate reports a violation, fix it before finishing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: no real network/clock/random.",
+        "detail": "Scans the specs this run wrote and rejects any that hit a live URL or use Date.now()/Math.random() unmocked — tests must route through mocks and control time/seed, so they are deterministic and not flaky.",
+        "rule": "HERMETIC: tests must not hit a real network or real clock/random. Route all network through the provided mocks (MSW handlers / vi.mock / page.route), and control time/random with fake timers or seeds. A test that calls fetch/axios directly or uses Date.now()/Math.random() unmocked is rejected.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: edited source must not regress.",
+        "detail": "Opt-in. Runs a source-quality analysis on the files the model edited and blocks if quality regresses (e.g. oversized files/functions), keeping the change clean, not just green.",
+        "rule": "CODE QUALITY (enforced by a quality gate on the source you edit): keep files under 300 lines and functions under 50 lines / complexity 12 / nesting 4. Do not let an edited file regress past its starting quality; extract helpers instead of growing one file.",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: micro-frontend standards.",
+        "detail": "Opt-in. Enforces Module Federation conventions on a micro-frontend project; a no-op off-federation, so it is safe to leave enabled.",
+        "rule": "MICRO-FRONTEND STANDARDS (Module Federation, enforced by a gate): no deep imports past a remote's exposed API; framework deps shared as singletons; host remote-mounts wrapped in Suspense + an error boundary; exposed modules typed (.ts/.tsx). Don't regress these in the files you edit.",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Records a run summary on stop.",
+        "detail": "A harvest rune (no rule injected): on termination it writes a short diary entry of what the run did and how it ended, feeding the cross-session history.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Captures gotchas for next time.",
+        "detail": "A harvest rune: on stop it extracts caveats hit during the run (gate blocks, dead ends) into the learning library so future runs are pre-warned.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Saves an accepted run as a training trace.",
+        "detail": "A harvest rune, opt-in via PROBEVANE_TRACES=1: on an accepted run it records the task + accepted spec as a distillation trace for later local-model fine-tuning.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Promotes good specs to the library.",
+        "detail": "A harvest rune: on acceptance it promotes the strongest new specs into the cross-project learning library so they can seed future generations as few-shot exemplars.",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "fix": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "subroutine": "preamble",
+        "summary": "Seeds the prompt with project context.",
+        "detail": "Before the run it appends ground-truth context — learned few-shot exemplars from the cross-project library and target-specific patterns — so the model writes to the real API instead of guessing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Keeps edits inside the source tree.",
+        "detail": "A per-turn guard that vetoes any write outside project source (node_modules, build output, lockfiles, tooling). Prevents a stuck model from \"fixing\" its toolchain — e.g. overwriting node_modules/.bin/tsc.",
+        "rule": "SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Forces a plan before any edit.",
+        "detail": "Blocks write_file/edit_file until the model has called the plan tool exactly once, naming targets, behaviors, and concrete assertions. Stops the model from coding before it has read and thought.",
+        "rule": "PLANNING DISCIPLINE: You MUST call the `plan` tool exactly once before any write_file or edit_file. The plan must name the target(s), the behaviors to cover, and the concrete assertions each test will make. Writing a test file before planning is blocked.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "validation_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typecheck clean + new tests green.",
+        "detail": "On a stop attempt, runs the scoped tests and a typecheck. Blocks finishing unless the change adds no new type errors and the new tests run green (not all-skipped) — reporting the first failure to fix.",
+        "rule": "FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix the FIRST reported failure (shown under \"FIX THIS FIRST\"), re-run, then the next — one at a time. Do not rewrite the whole file each turn.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "audit_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: test-quality rules.",
+        "detail": "Static-audits the written specs for anti-patterns — assertion-free / render-only tests, .only, waitForTimeout, unasserted API mutations — and blocks until they are clean, so green tests are also meaningful.",
+        "rule": "QUALITY RULES (enforced by an audit gate): every test must make real assertions (no assertion-free or render-only tests); no .only; no waitForTimeout; API mutations in e2e must assert a status. If the audit gate reports a violation, fix it before finishing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "hermetic_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: no real network/clock/random.",
+        "detail": "Scans the specs this run wrote and rejects any that hit a live URL or use Date.now()/Math.random() unmocked — tests must route through mocks and control time/seed, so they are deterministic and not flaky.",
+        "rule": "HERMETIC: tests must not hit a real network or real clock/random. Route all network through the provided mocks (MSW handlers / vi.mock / page.route), and control time/random with fake timers or seeds. A test that calls fetch/axios directly or uses Date.now()/Math.random() unmocked is rejected.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: edited source must not regress.",
+        "detail": "Opt-in. Runs a source-quality analysis on the files the model edited and blocks if quality regresses (e.g. oversized files/functions), keeping the change clean, not just green.",
+        "rule": "CODE QUALITY (enforced by a quality gate on the source you edit): keep files under 300 lines and functions under 50 lines / complexity 12 / nesting 4. Do not let an edited file regress past its starting quality; extract helpers instead of growing one file.",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: micro-frontend standards.",
+        "detail": "Opt-in. Enforces Module Federation conventions on a micro-frontend project; a no-op off-federation, so it is safe to leave enabled.",
+        "rule": "MICRO-FRONTEND STANDARDS (Module Federation, enforced by a gate): no deep imports past a remote's exposed API; framework deps shared as singletons; host remote-mounts wrapped in Suspense + an error boundary; exposed modules typed (.ts/.tsx). Don't regress these in the files you edit.",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Records a run summary on stop.",
+        "detail": "A harvest rune (no rule injected): on termination it writes a short diary entry of what the run did and how it ended, feeding the cross-session history.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Captures gotchas for next time.",
+        "detail": "A harvest rune: on stop it extracts caveats hit during the run (gate blocks, dead ends) into the learning library so future runs are pre-warned.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "distill_trace",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Saves an accepted run as a training trace.",
+        "detail": "A harvest rune, opt-in via PROBEVANE_TRACES=1: on an accepted run it records the task + accepted spec as a distillation trace for later local-model fine-tuning.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "library_promote",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Promotes good specs to the library.",
+        "detail": "A harvest rune: on acceptance it promotes the strongest new specs into the cross-project learning library so they can seed future generations as few-shot exemplars.",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "migrate": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "subroutine": "preamble",
+        "summary": "Seeds the prompt with project context.",
+        "detail": "Before the run it appends ground-truth context — learned few-shot exemplars from the cross-project library and target-specific patterns — so the model writes to the real API instead of guessing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Keeps edits inside the source tree.",
+        "detail": "A per-turn guard that vetoes any write outside project source (node_modules, build output, lockfiles, tooling). Prevents a stuck model from \"fixing\" its toolchain — e.g. overwriting node_modules/.bin/tsc.",
+        "rule": "SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Forces a plan before any edit.",
+        "detail": "Blocks write_file/edit_file until the model has called the plan tool exactly once, naming targets, behaviors, and concrete assertions. Stops the model from coding before it has read and thought.",
+        "rule": "PLANNING DISCIPLINE: You MUST call the `plan` tool exactly once before any write_file or edit_file. The plan must name the target(s), the behaviors to cover, and the concrete assertions each test will make. Writing a test file before planning is blocked.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "behavior_lock",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "beforeToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "subroutine": "safety-net",
+        "summary": "Characterization lock: tests are the contract.",
+        "detail": "For refactor/migrate/document. Snapshots the green suite and blocks test edits so only source changes — the unchanged tests then prove behavior was preserved across the change.",
+        "rule": "REFACTOR RULES: change the SOURCE only — do not edit, add, or delete any test file (the tests are the behavior contract). Every test that passes now must still pass when you finish, and you must actually change the source. If a test goes red, your refactor changed behavior — fix the source, not the test.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "quality_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: edited source must not regress.",
+        "detail": "Opt-in. Runs a source-quality analysis on the files the model edited and blocks if quality regresses (e.g. oversized files/functions), keeping the change clean, not just green.",
+        "rule": "CODE QUALITY (enforced by a quality gate on the source you edit): keep files under 300 lines and functions under 50 lines / complexity 12 / nesting 4. Do not let an edited file regress past its starting quality; extract helpers instead of growing one file.",
+        "requiredBy": "quality",
+        "e2eOnly": false
+      },
+      {
+        "name": "mfe_gate",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "opt-in",
+        "summary": "Finish gate: micro-frontend standards.",
+        "detail": "Opt-in. Enforces Module Federation conventions on a micro-frontend project; a no-op off-federation, so it is safe to leave enabled.",
+        "rule": "MICRO-FRONTEND STANDARDS (Module Federation, enforced by a gate): no deep imports past a remote's exposed API; framework deps shared as singletons; host remote-mounts wrapped in Suspense + an error boundary; exposed modules typed (.ts/.tsx). Don't regress these in the files you edit.",
+        "requiredBy": "mfe",
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Records a run summary on stop.",
+        "detail": "A harvest rune (no rule injected): on termination it writes a short diary entry of what the run did and how it ended, feeding the cross-session history.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Captures gotchas for next time.",
+        "detail": "A harvest rune: on stop it extracts caveats hit during the run (gate blocks, dead ends) into the learning library so future runs are pre-warned.",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "document": [
+      {
+        "name": "context_inject",
+        "hooks": [
+          "prepare"
+        ],
+        "phase": "context",
+        "subroutine": "preamble",
+        "summary": "Seeds the prompt with project context.",
+        "detail": "Before the run it appends ground-truth context — learned few-shot exemplars from the cross-project library and target-specific patterns — so the model writes to the real API instead of guessing.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "path_guard",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Keeps edits inside the source tree.",
+        "detail": "A per-turn guard that vetoes any write outside project source (node_modules, build output, lockfiles, tooling). Prevents a stuck model from \"fixing\" its toolchain — e.g. overwriting node_modules/.bin/tsc.",
+        "rule": "SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "plan_first",
+        "hooks": [
+          "systemPromptAddition",
+          "beforeToolCall"
+        ],
+        "phase": "guard",
+        "subroutine": "preamble",
+        "summary": "Forces a plan before any edit.",
+        "detail": "Blocks write_file/edit_file until the model has called the plan tool exactly once, naming targets, behaviors, and concrete assertions. Stops the model from coding before it has read and thought.",
+        "rule": "PLANNING DISCIPLINE: You MUST call the `plan` tool exactly once before any write_file or edit_file. The plan must name the target(s), the behaviors to cover, and the concrete assertions each test will make. Writing a test file before planning is blocked.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "behavior_lock",
+        "hooks": [
+          "systemPromptAddition",
+          "prepare",
+          "beforeToolCall",
+          "shouldStop"
+        ],
+        "phase": "guard",
+        "subroutine": "safety-net",
+        "summary": "Characterization lock: tests are the contract.",
+        "detail": "For refactor/migrate/document. Snapshots the green suite and blocks test edits so only source changes — the unchanged tests then prove behavior was preserved across the change.",
+        "rule": "REFACTOR RULES: change the SOURCE only — do not edit, add, or delete any test file (the tests are the behavior contract). Every test that passes now must still pass when you finish, and you must actually change the source. If a test goes red, your refactor changed behavior — fix the source, not the test.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "session_diary",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Records a run summary on stop.",
+        "detail": "A harvest rune (no rule injected): on termination it writes a short diary entry of what the run did and how it ended, feeding the cross-session history.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "caveat_harvest",
+        "hooks": [
+          "onStop"
+        ],
+        "phase": "harvest",
+        "subroutine": "harvest",
+        "summary": "Captures gotchas for next time.",
+        "detail": "A harvest rune: on stop it extracts caveats hit during the run (gate blocks, dead ends) into the learning library so future runs are pre-warned.",
+        "requiredBy": null,
+        "e2eOnly": false
+      }
+    ],
+    "bare": []
+  },
+  "toggles": [
+    {
+      "key": "quality",
+      "label": "quality",
+      "detail": "Adds quality_gate — blocks finishing if the source you edited regresses in quality (oversized files/functions, etc.)."
+    },
+    {
+      "key": "mutation",
+      "label": "mutation",
+      "detail": "Adds mutation_gate — mutates the source and requires the new tests to catch the mutants (slow, strongest signal)."
+    },
+    {
+      "key": "flakeGuard",
+      "label": "flake",
+      "detail": "Adds flake_gate — runs the new specs several times and rejects nondeterminism."
+    },
+    {
+      "key": "assertMin",
+      "label": "assertion",
+      "detail": "Adds assertion_gate — enforces an assertion-quality floor on the new tests."
+    },
+    {
+      "key": "a11y",
+      "label": "a11y",
+      "detail": "Adds a11y_gate — requires component/e2e specs to assert accessibility (roles / labels / axe)."
+    },
+    {
+      "key": "visual",
+      "label": "visual",
+      "detail": "Adds visual_gate (e2e only) — requires e2e specs to capture a screenshot checkpoint."
+    },
+    {
+      "key": "mfe",
+      "label": "mfe",
+      "detail": "Adds mfe_gate — enforces Module Federation standards on a micro-frontend project (no-op off-federation)."
+    }
+  ],
+  "phases": [
+    {
+      "id": "context",
+      "label": "Context / prepare",
+      "detail": "Before the run: prepare()/systemPromptAddition runes seed the model with project context, rules, and few-shot exemplars."
+    },
+    {
+      "id": "guard",
+      "label": "Per-turn guards (beforeToolCall — first block wins)",
+      "detail": "On every tool call, beforeToolCall runes can veto it before it runs. The first rune to block wins, so order matters."
+    },
+    {
+      "id": "observer",
+      "label": "Observers (afterToolCall)",
+      "detail": "After a tool completes, afterToolCall runes observe the result to track state — they do not block."
+    },
+    {
+      "id": "gate",
+      "label": "Finish gates (shouldStop — first block injects + continues)",
+      "detail": "When the model tries to finish, shouldStop runes gate it. A block injects feedback and the loop continues; acceptance needs every gate green."
+    },
+    {
+      "id": "harvest",
+      "label": "Harvest (onStop)",
+      "detail": "On termination, onStop runes record and learn — diaries, caveats, traces, library promotion."
+    }
+  ],
+  "subroutines": [
+    {
+      "id": "preamble",
+      "label": "Preamble (context + guards + plan)",
+      "detail": "Shared setup every working profile starts with: inject context, guard the write scope, and require a plan — plus optional TDD red-gate / regression guard."
+    },
+    {
+      "id": "green-gates",
+      "label": "Green-suite gates (validation → audit → hermetic → acceptance)",
+      "detail": "The finish-gate stack that proves the change is real: typecheck + tests green, audit-clean, hermetic, and meets the acceptance bar."
+    },
+    {
+      "id": "safety-net",
+      "label": "Safety net (behavior lock)",
+      "detail": "The characterization-first alternative to green-gates for source-changing profiles: lock the tests so only source changes and behavior is provably preserved."
+    },
+    {
+      "id": "opt-in",
+      "label": "Opt-in gates (quality / mfe / extras)",
+      "detail": "Toggle-enabled extra gates — source quality, micro-frontend standards, and the write_tests extras (flake / assertion / mutation / a11y / visual)."
+    },
+    {
+      "id": "harvest",
+      "label": "Harvest (diary / caveats / distil)",
+      "detail": "The on-stop tail that turns each run into learning: session diary, caveat capture, and (full) distil trace + library promotion."
+    }
+  ],
+  "hookDescriptions": {
+    "systemPromptAddition": "Appends static rule text to the system prompt.",
+    "prepare": "Async pre-run contribution (e.g. RAG few-shot) appended before the first turn.",
+    "onTurnStart": "Runs at the start of every turn.",
+    "beforeToolCall": "Vetoes a tool before it runs — the first rune to block wins.",
+    "afterToolCall": "Observes a completed tool call (tracks state).",
+    "shouldStop": "Gates the model's intent to finish — a block injects feedback and the loop continues.",
+    "onStop": "Runs once on termination (record / learn / harvest)."
+  }
+}
