@@ -1,4 +1,5 @@
 import { readdir, readFile, access } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type {
   StackAdapter,
@@ -49,13 +50,24 @@ export const pythonAdapter: StackAdapter = {
   },
 
   async install(dir: string): Promise<void> {
-    const py = await pyBin(dir);
-    // Idempotent-ish: only install if pytest missing for this interpreter.
+    let py = await pyBin(dir);
+    // Idempotent: only act if pytest missing for the resolved interpreter.
     const has = await sh(`${py} -c "import pytest"`, dir);
-    if (!has.ok) {
-      const r = await sh(`${py} -m pip install pytest pytest-cov`, dir, 300_000);
-      if (!r.ok) throw new Error(`probevane: pip install failed\n${r.stderr.slice(-1500)}`);
+    if (has.ok) return;
+    if (!process.env.PROBEVANE_PY && py === 'python3') {
+      // System python without pytest — PEP 668 hosts also refuse `pip install`
+      // into it. Bootstrap a project-local .venv instead (pyBin prefers it).
+      const venv = join(dir, '.venv', 'bin', 'python');
+      if (!(await exists(venv))) {
+        const mk = await sh('python3 -m venv .venv', dir, 120_000);
+        if (!mk.ok) throw new Error(`probevane: venv create failed\n${mk.stderr.slice(-1500)}`);
+      }
+      py = venv;
+      const again = await sh(`${py} -c "import pytest"`, dir);
+      if (again.ok) return;
     }
+    const r = await sh(`${py} -m pip install pytest pytest-cov`, dir, 300_000);
+    if (!r.ok) throw new Error(`probevane: pip install failed\n${r.stderr.slice(-1500)}`);
   },
 
   async discover(dir: string, _kind: TestKind): Promise<TestTarget[]> {
@@ -158,10 +170,10 @@ export const pythonAdapter: StackAdapter = {
     return pyAuditRules();
   },
 
-  commands(): AdapterCommands {
-    // pyBin can't be resolved synchronously; commands use python3 + a .venv hint
-    // via the PROBEVANE_PY env when set. validation_gate uses adapter.run anyway.
-    const py = process.env.PROBEVANE_PY ?? 'python3';
+  commands(dir: string): AdapterCommands {
+    // Sync mirror of pyBin: PROBEVANE_PY > project .venv > python3.
+    const venv = join(dir, '.venv', 'bin', 'python');
+    const py = process.env.PROBEVANE_PY ?? (existsSync(venv) ? venv : 'python3');
     return {
       typecheck: 'true', // mypy optional; don't block test-adding
       lint: 'true',

@@ -121,5 +121,6 @@ export interface StackAdapter {
   patternsDoc(kind: TestKind): Promise<string>;
 
   auditRules(): AuditRule[];
-  commands(): AdapterCommands;
+  /** `dir` lets a stack resolve project-local toolchains (e.g. a python .venv). */
+  commands(dir: string): AdapterCommands;
 }

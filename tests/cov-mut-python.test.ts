@@ -186,3 +186,124 @@ describe('pythonAdapter.specFiles — test-file filter (kills \\w+ → \\w-)', (
     expect(files).not.toContain('helper.py');
   });
 });
+
+// =========================================================================
+// install() — .venv bootstrap on PEP-668 hosts (system python lacks pytest,
+// pip into it is blocked). Sequence: probe import → venv create → venv probe.
+// commands(dir) — sync mirror of pyBin: PROBEVANE_PY > <dir>/.venv > python3.
+// =========================================================================
+async function withShScript(script: (cmd: string) => { ok: boolean; stderr?: string }) {
+  const calls: string[] = [];
+  vi.resetModules();
+  vi.doMock('../src/util/exec.js', () => ({
+    sh: async (cmd: string) => {
+      calls.push(cmd);
+      const r = script(cmd);
+      return { ok: r.ok, code: r.ok ? 0 : 1, stdout: '', stderr: r.stderr ?? '' };
+    },
+    capOutput: (s: string) => s,
+  }));
+  const adapter = (await import('../src/adapters/python-pytest/index.js')).pythonAdapter;
+  return { adapter, calls };
+}
+
+describe('pythonAdapter.install — .venv bootstrap', () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock('../src/util/exec.js');
+    delete process.env.PROBEVANE_PY;
+  });
+
+  it('no-ops when pytest already imports', async () => {
+    const d = tmp();
+    const { adapter, calls } = await withShScript(() => ({ ok: true }));
+    await adapter.install(d);
+    expect(calls).toEqual(['python3 -c "import pytest"']);
+  });
+
+  it('creates .venv + pip-installs into it when system python lacks pytest', async () => {
+    const d = tmp();
+    const { adapter, calls } = await withShScript((cmd) => ({
+      // import-probes fail (both system and fresh venv), venv create + pip succeed
+      ok: !cmd.includes('import pytest'),
+    }));
+    await adapter.install(d);
+    const venvPy = join(d, '.venv', 'bin', 'python');
+    expect(calls).toEqual([
+      'python3 -c "import pytest"',
+      'python3 -m venv .venv',
+      `${venvPy} -c "import pytest"`,
+      `${venvPy} -m pip install pytest pytest-cov`,
+    ]);
+  });
+
+  it('skips venv creation when .venv already exists, still installs pytest there', async () => {
+    const d = tmp();
+    write(d, '.venv/bin/python', '');
+    const { adapter, calls } = await withShScript((cmd) => ({
+      ok: !cmd.includes('import pytest'),
+    }));
+    await adapter.install(d);
+    expect(calls.some((c) => c.includes('-m venv'))).toBe(false);
+    expect(calls.some((c) => c.includes('.venv/bin/python -m pip install'))).toBe(true);
+  });
+
+  it('stops after venv probe when the fresh venv already has pytest', async () => {
+    const d = tmp();
+    const { adapter, calls } = await withShScript((cmd) => ({
+      // system probe fails; venv probe (after create) succeeds
+      ok: !(cmd === 'python3 -c "import pytest"'),
+    }));
+    await adapter.install(d);
+    expect(calls.some((c) => c.includes('pip install'))).toBe(false);
+  });
+
+  it('respects PROBEVANE_PY: pip into it, never creates a venv', async () => {
+    const d = tmp();
+    process.env.PROBEVANE_PY = '/opt/py/bin/python';
+    const { adapter, calls } = await withShScript((cmd) => ({
+      ok: !cmd.includes('import pytest'),
+    }));
+    await adapter.install(d);
+    expect(calls).toEqual([
+      '/opt/py/bin/python -c "import pytest"',
+      '/opt/py/bin/python -m pip install pytest pytest-cov',
+    ]);
+  });
+
+  it('throws with stderr tail when venv creation fails', async () => {
+    const d = tmp();
+    const { adapter } = await withShScript((cmd) => {
+      if (cmd.includes('-m venv')) return { ok: false, stderr: 'no ensurepip' };
+      return { ok: cmd.includes('venv') };
+    });
+    await expect(adapter.install(d)).rejects.toThrow(/venv create failed[\s\S]*no ensurepip/);
+  });
+});
+
+describe('pythonAdapter.commands(dir) — interpreter resolution', () => {
+  afterEach(() => {
+    delete process.env.PROBEVANE_PY;
+  });
+
+  it('prefers the project .venv python when present', () => {
+    const d = tmp();
+    write(d, '.venv/bin/python', '');
+    const venvPy = join(d, '.venv', 'bin', 'python');
+    const cmds = pythonAdapter.commands(d);
+    expect(cmds.testUnit).toBe(`${venvPy} -m pytest -q`);
+    expect(cmds.coverage).toContain(venvPy);
+  });
+
+  it('falls back to python3 without a venv', () => {
+    const d = tmp();
+    expect(pythonAdapter.commands(d).testUnit).toBe('python3 -m pytest -q');
+  });
+
+  it('PROBEVANE_PY wins over the venv', () => {
+    const d = tmp();
+    write(d, '.venv/bin/python', '');
+    process.env.PROBEVANE_PY = '/opt/py/bin/python';
+    expect(pythonAdapter.commands(d).testUnit).toBe('/opt/py/bin/python -m pytest -q');
+  });
+});

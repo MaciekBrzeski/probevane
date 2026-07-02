@@ -21,7 +21,7 @@ const BEHAVIOR_SYSTEM_PROMPT =
 async function behaviorPrepare(ctx: RunCtx, state: BehaviorState): Promise<string | undefined> {
   const run = await ctx.adapter.run(ctx.workdir, 'unit');
   state.baselinePassed = run.passed;
-  const tc = await sh(ctx.adapter.commands().typecheck, ctx.workdir);
+  const tc = await sh(ctx.adapter.commands(ctx.workdir).typecheck, ctx.workdir);
   state.baselineTypecheckOk = tc.ok;
   return state.baselinePassed === 0
     ? 'WARNING: no passing tests found to lock behavior — refactor conservatively; typecheck must stay clean.'
@@ -45,7 +45,7 @@ async function behaviorShouldStop(ctx: RunCtx, state: BehaviorState): Promise<Ru
     return block('behavior_lock: nothing was refactored', 'No source file changed yet. Perform the refactor, then finish.');
   }
   if (state.baselineTypecheckOk) {
-    const tc = await sh(ctx.adapter.commands().typecheck, ctx.workdir);
+    const tc = await sh(ctx.adapter.commands(ctx.workdir).typecheck, ctx.workdir);
     if (!tc.ok) return block('behavior_lock: typecheck failed', `Typecheck failed after the refactor:\n${tail(tc.stdout + tc.stderr)}`);
   }
   const run = await ctx.adapter.run(ctx.workdir, 'unit');
