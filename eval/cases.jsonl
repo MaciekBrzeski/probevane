@@ -7,3 +7,4 @@
 {"fixture":"rust-calc","kind":"unit"}
 {"fixture":"angular-counter","kind":"unit"}
 {"fixture":"node-calc","kind":"unit"}
+{"fixture":"react-shop","kind":"unit"}
