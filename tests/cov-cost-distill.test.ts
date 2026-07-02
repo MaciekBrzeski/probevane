@@ -19,7 +19,7 @@ import {
   estimateOutputTokens,
 } from '../src/cost/estimate.js';
 import { spentSince, overCap } from '../src/cost/budget.js';
-import { stripFences, basePrompt, baseValue } from '../src/distill/bases.js';
+import { stripFences, basePrompt, baseValue, cpuGenerate } from '../src/distill/bases.js';
 import { parseDirective, htmlToText } from '../src/integrations/ado.js';
 import { costOf } from '../src/cost/pricing.js';
 
@@ -345,6 +345,66 @@ describe('distill/bases', () => {
     const dir = mkTmp();
     const prompt = await basePrompt(dir, 'does-not-exist.ts', 'Test it.');
     expect(prompt).toContain('Source does-not-exist.ts:\n\n\n\nTest it.');
+  });
+});
+
+// ===========================================================================
+// src/distill/bases.ts cpuGenerate — ollama /api/chat via a STUBBED global
+// fetch (no network, no model). Only the HTTP shape + response math is real.
+// ===========================================================================
+describe('distill/bases cpuGenerate (stubbed fetch)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const ok = (body: unknown) =>
+    ({ ok: true, status: 200, json: async () => body, text: async () => '' }) as unknown as Response;
+
+  it('happy path: forces CPU (num_gpu=0), returns text + tokPerSec from eval stats', async () => {
+    let captured: { url: string; body: any } | undefined;
+    vi.stubGlobal('fetch', async (url: any, init: any) => {
+      captured = { url: String(url), body: JSON.parse(init.body) };
+      return ok({ message: { content: '```ts\nconst t = 1;\n```' }, eval_count: 100, eval_duration: 2e9 });
+    });
+    const r = await cpuGenerate('qwen2.5-coder:3b', 'sys prompt', 'user prompt');
+    expect(r.text).toBe('```ts\nconst t = 1;\n```');
+    expect(r.tokPerSec).toBe(50); // 100 tokens / 2s
+    expect(r.ms).toBeGreaterThanOrEqual(0);
+    expect(captured!.url).toContain('/api/chat');
+    expect(captured!.body.model).toBe('qwen2.5-coder:3b');
+    expect(captured!.body.stream).toBe(false);
+    expect(captured!.body.options).toEqual({ num_gpu: 0, num_predict: 700, temperature: 0.1 });
+    expect(captured!.body.messages).toEqual([
+      { role: 'system', content: 'sys prompt' },
+      { role: 'user', content: 'user prompt' },
+    ]);
+  });
+
+  it('passes a custom numPredict through to options.num_predict', async () => {
+    let opts: any;
+    vi.stubGlobal('fetch', async (_u: any, init: any) => {
+      opts = JSON.parse(init.body).options;
+      return ok({ message: { content: 'x' } });
+    });
+    await cpuGenerate('m', 's', 'u', 123);
+    expect(opts.num_predict).toBe(123);
+  });
+
+  it('missing message/eval stats → empty text + tokPerSec 0 (nullish branches)', async () => {
+    vi.stubGlobal('fetch', async () => ok({}));
+    const r = await cpuGenerate('m', 's', 'u');
+    expect(r.text).toBe('');
+    expect(r.tokPerSec).toBe(0);
+  });
+
+  it('HTTP error → throws "<model>: <status> <body>"', async () => {
+    vi.stubGlobal('fetch', async () =>
+      ({ ok: false, status: 404, text: async () => 'model not found' }) as unknown as Response);
+    await expect(cpuGenerate('ghost-model', 's', 'u')).rejects.toThrow('ghost-model: 404 model not found');
+  });
+
+  it('HTTP error with an unreadable body still throws with the status (text catch → "")', async () => {
+    vi.stubGlobal('fetch', async () =>
+      ({ ok: false, status: 500, text: async () => { throw new Error('torn'); } }) as unknown as Response);
+    await expect(cpuGenerate('m', 's', 'u')).rejects.toThrow('m: 500 ');
   });
 });
 

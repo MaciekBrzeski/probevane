@@ -32,6 +32,54 @@ describe('pr builders (pure)', () => {
     expect(b).toContain('`src/Cart.test.tsx`');
     expect(b).toContain('does not merge');
   });
+
+  it('branchName falls back to "run" for an empty id and keeps ./_- and slashes', () => {
+    expect(branchName('')).toBe('probevane/run');
+    expect(branchName('op/refactor_v1.2-x')).toBe('probevane/op/refactor_v1.2-x');
+  });
+
+  it('branchName collapses consecutive forbidden chars into a single dash', () => {
+    expect(branchName('run  ~~ #42')).toBe('probevane/run-42');
+    expect(branchName('a!!!b???c')).toBe('probevane/a-b-c');
+  });
+
+  it('prTitle handles zero files and a repo without slashes', () => {
+    expect(prTitle(info({ files: [], repo: 'solo' }))).toBe('probevane(generate): 0 file(s) in solo');
+  });
+
+  it('prTitle keeps weird chars in op verbatim (no sanitizing of display text)', () => {
+    expect(prTitle(info({ op: 'fix <weird> & chars' }))).toContain('probevane(fix <weird> & chars):');
+  });
+
+  it('prBody with no edited files still carries the Files header and run id', () => {
+    const b = prBody(info({ files: [] }));
+    expect(b).toContain('Files:');
+    expect(b).toContain('run-abc123');
+    expect(b).not.toContain('- `'); // no file bullets
+  });
+
+  it('prBody omits the Result line when tests/coverage/cost are all absent', () => {
+    const b = prBody(info({ tests: undefined, coverage: undefined, cost: undefined }));
+    expect(b).not.toContain('Result:');
+    expect(b).toContain('all gates green');
+  });
+
+  it('prBody treats null coverage as absent but keeps other stats', () => {
+    const b = prBody(info({ coverage: null, cost: undefined }));
+    expect(b).toContain('Result: 12 tests');
+    expect(b).not.toContain('cov');
+  });
+
+  it('prBody includes zero-valued stats (0 tests, cov 0%, $0.0000) rather than dropping them', () => {
+    const b = prBody(info({ tests: 0, coverage: 0, cost: 0 }));
+    expect(b).toContain('0 tests');
+    expect(b).toContain('cov 0%'); // 0 != null → kept
+    expect(b).toContain('$0.0000');
+  });
+
+  it('prBody formats cost to 4 decimal places', () => {
+    expect(prBody(info({ cost: 1.23456 }))).toContain('$1.2346');
+  });
 });
 
 describe('shipRun (git smoke, no remote → local branch)', () => {
