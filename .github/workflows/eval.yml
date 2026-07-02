@@ -31,7 +31,7 @@ jobs:
       - run: npm run typecheck
       - name: install node fixture deps
         run: |
-          for f in fixtures/*/; do [ -f "$f/package.json" ] && (cd "$f" && npm install --no-fund --no-audit) || true; done
+          for f in fixtures/*/; do if [ -f "$f/package.json" ]; then (cd "$f" && npm install --no-fund --no-audit); fi; done
       - name: eval (ci-baseline, no LLM)
         run: ./bin/probevane eval
       - uses: actions/upload-artifact@v4
@@ -51,7 +51,7 @@ jobs:
       - run: npm ci || npm install
       - name: install fixture deps + browsers
         run: |
-          for f in fixtures/*/; do (cd "$f" && npm install --no-fund --no-audit); done
+          for f in fixtures/*/; do if [ -f "$f/package.json" ]; then (cd "$f" && npm install --no-fund --no-audit); fi; done
           npx playwright install --with-deps chromium
       - name: eval (live generation)
         env:
