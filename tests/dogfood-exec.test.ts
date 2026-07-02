@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { capOutput } from '../src/util/exec.js';
+import { capOutput, sh } from '../src/util/exec.js';
 
 // Helper: build a string of N numbered lines "L0\nL1\n...L(n-1)"
 function makeLines(n: number): string {
@@ -83,5 +83,29 @@ describe('capOutput', () => {
     const result = capOutput(s, 3, 3);
     // 20 - 3 - 3 = 14 elided
     expect(result).toContain('[14 lines elided]');
+  });
+});
+
+describe('sh — process-tree timeout', () => {
+  it('kills the WHOLE process group on timeout, not just the shell', async () => {
+    // bash spawns a grandchild that ignores nothing and sleeps long; killing
+    // only bash would orphan it (pipes stay open → sh hangs). The group kill
+    // must reap it and resolve promptly with the timeout marker.
+    const t0 = Date.now();
+    const r = await sh('bash -c "sleep 60" & wait', process.cwd(), 800);
+    expect(Date.now() - t0).toBeLessThan(10_000);
+    expect(r.ok).toBe(false);
+  }, 15_000);
+
+  it('normal completion is unaffected', async () => {
+    const r = await sh('echo hi', process.cwd());
+    expect(r.ok).toBe(true);
+    expect(r.stdout.trim()).toBe('hi');
+  });
+
+  it('non-zero exit reports code + ok:false without throwing', async () => {
+    const r = await sh('exit 3', process.cwd());
+    expect(r.code).toBe(3);
+    expect(r.ok).toBe(false);
   });
 });
