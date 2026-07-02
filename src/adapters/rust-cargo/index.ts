@@ -70,9 +70,14 @@ export const rustAdapter: StackAdapter = {
     };
   },
 
-  async coverage(_dir: string): Promise<CoverageResult> {
-    // No built-in coverage (would need cargo-llvm-cov/tarpaulin). Report n/a.
-    return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false };
+  async coverage(dir: string): Promise<CoverageResult> {
+    // Real coverage when cargo-llvm-cov is installed; n/a otherwise
+    // (`cargo install cargo-llvm-cov` to enable — not assumed on CI runners).
+    const probe = await sh('cargo llvm-cov --version', dir);
+    if (!probe.ok) return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false };
+    const r = await sh('cargo llvm-cov --json --summary-only --quiet', dir, 300_000);
+    if (!r.ok) return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false, raw: r.stderr.slice(-1500) };
+    return parseLlvmCovSummary(r.stdout);
   },
 
   async specFiles(dir: string): Promise<string[]> {
@@ -100,6 +105,25 @@ export const rustAdapter: StackAdapter = {
     };
   },
 };
+
+/** Parse `cargo llvm-cov --json --summary-only` output into a CoverageResult. */
+export function parseLlvmCovSummary(jsonText: string): CoverageResult {
+  try {
+    const j = JSON.parse(jsonText);
+    const t = j.data?.[0]?.totals;
+    if (!t) throw new Error('no totals');
+    const pct = (k: string) => Math.round((t[k]?.percent ?? 0) * 100) / 100;
+    return {
+      statements: pct('regions'),
+      branches: pct('branches'),
+      functions: pct('functions'),
+      lines: pct('lines'),
+      ok: true,
+    };
+  } catch {
+    return { statements: 0, branches: 0, functions: 0, lines: 0, ok: false };
+  }
+}
 
 async function crateName(dir: string): Promise<string> {
   const toml = await readFile(join(dir, 'Cargo.toml'), 'utf8').catch(() => '');
