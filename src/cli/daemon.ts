@@ -2,7 +2,7 @@ import { createServer, type ServerResponse } from 'node:http';
 import { readdir, readFile, stat, rename } from 'node:fs/promises';
 import { readFileSync, type Dirent } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { stateRoot } from '../util/state.js';
 import { readRuns, type RunRecord } from '../cost/ledger.js';
 import { appendJsonl } from '../util/jsonl.js';
@@ -109,11 +109,15 @@ function sendJson(res: ServerResponse, code: number, body: unknown) {
 const BIN = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'bin', 'probevane');
 const UI_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'ui');
 const UI_FILE = join(UI_DIR, 'control.html');
-// Cached at startup; PROBEVANE_UI_DEV re-reads per request so the `design` loop
-// sees its edits without a daemon restart.
+// Cached at startup; PROBEVANE_UI_DEV recompiles the TSX sources per request
+// (runtime compiler: edit a component, refresh, see it — no rebuild step, no
+// daemon restart). Falls back to re-reading the generated control.html when
+// the build module isn't available (published installs don't ship scripts/).
 const cachedDashboard = readFileSync(UI_FILE, 'utf8');
-const DASHBOARD = process.env.PROBEVANE_UI_DEV
-  ? () => readFileSync(UI_FILE, 'utf8')
+const DASHBOARD: () => string | Promise<string> = process.env.PROBEVANE_UI_DEV
+  ? await import(pathToFileURL(join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'scripts', 'build-ui.mjs')).href)
+      .then((m) => m.buildControlHtml as () => Promise<string>)
+      .catch(() => () => readFileSync(UI_FILE, 'utf8'))
   : () => cachedDashboard;
 const WIKI_DIR = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'docs', 'wiki');
 
