@@ -3,7 +3,7 @@
     "dirs": [
       {
         "dir": "loop",
-        "files": 55,
+        "files": 56,
         "fanOut": 13,
         "fanIn": 2,
         "imports": [
@@ -24,8 +24,8 @@
       },
       {
         "dir": "cli",
-        "files": 52,
-        "fanOut": 25,
+        "files": 55,
+        "fanOut": 26,
         "fanIn": 0,
         "imports": [
           "a11y",
@@ -36,6 +36,7 @@
           "config.ts",
           "cost",
           "distill",
+          "doctor",
           "factory",
           "git.ts",
           "integrations",
@@ -106,7 +107,7 @@
         "dir": "util",
         "files": 7,
         "fanOut": 0,
-        "fanIn": 16,
+        "fanIn": 17,
         "imports": []
       },
       {
@@ -148,6 +149,15 @@
         "files": 4,
         "fanOut": 1,
         "fanIn": 2,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "doctor",
+        "files": 4,
+        "fanOut": 1,
+        "fanIn": 1,
         "imports": [
           "util"
         ]
@@ -296,12 +306,12 @@
       {
         "from": "cli",
         "to": "adapters",
-        "count": 21
+        "count": 23
       },
       {
         "from": "cli",
         "to": "loop",
-        "count": 16
+        "count": 17
       },
       {
         "from": "adapters",
@@ -334,6 +344,11 @@
         "count": 8
       },
       {
+        "from": "cli",
+        "to": "config.ts",
+        "count": 8
+      },
+      {
         "from": "loop",
         "to": "util",
         "count": 8
@@ -341,11 +356,6 @@
       {
         "from": "cli",
         "to": "cost",
-        "count": 7
-      },
-      {
-        "from": "cli",
-        "to": "config.ts",
         "count": 7
       },
       {
@@ -375,6 +385,11 @@
       },
       {
         "from": "cli",
+        "to": "brain",
+        "count": 5
+      },
+      {
+        "from": "cli",
         "to": "quality",
         "count": 5
       },
@@ -382,11 +397,6 @@
         "from": "loop",
         "to": "audit",
         "count": 5
-      },
-      {
-        "from": "cli",
-        "to": "brain",
-        "count": 4
       },
       {
         "from": "cli",
@@ -474,6 +484,11 @@
         "count": 2
       },
       {
+        "from": "doctor",
+        "to": "util",
+        "count": 2
+      },
+      {
         "from": "factory",
         "to": "util",
         "count": 2
@@ -546,6 +561,11 @@
       {
         "from": "cli",
         "to": "arch",
+        "count": 1
+      },
+      {
+        "from": "cli",
+        "to": "doctor",
         "count": 1
       },
       {

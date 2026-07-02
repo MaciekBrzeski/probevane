@@ -10,6 +10,7 @@ import { generateTests } from '../loop/run-generation.js';
 import { loadConfig, pick } from '../config.js';
 import type { TestKind } from '../adapters/adapter.js';
 import { flag, dirArg } from './args.js';
+import { buildGenOpts } from './generate-opts.js';
 
 // probevane generate <dir> [--kind unit|e2e] [--model …] [--max-steps N] [--max-targets N]
 //   [--min-tests N] [--min-coverage P] [--strict]
@@ -35,62 +36,6 @@ function resolveKind(args: string[], cfg: Cfg): TestKind {
 async function resolveModel(args: string[], cfg: Cfg): Promise<string> {
   const { readModelPointer } = await import('../distill/improve.js');
   return flag(args, '--model') ?? cfg.model ?? (await readModelPointer()) ?? 'auto';
-}
-
-// Build the per-dir generate options (a closure so passk can re-target a copy).
-// Explicit --takeover overrides the escalation tier.
-function buildGenOpts(
-  args: string[],
-  cfg: Cfg,
-  adapter: Adapter,
-  kind: TestKind,
-  model: string,
-): (d: string) => GenOpts {
-  const maxSteps = pick(num(flag(args, '--max-steps')), cfg.maxSteps, 30)!;
-  const maxTargets = pick(num(flag(args, '--max-targets')), cfg.maxTargets, 8)!;
-  const minTests = pick(num(flag(args, '--min-tests')), cfg.minTests, kind === 'e2e' ? 1 : 5)!;
-  const minCoverage = pick(num(flag(args, '--min-coverage')), cfg.minCoverage);
-  // --strict: turn on the CORRECTNESS floor (KB: default gates measure well-formedness,
-  // not correctness). Enforces the mutation gate + proactively steers the model to kill
-  // surviving mutants. Off for casual runs (mutation re-runs the suite per mutant).
-  const strict = args.includes('--strict') || cfg.strict === true;
-  const mutation = strict || args.includes('--mutation') || cfg.mutation === true;
-  const mock = args.includes('--mock') || (!args.includes('--no-mock') && (cfg.mock ?? kind === 'unit'));
-  const targetGaps = args.includes('--target-gaps');
-  const flakeGuard = args.includes('--flake-guard') || cfg.flakeGuard === true;
-  const a11y = args.includes('--a11y') || cfg.a11y === true;
-  const visual = args.includes('--visual') || cfg.visual === true;
-  const budget = pick(num(flag(args, '--budget')), cfg.budget);
-  const takeoverOverride = flag(args, '--takeover');
-  return (d: string) => ({
-    dir: d,
-    kind,
-    adapter,
-    model,
-    // Resolve --takeover through brainFor (NOT anthropicBrain directly) so
-    // `--takeover ollama`/`openai:`/`local:` route to their backend + haiku/
-    // sonnet/opus hit their alias — an all-ollama hybrid needs a non-Anthropic
-    // rescue tier.
-    takeoverBrain: takeoverOverride && takeoverOverride !== 'none' ? brainFor(takeoverOverride) : undefined,
-    maxSteps,
-    maxTargets,
-    only: flag(args, '--only'),
-    minTests,
-    minCoverage,
-    mutation,
-    flakeGuard,
-    a11y,
-    visual,
-    flakeTolerance: num(flag(args, '--flake-tolerance')),
-    assertMin: num(flag(args, '--assert-min')),
-    quality: args.includes('--quality') || cfg.quality === true,
-    budget,
-    mock,
-    targetGaps,
-    property: args.includes('--property'),
-    mutationTarget: strict || args.includes('--mutation-target'),
-    log: (l: string) => console.error(l),
-  });
 }
 
 // Easy-band triage (dry run): classify discovered targets into local-draftable

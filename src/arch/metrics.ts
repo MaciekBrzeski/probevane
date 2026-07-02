@@ -83,6 +83,10 @@ export function archMetrics(graph: ModuleGraph): ArchMetrics {
  * so coupling regressions become visible over time. Empty array = no drift.
  */
 export function archDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta = 3): string[] {
+  return [...dirDrift(prev, next), ...edgeDrift(prev, next, minEdgeDelta), ...cycleDrift(prev, next)];
+}
+
+function dirDrift(prev: ArchMetrics, next: ArchMetrics): string[] {
   const out: string[] = [];
   const prevDirs = new Map(prev.dirs.map((d) => [d.dir, d]));
   const nextDirs = new Map(next.dirs.map((d) => [d.dir, d]));
@@ -93,6 +97,11 @@ export function archDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta = 3
     if (p.fanOut !== d.fanOut) out.push(`~ ${dir}/ fanOut ${p.fanOut} → ${d.fanOut}`);
   }
   for (const dir of prevDirs.keys()) if (!nextDirs.has(dir)) out.push(`- dir ${dir}/ removed`);
+  return out;
+}
+
+function edgeDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta: number): string[] {
+  const out: string[] = [];
   const prevEdges = new Map(prev.edges.map((e) => [`${e.from}|${e.to}`, e.count]));
   const nextEdges = new Map(next.edges.map((e) => [`${e.from}|${e.to}`, e.count]));
   for (const [key, count] of nextEdges) {
@@ -102,6 +111,11 @@ export function archDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta = 3
   }
   for (const [key, count] of prevEdges)
     if (!nextEdges.has(key) && count >= minEdgeDelta) out.push(`- edge ${key.replace('|', ' → ')} dropped (was ${count})`);
+  return out;
+}
+
+function cycleDrift(prev: ArchMetrics, next: ArchMetrics): string[] {
+  const out: string[] = [];
   const cyc = (m: ArchMetrics) => new Set(m.cycles.map(([a, b]) => [a, b].sort().join('↔')));
   const pc = cyc(prev), nc = cyc(next);
   for (const c of nc) if (!pc.has(c)) out.push(`+ CYCLE ${c}`);

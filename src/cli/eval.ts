@@ -68,6 +68,15 @@ interface EvalOpts {
   logPath: string;
 }
 
+// Live runs also grade correctness: does the fresh suite actually kill
+// mutants? Budget-capped, best-effort — a mutation failure never blocks eval.
+async function liveMutationScore(dir: string, adapter: Adapter): Promise<number | undefined> {
+  const { mutationScore } = await import('../loop/mutation.js');
+  return mutationScore(dir, adapter, 5, 3, { budgetMs: 60_000 })
+    .then((m) => (m.total > 0 ? Math.round((m.killed / m.total) * 100) / 100 : undefined))
+    .catch(() => undefined);
+}
+
 async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
   const { live, flakeRuns, stamp, logPath } = opts;
   const base = JSON.parse(
@@ -90,15 +99,7 @@ async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
   });
   const verdict = judge(score, base);
 
-  // Live runs also grade correctness: does the fresh suite actually kill
-  // mutants? Budget-capped, best-effort — a mutation failure never blocks eval.
-  let mutation: number | undefined;
-  if (live) {
-    const { mutationScore } = await import('../loop/mutation.js');
-    mutation = await mutationScore(dir, adapter, 5, 3, { budgetMs: 60_000 })
-      .then((m) => (m.total > 0 ? Math.round((m.killed / m.total) * 100) / 100 : undefined))
-      .catch(() => undefined);
-  }
+  const mutation = live ? await liveMutationScore(dir, adapter) : undefined;
 
   await appendLog(logPath, {
     timestamp: stamp,
@@ -187,9 +188,27 @@ interface PathOpts {
   logPath: string;
 }
 
+// Record to a sidecar; the committed cassette is only replaced when the run
+// ACCEPTS — a failed recording must not clobber a working cassette.
+async function startRecording(cassette: string): Promise<string> {
+  const rec = `${cassette}.rec`;
+  await rm(rec, { force: true }).catch(() => {});
+  process.env.PROBEVANE_RECORD = rec;
+  return rec;
+}
+
+async function finishRecording(rec: string, cassette: string, accepted: boolean, label: string): Promise<void> {
+  delete process.env.PROBEVANE_RECORD;
+  if (accepted) {
+    await (await import('node:fs/promises')).rename(rec, cassette);
+  } else {
+    await rm(rec, { force: true }).catch(() => {});
+    console.error(`[eval] ${label}: recording did not accept — kept the old cassette`);
+  }
+}
+
 async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   const { live, record, stamp, logPath } = opts;
-  const rec = `${join(ROOT, 'eval', 'cassettes', `${c.fixture}.${c.path}.jsonl`)}.rec`;
   const base = JSON.parse(
     await readFile(join(ROOT, 'eval', 'baseline', `${c.fixture}.${c.path}.json`), 'utf8'),
   ) as Baseline;
@@ -199,12 +218,7 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   const adapter = await selectAdapterOrThrow(dir);
   await adapter.install(dir).catch((e) => console.error(`[eval] install ${c.fixture}: ${e}`));
   const model = live ? opts.model : `replay:${cassette}`;
-  if (record) {
-    // Record to a sidecar; the committed cassette is only replaced when the
-    // run ACCEPTS — a failed recording must not clobber a working cassette.
-    await rm(rec, { force: true }).catch(() => {});
-    process.env.PROBEVANE_RECORD = rec;
-  }
+  const rec = record ? await startRecording(cassette) : '';
   const { runPath } = await import('../loop/run-path.js');
   console.log(`[eval] ${live ? (record ? 'recording' : 'live') : 'replay'} ${c.fixture}.${c.path}…`);
   const outcome = await runPath({
@@ -220,14 +234,7 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
     return null;
   });
   delete process.env.PROBEVANE_RECORD;
-  if (record) {
-    if (outcome?.accepted) {
-      await (await import('node:fs/promises')).rename(rec, cassette);
-    } else {
-      await rm(rec, { force: true }).catch(() => {});
-      console.error(`[eval] ${c.fixture}.${c.path}: recording did not accept — kept the old cassette`);
-    }
-  }
+  if (record) await finishRecording(rec, cassette, !!outcome?.accepted, `${c.fixture}.${c.path}`);
 
   const score = await scoreFixture(dir, adapter, {
     scope: 'unit',
