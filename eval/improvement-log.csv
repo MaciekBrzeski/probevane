@@ -418,3 +418,13 @@ timestamp,target,kind,pass,audit_score,tests,coverage,flake,library_good,library
 2026-07-02T11:05:53.819Z,react-todo,refactor,1,5,2,92.85,0,,,path-replay
 2026-07-02T11:05:53.819Z,py-calc,feature,1,5,6,100,0,,,path-replay
 2026-07-02T11:05:53.819Z,py-calc,repair,1,5,5,100,0,,,path-replay
+timestamp,target,kind,pass,audit_score,tests,coverage,flake,library_good,library_bad,note,mutation,cost_usd,tokens_in,tokens_out
+2026-07-02T11:11:22.868Z,react-todo,unit,1,5,2,92.85,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,react-forms,unit,1,5,6,100,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,py-calc,unit,1,5,5,100,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,vue-counter,unit,1,5,7,100,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,go-calc,unit,1,5,4,100,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,svelte-counter,unit,1,5,6,100,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,rust-calc,unit,1,5,4,0,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,angular-counter,unit,1,5,3,100,0,,,ci-baseline,,,,
+2026-07-02T11:11:22.868Z,node-calc,unit,1,5,9,100,0,,,ci-baseline,,,,
