@@ -258,3 +258,190 @@ describe('tracked-artifacts __pycache__ pattern', () => {
     expect(gi).not.toContain('cpython');
   });
 });
+
+// ---------------------------------------------------------------------------
+// lane checks 7-12 + --full scorecard
+// ---------------------------------------------------------------------------
+import {
+  checkNodeModules,
+  checkPlaywrightBrowsers,
+  checkConfig,
+  checkCredentials,
+  checkEvalBijection,
+  checkStaleCoverageReport,
+} from '../src/doctor/checks.js';
+import { fullReport } from '../src/doctor/full.js';
+import { utimesSync } from 'node:fs';
+
+describe('checkNodeModules', () => {
+  it('flags declared deps without node_modules; picks npm ci with a lockfile', async () => {
+    const d = tmp();
+    write(d, 'package.json', JSON.stringify({ devDependencies: { vitest: '^2' } }));
+    write(d, 'package-lock.json', '{}');
+    const r = await checkNodeModules(d);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0].hint).toBe('npm ci');
+    expect(r.findings[0].fixable).toBe(true);
+  });
+  it('silent when node_modules exists or no deps declared', async () => {
+    const d = tmp();
+    write(d, 'package.json', JSON.stringify({ devDependencies: { vitest: '^2' } }));
+    mkdirSync(join(d, 'node_modules'));
+    expect((await checkNodeModules(d)).findings).toEqual([]);
+    const e = tmp();
+    write(e, 'package.json', JSON.stringify({ name: 'x' }));
+    expect((await checkNodeModules(e)).findings).toEqual([]);
+  });
+});
+
+describe('checkPlaywrightBrowsers', () => {
+  it('flags a playwright config with an empty browser cache', async () => {
+    const d = tmp();
+    write(d, 'playwright.config.ts', 'export default {};');
+    const cache = tmp();
+    const old = process.env.PLAYWRIGHT_BROWSERS_PATH;
+    process.env.PLAYWRIGHT_BROWSERS_PATH = cache;
+    try {
+      const r = await checkPlaywrightBrowsers(d);
+      expect(r.findings).toHaveLength(1);
+      expect(r.findings[0].fixable).toBe(true);
+      mkdirSync(join(cache, 'chromium-1234'));
+      expect((await checkPlaywrightBrowsers(d)).findings).toEqual([]);
+    } finally {
+      if (old === undefined) delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+      else process.env.PLAYWRIGHT_BROWSERS_PATH = old;
+    }
+  });
+  it('silent without a playwright config', async () => {
+    expect((await checkPlaywrightBrowsers(tmp())).findings).toEqual([]);
+  });
+});
+
+describe('checkConfig', () => {
+  it('flags schema violations in probevane.config.json', async () => {
+    const d = tmp();
+    write(d, 'probevane.config.json', JSON.stringify({ minTests: 'lots', unknownKey: 1 }));
+    const r = await checkConfig(d);
+    expect(r.findings.length).toBeGreaterThanOrEqual(1);
+    expect(r.findings.every((f) => f.check === 'config-invalid')).toBe(true);
+  });
+  it('flags unparseable config as a load failure', async () => {
+    const d = tmp();
+    write(d, 'probevane.config.json', '{not json');
+    const r = await checkConfig(d);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0].message).toContain('failed to load');
+  });
+  it('silent with a valid config or none at all', async () => {
+    const d = tmp();
+    write(d, 'probevane.config.json', JSON.stringify({ minTests: 5 }));
+    expect((await checkConfig(d)).findings).toEqual([]);
+    expect((await checkConfig(tmp())).findings).toEqual([]);
+  });
+});
+
+describe('checkCredentials', () => {
+  it('warns without ANTHROPIC_API_KEY, silent with it', async () => {
+    const old = process.env.ANTHROPIC_API_KEY;
+    try {
+      delete process.env.ANTHROPIC_API_KEY;
+      const r = await checkCredentials('.');
+      expect(r.findings).toHaveLength(1);
+      expect(r.findings[0].severity).toBe('warn');
+      expect(r.findings[0].hint).toContain('bridge');
+      process.env.ANTHROPIC_API_KEY = 'sk-test';
+      expect((await checkCredentials('.')).findings).toEqual([]);
+    } finally {
+      if (old === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = old;
+    }
+  });
+});
+
+describe('checkEvalBijection', () => {
+  it('errors on case without fixture/baseline; warns on unguarded fixture + orphaned baseline', async () => {
+    const d = tmp();
+    write(d, 'eval/cases.jsonl', JSON.stringify({ fixture: 'ghost', kind: 'unit' }) + '\n');
+    write(d, 'fixtures/lonely/app.py', 'def f(): pass');
+    write(d, 'eval/baseline/orphan.unit.json', '{}');
+    write(d, 'eval/baseline/lonely.repair.json', '{}'); // path baseline — must NOT be flagged
+    const r = await checkEvalBijection(d);
+    const msgs = r.findings.map((f) => `${f.severity}:${f.message}`);
+    expect(msgs.some((m) => m.startsWith('error:') && m.includes('ghost.unit has no fixtures/ghost/'))).toBe(true);
+    expect(msgs.some((m) => m.startsWith('error:') && m.includes('ghost.unit.json'))).toBe(true);
+    expect(msgs.some((m) => m.includes('fixtures/lonely/ has no eval case'))).toBe(true);
+    expect(msgs.some((m) => m.includes('orphan.unit.json is orphaned'))).toBe(true);
+    expect(msgs.some((m) => m.includes('lonely.repair'))).toBe(false);
+  });
+  it('silent without eval/cases.jsonl', async () => {
+    expect((await checkEvalBijection(tmp())).findings).toEqual([]);
+  });
+});
+
+describe('checkStaleCoverageReport', () => {
+  it('warns when a test file is newer than the coverage report', async () => {
+    const d = tmp();
+    write(d, 'coverage/coverage-summary.json', '{}');
+    const past = new Date(Date.now() - 60_000);
+    utimesSync(join(d, 'coverage/coverage-summary.json'), past, past);
+    write(d, 'tests/new.test.ts', 'it');
+    const r = await checkStaleCoverageReport(d);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0].message).toContain('tests/new.test.ts');
+  });
+  it('silent when the report is fresh or absent', async () => {
+    const d = tmp();
+    write(d, 'tests/old.test.ts', 'it');
+    expect((await checkStaleCoverageReport(d)).findings).toEqual([]); // no report
+    const past = new Date(Date.now() - 60_000);
+    utimesSync(join(d, 'tests/old.test.ts'), past, past);
+    write(d, 'coverage/coverage-summary.json', '{}');
+    expect((await checkStaleCoverageReport(d)).findings).toEqual([]);
+  });
+});
+
+describe('fullReport', () => {
+  it('adapterless: quality + arch + skipped heavies, no audit/coverage lines', async () => {
+    const d = tmp();
+    write(d, 'src/a.ts', 'export const a = 1;\n');
+    const lines = await fullReport(d);
+    const areas = lines.map((l) => l.area);
+    expect(areas).toContain('quality');
+    expect(areas).toContain('arch');
+    expect(areas).toContain('mutation');
+    expect(areas).toContain('flake');
+    expect(areas).not.toContain('audit');
+    expect(areas).not.toContain('coverage');
+    expect(lines.find((l) => l.area === 'mutation')!.summary).toContain('probevane mutation');
+  });
+
+  it('with an adapter: audits specs, scores assertions, reads coverage', async () => {
+    const d = tmp();
+    write(d, 'src/a.ts', 'export const a = 1;\n');
+    write(d, 'src/a.test.ts', "import { it, expect } from 'vitest';\nit('x', () => { expect(1 + 1).toBe(2); });\n");
+    const adapter = fakeAdapter({
+      specFiles: async () => ['src/a.test.ts'],
+      coverage: async () => ({ statements: 95, branches: 90, functions: 92, lines: 95, ok: true }),
+      auditRules: () => [],
+    });
+    const lines = await fullReport(d, adapter);
+    const byArea = Object.fromEntries(lines.map((l) => [l.area, l]));
+    expect(byArea.audit.ok).toBe(true);
+    expect(byArea.assertions.summary).toMatch(/\/100 strong/);
+    expect(byArea.coverage.ok).toBe(true);
+    expect(byArea.coverage.summary).toContain('95% lines');
+  });
+
+  it('flags missing specs and unavailable coverage as not-ok', async () => {
+    const d = tmp();
+    write(d, 'src/a.ts', 'export const a = 1;\n');
+    const adapter = fakeAdapter({
+      specFiles: async () => [],
+      coverage: async () => ({ statements: 0, branches: 0, functions: 0, lines: 0, ok: false }),
+    });
+    const lines = await fullReport(d, adapter);
+    const byArea = Object.fromEntries(lines.map((l) => [l.area, l]));
+    expect(byArea.audit.ok).toBe(false);
+    expect(byArea.coverage.ok).toBe(false);
+  });
+});
