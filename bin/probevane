@@ -23,7 +23,7 @@ run_cli() {
 }
 
 case "$cmd" in
-  init|plan|generate|run|audit|coverage|learn|eval|status|mock|graph|spec|refactor|feature|repair|fix|ci|review|bench|watch|skill|a11y|distill|serve|peek|improve|history|ado|simcost|assert-score|impact|revert|factory|daemon|quality|mfe-audit|mfe-contract|mfe|migrate|document|docs|otel|enqueue|scan|improve-cycle|pipeline|search|mutation|design|arch)
+  init|plan|generate|run|audit|coverage|learn|eval|status|mock|graph|spec|refactor|feature|repair|fix|ci|review|bench|watch|skill|a11y|distill|serve|peek|improve|history|ado|simcost|assert-score|impact|revert|factory|daemon|quality|mfe-audit|mfe-contract|mfe|migrate|document|docs|otel|enqueue|scan|improve-cycle|pipeline|search|mutation|design|arch|doctor)
     # `<cmd> -h/--help` → catalog-driven per-command help. Without this, most
     # subcommands treat the flag as noise and silently run against `.`.
     for a in "$@"; do

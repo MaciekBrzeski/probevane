@@ -41,6 +41,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `enqueue` | Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake. |
 | `scan` | Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon). |
 | `otel` | Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans — one per run — + metrics: token usage, runs, acceptance, cost by model) → write a file, POST to a collector (--endpoint / OTEL_EXPORTER_OTLP_ENDPOINT), or emit Prometheus text (--prometheus). $0, reads runs.jsonl. |
+| `doctor` | Health checks distilled from real field failures — detect (and with --fix repair) broken toolchains (bootstraps e.g. a python .venv), coverage blind spots (source never loaded by any test, respecting deliberate config excludes), git-tracked test artifacts (untrack + gitignore), package.json "files" entries that don't exist, CI steps swallowing failures (|| true), and stale replay cassettes. Exit 1 on unfixed errors. |
 | `history` | Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown; --trend adds the daily time-series + the daemon’s cost/acceptance alerts. |
 | `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
 | `revert` | Undo a run — restore the files a run edited to its pre-run checkpoint (or remove ones it created), from the diary record. Safety net for a crashed/bad run. |
@@ -337,6 +338,14 @@ Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans
 ```bash
 probevane otel [--root <stateDir>] [--out <file>] [--endpoint <url>] [--prometheus]
 # e.g. probevane otel --prometheus
+```
+
+### doctor
+Health checks distilled from real field failures — detect (and with --fix repair) broken toolchains (bootstraps e.g. a python .venv), coverage blind spots (source never loaded by any test, respecting deliberate config excludes), git-tracked test artifacts (untrack + gitignore), package.json "files" entries that don't exist, CI steps swallowing failures (|| true), and stale replay cassettes. Exit 1 on unfixed errors.
+
+```bash
+probevane doctor <dir> [--fix] [--json]
+# e.g. probevane doctor . --fix
 ```
 
 ### history
