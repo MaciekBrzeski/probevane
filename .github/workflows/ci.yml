@@ -37,6 +37,8 @@ jobs:
         run: npm run build
       - name: skill + wiki in sync (drift gate)
         run: ./bin/probevane skill --check
+      - name: control-center UI in sync (drift gate — control.html is generated from src/ui/app/)
+        run: node scripts/build-ui.mjs --check
       - name: source-quality gate (dogfood — probevane grades its own source)
         run: ./bin/probevane quality . --strict
       - name: mutation gate (dogfood — do the tests actually catch bugs?)

@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
@@ -11,6 +13,14 @@
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["fixtures", "node_modules", "dist", "src/e2e/checkpoint.ts"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "fixtures",
+    "node_modules",
+    "dist",
+    "src/e2e/checkpoint.ts",
+    "src/ui"
+  ]
 }

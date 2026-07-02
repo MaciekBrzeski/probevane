@@ -19,12 +19,13 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepublishOnly": "node scripts/build.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.ui.json",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "eval": "tsx src/cli/eval.ts",
     "wiki": "node scripts/wiki.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:ui": "node scripts/build-ui.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
