@@ -24,6 +24,11 @@ jobs:
           go-version: '1.22'
       - run: pip install pytest pytest-cov
       - run: npm ci || npm install
+      - name: install fixture deps
+        # BEFORE the self-tests: real-fixture tests (passk.scoreSuite over
+        # react-todo) execute the fixture suite, which needs its node_modules.
+        run: |
+          for f in fixtures/*/; do if [ -f "$f/package.json" ]; then (cd "$f" && npm install --no-fund --no-audit --legacy-peer-deps); fi; done
       - name: typecheck
         run: npm run typecheck
       - name: probevane self-tests + coverage floor
@@ -49,9 +54,6 @@ jobs:
         run: ./bin/probevane spec . --wiki && test -f docs/wiki/project-probevane.md
       - name: dashboard e2e (real browser + visual regression)
         run: npx playwright install --with-deps chromium && npm run test:e2e
-      - name: install fixture deps
-        run: |
-          for f in fixtures/*/; do if [ -f "$f/package.json" ]; then (cd "$f" && npm install --no-fund --no-audit); fi; done
       - name: fixture eval (no LLM)
         run: ./bin/probevane eval
       - name: path eval — refactor/feature/repair (replay cassettes, no LLM)
