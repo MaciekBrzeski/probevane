@@ -111,6 +111,7 @@ export async function runDelegated(opts: DelegateOpts): Promise<DelegateOutcome>
   const scope: RunScope = kind === 'e2e' ? 'e2e' : 'unit';
   const maxRounds = opts.maxRounds ?? 3;
   const runId = `delegate-${Date.now().toString(36)}`;
+  const startedMs = Date.now();
   const base = buildBasePrompt(opts, dir, kind);
 
   let costUsd = 0;
@@ -137,6 +138,7 @@ export async function runDelegated(opts: DelegateOpts): Promise<DelegateOutcome>
     model: opts.model ? `claude-code:${opts.model}` : 'claude-code',
     tokensIn: 0, tokensOut: 0, cacheRead: 0, accepted, tookOver: false,
     stopReason: accepted ? 'accepted' : 'max_steps', steps: roundsRun, costUsd: costUsd || undefined,
+    durationMs: Date.now() - startedMs,
   });
   return { accepted, rounds: roundsRun, changedFiles: changed, costUsd, green, auditErrors };
 }

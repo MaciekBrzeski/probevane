@@ -613,3 +613,25 @@ describe('cost/ledger summarize', () => {
     expect(s.totalCost).toBe(0.3); // not 0.30000000000000004
   });
 });
+
+describe('cost/ledger summarize — duration rollup', () => {
+  const base: RunRecord = {
+    ts: '2026-06-27T10:00:00.000Z', runId: 'r1', label: 'generate:app', model: 'm',
+    tokensIn: 0, tokensOut: 0, cacheRead: 0, cost: 0, accepted: true, tookOver: false,
+    stopReason: 'accepted', steps: 1,
+  };
+  it('averages only over runs that recorded a duration', () => {
+    const s = summarizeLedger([
+      { ...base, durationMs: 1000 },
+      { ...base, runId: 'r2', durationMs: 3000 },
+      { ...base, runId: 'r3' }, // pre-durationMs ledger line
+    ]);
+    expect(s.totalDurationMs).toBe(4000);
+    expect(s.avgDurationMs).toBe(2000);
+  });
+  it('zero runs → zero durations (no NaN)', () => {
+    const s = summarizeLedger([]);
+    expect(s.totalDurationMs).toBe(0);
+    expect(s.avgDurationMs).toBe(0);
+  });
+});

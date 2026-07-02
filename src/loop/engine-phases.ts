@@ -47,6 +47,8 @@ export interface LoopRun {
   log: (line: string) => void;
   st: LoopState;
   runId: string;
+  /** Wall-clock start (epoch ms) — finalizeRun records the duration from it. */
+  startedMs: number;
   eventsOn: boolean;
   eventsPath: string;
   maxSteps: number;

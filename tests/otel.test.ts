@@ -69,3 +69,18 @@ describe('prometheusText', () => {
     expect(t).toContain('# TYPE probevane_cost_usd_total counter');
   });
 });
+
+describe('tracesPayload span width', () => {
+  it('span width = durationMs when the run recorded one', () => {
+    const s = tracesPayload([rec({ durationMs: 2500 })]).resourceSpans[0].scopeSpans[0].spans[0];
+    expect(BigInt(s.endTimeUnixNano) - BigInt(s.startTimeUnixNano)).toBe(2_500_000_000n);
+  });
+  it('zero-width span for ledger lines that predate durationMs', () => {
+    const s = tracesPayload([rec()]).resourceSpans[0].scopeSpans[0].spans[0];
+    expect(s.endTimeUnixNano).toBe(s.startTimeUnixNano);
+  });
+  it('negative duration clamps to zero-width (clock skew guard)', () => {
+    const s = tracesPayload([rec({ durationMs: -50 })]).resourceSpans[0].scopeSpans[0].spans[0];
+    expect(s.endTimeUnixNano).toBe(s.startTimeUnixNano);
+  });
+});
