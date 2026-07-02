@@ -12,6 +12,9 @@ eval/**/*.js
 fixtures/**/coverage/
 fixtures/**/test-fixtures/
 fixtures/**/src/mocks/
+# react-shop's mock-chained suite IS the fixture (eval input), not regenerable output
+!fixtures/react-shop/test-fixtures/
+!fixtures/react-shop/src/mocks/
 **/.probevane-vitest.json
 **/.probevane-pytest.xml
 **/.probevane-cover.out

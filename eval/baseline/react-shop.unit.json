@@ -1,0 +1,7 @@
+{
+  "scope": "unit",
+  "minTests": 20,
+  "minCoverage": 95,
+  "maxFlake": 0,
+  "oracleAssertions": ["fetchProduct(7)).rejects.toThrow('product 7: 404')", "formatPrice(-99)", "2 in stock"]
+}

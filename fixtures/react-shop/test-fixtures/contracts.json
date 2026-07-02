@@ -1,0 +1,34 @@
+{
+  "fixtures": {
+    "products": [
+      {
+        "id": 1,
+        "name": "Item 1",
+        "priceCents": 0,
+        "inStock": true
+      },
+      {
+        "id": 2,
+        "name": "Item 2",
+        "priceCents": 0,
+        "inStock": true
+      }
+    ]
+  },
+  "outputs": {
+    "src/format.ts#inStockOnly": [
+      {
+        "id": 1,
+        "name": "Item 1",
+        "priceCents": 0,
+        "inStock": true
+      },
+      {
+        "id": 2,
+        "name": "Item 2",
+        "priceCents": 0,
+        "inStock": true
+      }
+    ]
+  }
+}
