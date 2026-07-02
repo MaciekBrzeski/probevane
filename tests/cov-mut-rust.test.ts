@@ -74,3 +74,43 @@ describe('rustAdapter.run — parses cargo test report (kills :60/:61/:62/:68)',
     expect(r.green).toBe(false); // :68 failed===0 false → green false
   });
 });
+
+// =========================================================================
+// parseLlvmCovSummary — cargo-llvm-cov JSON totals → CoverageResult
+// =========================================================================
+import { parseLlvmCovSummary } from '../src/adapters/rust-cargo/index.js';
+
+describe('parseLlvmCovSummary', () => {
+  it('maps totals percentages (rounded to 2dp)', () => {
+    const j = JSON.stringify({
+      data: [{ totals: {
+        lines: { percent: 91.6667 },
+        functions: { percent: 100 },
+        regions: { percent: 88.4615 },
+        branches: { percent: 0 },
+      } }],
+    });
+    const c = parseLlvmCovSummary(j);
+    expect(c.ok).toBe(true);
+    expect(c.lines).toBe(91.67);
+    expect(c.functions).toBe(100);
+    expect(c.statements).toBe(88.46);
+    expect(c.branches).toBe(0);
+  });
+
+  it('missing branches key reads as 0, still ok', () => {
+    const j = JSON.stringify({ data: [{ totals: { lines: { percent: 50 } } }] });
+    const c = parseLlvmCovSummary(j);
+    expect(c.ok).toBe(true);
+    expect(c.lines).toBe(50);
+    expect(c.branches).toBe(0);
+  });
+
+  it('malformed JSON → ok:false', () => {
+    expect(parseLlvmCovSummary('not json').ok).toBe(false);
+  });
+
+  it('valid JSON without totals → ok:false', () => {
+    expect(parseLlvmCovSummary('{"data":[]}').ok).toBe(false);
+  });
+});
