@@ -21,6 +21,7 @@ export interface MutationResult {
   total: number;
   killed: number;
   score: number; // killed/total (1 if none applicable)
+  budgetHit?: boolean; // true if the wall-budget cut the run short (partial score)
 }
 
 /** A mutant the current suite does NOT catch — the actionable signal for
@@ -267,20 +268,46 @@ export async function mutationScore(
   adapter: StackAdapter,
   maxMutants = 5,
   maxTargets = 3,
+  opts: { budgetMs?: number; scope?: string[] } = {},
 ): Promise<MutationResult> {
-  const targets = (await adapter.discover(dir, 'unit')).slice(0, maxTargets);
+  let targets = await adapter.discover(dir, 'unit');
+  // Scope: prefer targets whose source matches a file the run just tested, so we
+  // mutate what THIS run covered rather than arbitrary discover-first-N. Clean
+  // fallback to all targets when nothing matches (heuristic, never fails closed).
+  if (opts.scope?.length) {
+    const want = new Set(opts.scope.map(sourceStem));
+    const hit = targets.filter((t) => want.has(sourceStem(t.sourcePath)));
+    if (hit.length) targets = hit;
+  }
+  targets = targets.slice(0, maxTargets);
+  const deadline = opts.budgetMs != null ? Date.now() + opts.budgetMs : Infinity;
   let total = 0;
   let killed = 0;
+  let budgetHit = false;
   for (const t of targets) {
     const ctx = await targetCtx(dir, adapter, t.sourcePath);
     if (!ctx) continue;
     for (const [re, repl] of MUTATIONS) {
       if (total >= maxMutants) break;
+      // Wall-budget: each mutant re-runs the suite. If we're out of time, stop and
+      // flag it — the gate treats a budget-truncated run as advisory (never a false
+      // block, never a CI deadlock).
+      if (Date.now() >= deadline) { budgetHit = true; break; }
       const result = await scoreMutant(ctx, re, repl);
       if (result === null) continue;
       total++;
       if (result) killed++;
     }
+    if (budgetHit) break;
   }
-  return { total, killed, score: total ? killed / total : 1 };
+  // Only surface budgetHit when true — keeps the common result shape stable for
+  // callers that deep-equal it.
+  return { total, killed, score: total ? killed / total : 1, ...(budgetHit ? { budgetHit } : {}) };
+}
+
+/** Filename stem (no dir, no extension, no .test/.spec) — for matching a test
+ *  file back to the source it covers. `src/format.test.ts` → `format`. */
+function sourceStem(path: string): string {
+  const base = path.split('/').pop() ?? path;
+  return base.replace(/\.(test|spec)\./, '.').replace(/\.[^.]+$/, '');
 }

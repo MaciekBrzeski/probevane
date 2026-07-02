@@ -15,6 +15,7 @@ export interface ProbevaneConfig {
   maxSteps?: number;
   mock?: boolean;
   mutation?: boolean;
+  strict?: boolean; // correctness floor: enforce mutation gate + mutation-target steering
   flakeGuard?: boolean;
   a11y?: boolean;
   visual?: boolean;
@@ -32,7 +33,7 @@ const NAMES = ['probevane.config.ts', 'probevane.config.js', 'probevane.config.m
 const SCHEMA: Record<keyof ProbevaneConfig, 'string' | 'number' | 'boolean'> = {
   model: 'string', kind: 'string', minTests: 'number', minCoverage: 'number',
   maxTargets: 'number', maxSteps: 'number', mock: 'boolean', mutation: 'boolean',
-  flakeGuard: 'boolean', a11y: 'boolean', visual: 'boolean', quality: 'boolean',
+  strict: 'boolean', flakeGuard: 'boolean', a11y: 'boolean', visual: 'boolean', quality: 'boolean',
   mfe: 'boolean', takeover: 'string', budget: 'number',
 };
 

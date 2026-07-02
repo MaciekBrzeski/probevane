@@ -19,6 +19,7 @@ Unified agentic harness that adds **unit + e2e tests** to a project. Distills th
 - CLI: `./bin/probevane <cmd> <dir>`. Commands: init, plan, generate, run, audit, coverage, learn, eval, status.
 - Adapters never let the model guess: `probe()` gathers ground truth first; a failed probe is a hard `plan_first` block.
 - improvement-log is append-only (fourier rule). Failing eval cases stay flagged, never deleted.
+- Default gates measure **well-formedness** (green, anti-patterns, min count, coverage %). The **correctness** floor — does the suite actually catch bugs? — is the mutation gate, opt-in via `--strict` (or `strict: true` config) and default-on in self-eval CI. `--strict` also steers the model to kill surviving mutants. Budget-capped + advisory on timeout (never a false block / CI deadlock).
 
 ## Phase status
 ALL phases (P0–P6) complete. React (unit+e2e) and Python (unit) adapters; gated write_tests loop = context_inject → path_guard → plan_first → no_regression → validation_gate → audit_gate → acceptance_gate → session_diary → caveat_harvest, with a consult ladder + Sonnet takeover on stalls. Self-eval CI over 3 fixtures. Proven on a fresh unseen React app (0→22 unit @100% cov + 5 e2e @0 flake) and Python (0→22 pytest). Living wiki: `npm run wiki`. Full record in `docs/wiki/Phase-Log.md`; plan at `/home/wruszbit/.claude/plans/hi-we-recently-had-jaunty-axolotl.md`.

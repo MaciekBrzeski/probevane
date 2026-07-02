@@ -37,6 +37,11 @@ async function liveGenerate(c: EvalCase, dir: string, adapter: Adapter, base: Ba
     brain: anthropicBrain(),
     minTests: base.minTests,
     minCoverage: base.minCoverage,
+    // Strict: CI enforces the correctness floor (mutation gate) + proactively
+    // steers the model to kill surviving mutants. Self-eval is where default-on
+    // bites — every fixture must prove its suite catches bugs, not just runs green.
+    mutation: true,
+    mutationTarget: true,
     log: (l) => console.error(l),
   }).catch((e) => {
     console.error(`[eval] generation failed: ${e}`);

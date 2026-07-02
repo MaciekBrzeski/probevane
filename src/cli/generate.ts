@@ -11,7 +11,9 @@ import { loadConfig, pick } from '../config.js';
 import type { TestKind } from '../adapters/adapter.js';
 
 // probevane generate <dir> [--kind unit|e2e] [--model …] [--max-steps N] [--max-targets N]
-//   [--min-tests N] [--min-coverage P]
+//   [--min-tests N] [--min-coverage P] [--strict]
+//   --strict: correctness floor — enforce the mutation gate + steer the model to kill
+//             surviving mutants (the suite must CATCH bugs, not just run green).
 //
 // Precedence for every option: CLI flag > probevane.config.{ts,json} > default.
 
@@ -51,7 +53,11 @@ function buildGenOpts(
   const maxTargets = pick(num(flag(args, '--max-targets')), cfg.maxTargets, 8)!;
   const minTests = pick(num(flag(args, '--min-tests')), cfg.minTests, kind === 'e2e' ? 1 : 5)!;
   const minCoverage = pick(num(flag(args, '--min-coverage')), cfg.minCoverage);
-  const mutation = args.includes('--mutation') || cfg.mutation === true;
+  // --strict: turn on the CORRECTNESS floor (KB: default gates measure well-formedness,
+  // not correctness). Enforces the mutation gate + proactively steers the model to kill
+  // surviving mutants. Off for casual runs (mutation re-runs the suite per mutant).
+  const strict = args.includes('--strict') || cfg.strict === true;
+  const mutation = strict || args.includes('--mutation') || cfg.mutation === true;
   const mock = args.includes('--mock') || (!args.includes('--no-mock') && (cfg.mock ?? kind === 'unit'));
   const targetGaps = args.includes('--target-gaps');
   const flakeGuard = args.includes('--flake-guard') || cfg.flakeGuard === true;
@@ -85,7 +91,7 @@ function buildGenOpts(
     mock,
     targetGaps,
     property: args.includes('--property'),
-    mutationTarget: args.includes('--mutation-target'),
+    mutationTarget: strict || args.includes('--mutation-target'),
     log: (l: string) => console.error(l),
   });
 }
