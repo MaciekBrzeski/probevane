@@ -267,6 +267,7 @@ describe('validation_gate tsc error counting', () => {
 
 describe('playwright-test-import audit rule', () => {
   it('flags bare playwright/test, allows @playwright/test', () => {
+    // probevane-allow: playwright-test-import — fixture string, not a real call
     const bad = auditSource('e2e/a.spec.ts', `import { test } from 'playwright/test';`, jsAuditRules());
     expect(bad.map((v) => v.rule)).toContain('playwright-test-import');
     const ok = auditSource('e2e/a.spec.ts', `import { test } from '@playwright/test';`, jsAuditRules());
