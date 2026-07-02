@@ -87,6 +87,43 @@ describe('improvement-log', () => {
     // unset columns become '' (the `?? ''` branch)
     expect(rows[0].coverage).toBe('');
   });
+
+  it('appendLog to an old-schema file appends a NEW header line, never rewrites', async () => {
+    const oldHeader = 'timestamp,target,kind,pass,audit_score,tests,coverage,flake,library_good,library_bad,note';
+    const oldRow = '2026-06-24T00:00:00.000Z,react-todo,unit,1,5,2,92.85,0,,,ci-baseline';
+    const { writeFile, mkdir } = await import('node:fs/promises');
+    await mkdir(join(dir, 'nested'), { recursive: true });
+    await writeFile(logPath, oldHeader + '\n' + oldRow + '\n');
+
+    await appendLog(logPath, { target: 'py-calc', mutation: 0.8, cost_usd: 0.12 });
+    const lines = (await readFile(logPath, 'utf8')).trim().split('\n');
+    // old era untouched, new header inserted before the new row
+    expect(lines[0]).toBe(oldHeader);
+    expect(lines[1]).toBe(oldRow);
+    expect(lines[2]).toBe(LOG_COLUMNS.join(','));
+    expect(lines[3]).toContain('py-calc');
+    // a further append reuses the current header (no duplicate)
+    await appendLog(logPath, { target: 'vue-counter' });
+    const again = (await readFile(logPath, 'utf8')).trim().split('\n');
+    expect(again.filter((l) => l.startsWith('timestamp,'))).toHaveLength(2);
+  });
+
+  it('readLog parses each era with its own schema', async () => {
+    const oldHeader = 'timestamp,target,kind,pass,audit_score,tests,coverage,flake,library_good,library_bad,note';
+    const { writeFile, mkdir } = await import('node:fs/promises');
+    await mkdir(join(dir, 'nested'), { recursive: true });
+    await writeFile(logPath, oldHeader + '\n' + 'ts1,react-todo,unit,1,5,2,92.85,0,,,old-note\n');
+    await appendLog(logPath, { timestamp: 'ts2', target: 'py-calc', mutation: 0.8, tokens_in: 1200 });
+
+    const rows = await readLog(logPath);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].target).toBe('react-todo');
+    expect(rows[0].note).toBe('old-note');
+    expect(rows[0].mutation).toBeUndefined(); // old era has no such column
+    expect(rows[1].target).toBe('py-calc');
+    expect(rows[1].mutation).toBe('0.8');
+    expect(rows[1].tokens_in).toBe('1200');
+  });
 });
 
 // ---------------------------------------------------------------------------

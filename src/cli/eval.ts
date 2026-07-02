@@ -25,16 +25,19 @@ interface EvalCase {
   kind: 'unit' | 'e2e';
 }
 
-// Live mode: regenerate the fixture suite from zero before scoring.
-async function liveGenerate(c: EvalCase, dir: string, adapter: Adapter, base: Baseline): Promise<void> {
+// Live mode: regenerate the fixture suite from zero before scoring. Returns
+// the run's cost/token footprint so the improvement-log can join quality × $.
+interface LiveStats { costUsd: number; tokensIn: number; tokensOut: number }
+async function liveGenerate(c: EvalCase, dir: string, adapter: Adapter, base: Baseline): Promise<LiveStats | null> {
   const { anthropicBrain } = await import('../brain/anthropic-sdk.js');
   const { generateTests } = await import('../loop/run-generation.js');
+  const brain = anthropicBrain();
   console.log(`[eval] live generating ${c.fixture}.${c.kind}…`);
   const outcome = await generateTests({
     dir,
     kind: c.kind,
     adapter,
-    brain: anthropicBrain(),
+    brain,
     minTests: base.minTests,
     minCoverage: base.minCoverage,
     // Strict: CI enforces the correctness floor (mutation gate) + proactively
@@ -48,6 +51,13 @@ async function liveGenerate(c: EvalCase, dir: string, adapter: Adapter, base: Ba
     return null;
   });
   if (!outcome?.accepted) console.log(`[eval] ${c.fixture}.${c.kind}: generation did not accept`);
+  if (!outcome) return null;
+  const { costOf } = await import('../cost/pricing.js');
+  return {
+    costUsd: costOf(brain.model, { input: outcome.tokensIn, output: outcome.tokensOut, cacheRead: outcome.cacheRead }),
+    tokensIn: outcome.tokensIn,
+    tokensOut: outcome.tokensOut,
+  };
 }
 
 interface EvalOpts {
@@ -70,7 +80,7 @@ async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
   // Self-sufficient on a fresh host: bootstrap the fixture's toolchain
   // (e.g. python .venv). Idempotent; a failure surfaces in the score anyway.
   await adapter.install(dir).catch((e) => console.error(`[eval] install ${c.fixture}: ${e}`));
-  if (live) await liveGenerate(c, dir, adapter, base);
+  const stats = live ? await liveGenerate(c, dir, adapter, base) : null;
 
   const score = await scoreFixture(dir, adapter, {
     scope: c.kind,
@@ -78,6 +88,16 @@ async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
     oracleAssertions: base.oracleAssertions,
   });
   const verdict = judge(score, base);
+
+  // Live runs also grade correctness: does the fresh suite actually kill
+  // mutants? Budget-capped, best-effort — a mutation failure never blocks eval.
+  let mutation: number | undefined;
+  if (live) {
+    const { mutationScore } = await import('../loop/mutation.js');
+    mutation = await mutationScore(dir, adapter, 5, 3, { budgetMs: 60_000 })
+      .then((m) => (m.total > 0 ? Math.round((m.killed / m.total) * 100) / 100 : undefined))
+      .catch(() => undefined);
+  }
 
   await appendLog(logPath, {
     timestamp: stamp,
@@ -89,6 +109,10 @@ async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
     coverage: score.coverage,
     flake: score.flake,
     note: live ? 'live' : 'ci-baseline',
+    mutation,
+    cost_usd: stats ? Math.round(stats.costUsd * 1e4) / 1e4 : undefined,
+    tokens_in: stats?.tokensIn,
+    tokens_out: stats?.tokensOut,
   });
 
   const tag = verdict.pass ? 'PASS' : `FAIL (${verdict.reasons.join('; ')})`;
@@ -215,6 +239,7 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
     timestamp: stamp, target: c.fixture, kind: c.path, pass: ok ? 1 : 0,
     audit_score: score.auditScore, tests: score.tests, coverage: score.coverage,
     flake: score.flake, note: live ? (record ? 'path-record' : 'path-live') : 'path-replay',
+    tokens_in: outcome?.tokensIn, tokens_out: outcome?.tokensOut,
   });
   console.log(`[eval] ${c.fixture}.${c.path}: ${ok ? 'PASS' : `FAIL (${outcome?.accepted ? verdict.reasons.join('; ') : 'did not accept'})`} — tests=${score.tests} green=${score.green} audit=${score.auditScore}/5`);
   await rm(dir, { recursive: true, force: true }).catch(() => {});
