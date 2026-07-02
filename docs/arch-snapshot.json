@@ -1,0 +1,639 @@
+{
+  "metrics": {
+    "dirs": [
+      {
+        "dir": "loop",
+        "files": 55,
+        "fanOut": 13,
+        "fanIn": 2,
+        "imports": [
+          "adapters",
+          "audit",
+          "brain",
+          "cost",
+          "distill",
+          "docs",
+          "library",
+          "mfe",
+          "mock",
+          "observe",
+          "quality",
+          "review",
+          "util"
+        ]
+      },
+      {
+        "dir": "cli",
+        "files": 52,
+        "fanOut": 25,
+        "fanIn": 0,
+        "imports": [
+          "a11y",
+          "adapters",
+          "arch",
+          "audit",
+          "brain",
+          "config.ts",
+          "cost",
+          "distill",
+          "factory",
+          "git.ts",
+          "integrations",
+          "library",
+          "loop",
+          "mfe",
+          "mock",
+          "observe",
+          "plan",
+          "quality",
+          "review",
+          "search",
+          "server",
+          "skill",
+          "spec",
+          "util",
+          "visual"
+        ]
+      },
+      {
+        "dir": "adapters",
+        "files": 25,
+        "fanOut": 3,
+        "fanIn": 3,
+        "imports": [
+          "audit",
+          "library",
+          "util"
+        ]
+      },
+      {
+        "dir": "observe",
+        "files": 11,
+        "fanOut": 2,
+        "fanIn": 3,
+        "imports": [
+          "cost",
+          "util"
+        ]
+      },
+      {
+        "dir": "brain",
+        "files": 8,
+        "fanOut": 2,
+        "fanIn": 2,
+        "imports": [
+          "cost",
+          "util"
+        ]
+      },
+      {
+        "dir": "audit",
+        "files": 7,
+        "fanOut": 0,
+        "fanIn": 3,
+        "imports": []
+      },
+      {
+        "dir": "mfe",
+        "files": 7,
+        "fanOut": 1,
+        "fanIn": 3,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "util",
+        "files": 7,
+        "fanOut": 0,
+        "fanIn": 16,
+        "imports": []
+      },
+      {
+        "dir": "cost",
+        "files": 6,
+        "fanOut": 1,
+        "fanIn": 6,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "library",
+        "files": 6,
+        "fanOut": 1,
+        "fanIn": 3,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "mock",
+        "files": 6,
+        "fanOut": 1,
+        "fanIn": 5,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "quality",
+        "files": 6,
+        "fanOut": 0,
+        "fanIn": 3,
+        "imports": []
+      },
+      {
+        "dir": "distill",
+        "files": 4,
+        "fanOut": 1,
+        "fanIn": 2,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "visual",
+        "files": 4,
+        "fanOut": 1,
+        "fanIn": 1,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "factory",
+        "files": 3,
+        "fanOut": 5,
+        "fanIn": 1,
+        "imports": [
+          "adapters",
+          "cost",
+          "mfe",
+          "ship",
+          "util"
+        ]
+      },
+      {
+        "dir": "arch",
+        "files": 2,
+        "fanOut": 1,
+        "fanIn": 1,
+        "imports": [
+          "mock"
+        ]
+      },
+      {
+        "dir": "review",
+        "files": 2,
+        "fanOut": 1,
+        "fanIn": 2,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "search",
+        "files": 2,
+        "fanOut": 1,
+        "fanIn": 1,
+        "imports": [
+          "mock"
+        ]
+      },
+      {
+        "dir": "server",
+        "files": 2,
+        "fanOut": 6,
+        "fanIn": 1,
+        "imports": [
+          "cost",
+          "loop",
+          "observe",
+          "quality",
+          "ship",
+          "util"
+        ]
+      },
+      {
+        "dir": "ship",
+        "files": 2,
+        "fanOut": 1,
+        "fanIn": 2,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "skill",
+        "files": 2,
+        "fanOut": 0,
+        "fanIn": 1,
+        "imports": []
+      },
+      {
+        "dir": "a11y",
+        "files": 1,
+        "fanOut": 0,
+        "fanIn": 1,
+        "imports": []
+      },
+      {
+        "dir": "config.ts",
+        "files": 1,
+        "fanOut": 0,
+        "fanIn": 1,
+        "imports": []
+      },
+      {
+        "dir": "docs",
+        "files": 1,
+        "fanOut": 0,
+        "fanIn": 1,
+        "imports": []
+      },
+      {
+        "dir": "e2e",
+        "files": 1,
+        "fanOut": 0,
+        "fanIn": 0,
+        "imports": []
+      },
+      {
+        "dir": "git.ts",
+        "files": 1,
+        "fanOut": 1,
+        "fanIn": 1,
+        "imports": [
+          "util"
+        ]
+      },
+      {
+        "dir": "integrations",
+        "files": 1,
+        "fanOut": 0,
+        "fanIn": 1,
+        "imports": []
+      },
+      {
+        "dir": "plan",
+        "files": 1,
+        "fanOut": 0,
+        "fanIn": 1,
+        "imports": []
+      },
+      {
+        "dir": "spec",
+        "files": 1,
+        "fanOut": 1,
+        "fanIn": 1,
+        "imports": [
+          "mock"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cli",
+        "to": "adapters",
+        "count": 21
+      },
+      {
+        "from": "cli",
+        "to": "loop",
+        "count": 16
+      },
+      {
+        "from": "adapters",
+        "to": "util",
+        "count": 13
+      },
+      {
+        "from": "cli",
+        "to": "util",
+        "count": 11
+      },
+      {
+        "from": "server",
+        "to": "observe",
+        "count": 11
+      },
+      {
+        "from": "cli",
+        "to": "observe",
+        "count": 10
+      },
+      {
+        "from": "adapters",
+        "to": "audit",
+        "count": 8
+      },
+      {
+        "from": "adapters",
+        "to": "library",
+        "count": 8
+      },
+      {
+        "from": "loop",
+        "to": "util",
+        "count": 8
+      },
+      {
+        "from": "cli",
+        "to": "cost",
+        "count": 7
+      },
+      {
+        "from": "cli",
+        "to": "config.ts",
+        "count": 7
+      },
+      {
+        "from": "loop",
+        "to": "library",
+        "count": 7
+      },
+      {
+        "from": "cli",
+        "to": "git.ts",
+        "count": 6
+      },
+      {
+        "from": "cli",
+        "to": "factory",
+        "count": 6
+      },
+      {
+        "from": "cli",
+        "to": "mfe",
+        "count": 6
+      },
+      {
+        "from": "cli",
+        "to": "audit",
+        "count": 5
+      },
+      {
+        "from": "cli",
+        "to": "quality",
+        "count": 5
+      },
+      {
+        "from": "loop",
+        "to": "audit",
+        "count": 5
+      },
+      {
+        "from": "cli",
+        "to": "brain",
+        "count": 4
+      },
+      {
+        "from": "cli",
+        "to": "distill",
+        "count": 4
+      },
+      {
+        "from": "cli",
+        "to": "mock",
+        "count": 4
+      },
+      {
+        "from": "loop",
+        "to": "mock",
+        "count": 4
+      },
+      {
+        "from": "loop",
+        "to": "brain",
+        "count": 4
+      },
+      {
+        "from": "cli",
+        "to": "skill",
+        "count": 3
+      },
+      {
+        "from": "distill",
+        "to": "util",
+        "count": 3
+      },
+      {
+        "from": "review",
+        "to": "util",
+        "count": 3
+      },
+      {
+        "from": "server",
+        "to": "loop",
+        "count": 3
+      },
+      {
+        "from": "spec",
+        "to": "mock",
+        "count": 3
+      },
+      {
+        "from": "arch",
+        "to": "mock",
+        "count": 2
+      },
+      {
+        "from": "brain",
+        "to": "util",
+        "count": 2
+      },
+      {
+        "from": "cli",
+        "to": "review",
+        "count": 2
+      },
+      {
+        "from": "cli",
+        "to": "server",
+        "count": 2
+      },
+      {
+        "from": "cli",
+        "to": "visual",
+        "count": 2
+      },
+      {
+        "from": "cli",
+        "to": "library",
+        "count": 2
+      },
+      {
+        "from": "cli",
+        "to": "search",
+        "count": 2
+      },
+      {
+        "from": "cost",
+        "to": "util",
+        "count": 2
+      },
+      {
+        "from": "factory",
+        "to": "util",
+        "count": 2
+      },
+      {
+        "from": "factory",
+        "to": "mfe",
+        "count": 2
+      },
+      {
+        "from": "library",
+        "to": "util",
+        "count": 2
+      },
+      {
+        "from": "loop",
+        "to": "cost",
+        "count": 2
+      },
+      {
+        "from": "loop",
+        "to": "adapters",
+        "count": 2
+      },
+      {
+        "from": "loop",
+        "to": "quality",
+        "count": 2
+      },
+      {
+        "from": "loop",
+        "to": "distill",
+        "count": 2
+      },
+      {
+        "from": "loop",
+        "to": "review",
+        "count": 2
+      },
+      {
+        "from": "loop",
+        "to": "mfe",
+        "count": 2
+      },
+      {
+        "from": "observe",
+        "to": "cost",
+        "count": 2
+      },
+      {
+        "from": "observe",
+        "to": "util",
+        "count": 2
+      },
+      {
+        "from": "brain",
+        "to": "cost",
+        "count": 1
+      },
+      {
+        "from": "cli",
+        "to": "a11y",
+        "count": 1
+      },
+      {
+        "from": "cli",
+        "to": "integrations",
+        "count": 1
+      },
+      {
+        "from": "cli",
+        "to": "arch",
+        "count": 1
+      },
+      {
+        "from": "cli",
+        "to": "plan",
+        "count": 1
+      },
+      {
+        "from": "cli",
+        "to": "spec",
+        "count": 1
+      },
+      {
+        "from": "factory",
+        "to": "cost",
+        "count": 1
+      },
+      {
+        "from": "factory",
+        "to": "adapters",
+        "count": 1
+      },
+      {
+        "from": "factory",
+        "to": "ship",
+        "count": 1
+      },
+      {
+        "from": "git.ts",
+        "to": "util",
+        "count": 1
+      },
+      {
+        "from": "loop",
+        "to": "docs",
+        "count": 1
+      },
+      {
+        "from": "loop",
+        "to": "observe",
+        "count": 1
+      },
+      {
+        "from": "mfe",
+        "to": "util",
+        "count": 1
+      },
+      {
+        "from": "mock",
+        "to": "util",
+        "count": 1
+      },
+      {
+        "from": "search",
+        "to": "mock",
+        "count": 1
+      },
+      {
+        "from": "server",
+        "to": "util",
+        "count": 1
+      },
+      {
+        "from": "server",
+        "to": "cost",
+        "count": 1
+      },
+      {
+        "from": "server",
+        "to": "ship",
+        "count": 1
+      },
+      {
+        "from": "server",
+        "to": "quality",
+        "count": 1
+      },
+      {
+        "from": "ship",
+        "to": "util",
+        "count": 1
+      },
+      {
+        "from": "visual",
+        "to": "util",
+        "count": 1
+      }
+    ],
+    "cycles": []
+  }
+}

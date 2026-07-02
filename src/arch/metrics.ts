@@ -77,6 +77,38 @@ export function archMetrics(graph: ModuleGraph): ArchMetrics {
   return { dirs, edges: edges.sort((a, b) => b.count - a.count), cycles };
 }
 
+/**
+ * Diff two metric snapshots into human-readable drift lines. Report-only —
+ * feeds `arch --snapshot`, which prints drift against the committed snapshot
+ * so coupling regressions become visible over time. Empty array = no drift.
+ */
+export function archDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta = 3): string[] {
+  const out: string[] = [];
+  const prevDirs = new Map(prev.dirs.map((d) => [d.dir, d]));
+  const nextDirs = new Map(next.dirs.map((d) => [d.dir, d]));
+  for (const [dir, d] of nextDirs) {
+    const p = prevDirs.get(dir);
+    if (!p) { out.push(`+ dir ${dir}/ (${d.files} files)`); continue; }
+    if (p.files !== d.files) out.push(`~ ${dir}/ files ${p.files} → ${d.files}`);
+    if (p.fanOut !== d.fanOut) out.push(`~ ${dir}/ fanOut ${p.fanOut} → ${d.fanOut}`);
+  }
+  for (const dir of prevDirs.keys()) if (!nextDirs.has(dir)) out.push(`- dir ${dir}/ removed`);
+  const prevEdges = new Map(prev.edges.map((e) => [`${e.from}|${e.to}`, e.count]));
+  const nextEdges = new Map(next.edges.map((e) => [`${e.from}|${e.to}`, e.count]));
+  for (const [key, count] of nextEdges) {
+    const before = prevEdges.get(key) ?? 0;
+    if (Math.abs(count - before) >= minEdgeDelta)
+      out.push(`~ edge ${key.replace('|', ' → ')} ${before} → ${count}`);
+  }
+  for (const [key, count] of prevEdges)
+    if (!nextEdges.has(key) && count >= minEdgeDelta) out.push(`- edge ${key.replace('|', ' → ')} dropped (was ${count})`);
+  const cyc = (m: ArchMetrics) => new Set(m.cycles.map(([a, b]) => [a, b].sort().join('↔')));
+  const pc = cyc(prev), nc = cyc(next);
+  for (const c of nc) if (!pc.has(c)) out.push(`+ CYCLE ${c}`);
+  for (const c of pc) if (!nc.has(c)) out.push(`✓ cycle ${c} resolved`);
+  return out;
+}
+
 /** A compact text digest of the metrics for an LLM prompt. */
 export function archDigest(m: ArchMetrics): string {
   const lines: string[] = ['## Directory coupling (files · fanOut→ · fanIn←)'];
