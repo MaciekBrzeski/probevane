@@ -3,16 +3,13 @@ import { writeFile } from 'node:fs/promises';
 import { readRuns } from '../cost/ledger.js';
 import { statePath } from '../util/state.js';
 import { tracesPayload, metricsPayload, prometheusText } from '../observe/otel.js';
+import { flag } from './args.js';
 
 // probevane otel [--root <stateDir>] [--out <file>] [--endpoint <otlp-url>] [--prometheus]
 //
 // Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.*
 // spans + metrics) — write to a file, POST to a collector, or emit Prometheus
 // text. Reads existing runs.jsonl ($0, no LLM).
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 async function main() {
   const args = process.argv.slice(2);

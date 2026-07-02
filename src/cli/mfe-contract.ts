@@ -1,6 +1,7 @@
-import { resolve, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { planContracts } from '../mfe/contract-scan.js';
+import { dirArg } from './args.js';
 
 // probevane mfe-contract <dir> [--write] [--json]
 //
@@ -12,7 +13,7 @@ import { planContracts } from '../mfe/contract-scan.js';
 // Dry-run by default (lists planned files + notes); --write emits them.
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const write = args.includes('--write');
 
   const plan = await planContracts(dir);

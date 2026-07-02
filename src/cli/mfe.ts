@@ -3,6 +3,7 @@ import { readFile, writeFile, stat } from 'node:fs/promises';
 import { runMfe } from '../mfe/driver.js';
 import { parseRepoList } from '../factory/report.js';
 import { formatMfe } from '../mfe/standards.js';
+import { flag } from './args.js';
 
 // probevane mfe <repos.txt | dir...> [--contract] [--generate] [--fix]
 //               [--model …] [--concurrency N] [--report <path>]
@@ -12,10 +13,6 @@ import { formatMfe } from '../mfe/standards.js';
 // cross-repo shared-version alignment. Default (no LLM flags) = a $0 fleet
 // standards report; --contract adds deterministic contract tests; --generate /
 // --fix run the LLM loop. Writes a combined report.json.
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 async function resolveRepos(args: string[]): Promise<string[]> {
   const positionals = args.filter((a) => !a.startsWith('--'));

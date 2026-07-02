@@ -1,9 +1,10 @@
 import { createServer } from 'node:http';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { resolve, join, dirname } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sseFrame, tailFrom } from '../loop/observe.js';
+import { flag, dirArg } from './args.js';
 
 // probevane serve [dir] [--port N]
 //
@@ -12,14 +13,9 @@ import { sseFrame, tailFrom } from '../loop/observe.js';
 // gate blocks, tokens, and edits as the gated loop runs. Zero-dep native http,
 // mirrors the cc-remote wrap-the-CLI pattern. Read-only over the event log.
 const args = process.argv.slice(2);
-const DIR = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+const DIR = dirArg(args);
 const EVENTS = join(DIR, '.probevane');
-const PORT = Number(flag('--port') ?? process.env.PROBEVANE_SERVE_PORT ?? 7655);
-
-function flag(name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
+const PORT = Number(flag(args, '--port') ?? process.env.PROBEVANE_SERVE_PORT ?? 7655);
 
 // Byte-offset tailer: new lines appended to each events-*.jsonl since last seen.
 // The decision (which lines are new) is the pure `tailFrom`; this is just the I/O.

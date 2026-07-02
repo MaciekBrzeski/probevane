@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { adoClient, triggerWiql, parseDirective, summarize, type AdoConfig, type AdoDirective } from '../integrations/ado.js';
+import { flag } from './args.js';
 
 type Client = ReturnType<typeof adoClient>;
 
@@ -23,11 +24,6 @@ function resolvePat(): string {
 //
 // Auth/config: AZURE_DEVOPS_PAT (required), AZURE_DEVOPS_ORG, AZURE_DEVOPS_PROJECT
 // (or --org/--project). Board states default to the Basic process (To Do/Doing/Done).
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 function runCli(directive: AdoDirective): Promise<{ ok: boolean; out: string }> {
   const args: string[] = [directive.command, directive.dir, '--kind', directive.kind];

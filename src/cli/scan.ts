@@ -5,16 +5,13 @@ import { statePath } from '../util/state.js';
 import { appendJsonl } from '../util/jsonl.js';
 import { newItem } from '../observe/queue.js';
 import { parseRepoList } from '../factory/report.js';
+import { flag } from './args.js';
 
 // probevane scan <repos.txt | dir...> [--op generate] [--root <stateDir>] [...op flags]
 //
 // Intake: enqueue one work item per repo for the supervisor to dispatch. Feed it a
 // repo-list (or dirs); a daemon with PROBEVANE_QUEUE=1 drains them. The autonomous
 // front door to the dark factory.
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 async function isFile(p: string): Promise<boolean> {
   return await stat(p).then((s) => s.isFile()).catch(() => false);

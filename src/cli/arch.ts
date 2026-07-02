@@ -1,6 +1,7 @@
 import { resolve, join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { archCritique } from '../arch/critique.js';
+import { dirArg } from './args.js';
 
 // probevane arch <dir> [--no-llm] [--folder-only] [--snapshot [--out <file>]]
 //
@@ -13,7 +14,7 @@ import { archCritique } from '../arch/critique.js';
 // regressions visible over time. Still report-only, never a gate.
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const llm = !args.includes('--no-llm') && !args.includes('--folder-only') && !args.includes('--snapshot');
 
   if (args.includes('--snapshot')) return snapshot(dir, args);

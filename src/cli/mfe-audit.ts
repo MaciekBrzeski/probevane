@@ -3,6 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { scanMfe } from '../mfe/scan.js';
 import { formatMfe, versionAlign, type MfeViolation, type RepoShared, type MfeAudit } from '../mfe/standards.js';
 import { parseRepoList } from '../factory/report.js';
+import { flag } from './args.js';
 
 // probevane mfe-audit <dir | repos.txt> [--repos <file>] [--json] [--strict]
 //                     [--design-system <pkg>]
@@ -12,11 +13,6 @@ import { parseRepoList } from '../factory/report.js';
 // typed contracts — per repo. With multiple repos it also checks cross-repo shared
 // version alignment. Pure analysis ($0, no LLM). --strict exits 1 on errors — the
 // fitness function the refactor loop will later enforce.
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 async function isFile(p: string): Promise<boolean> {
   return (await stat(p).then((s) => s.isFile()).catch(() => false));

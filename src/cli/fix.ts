@@ -1,4 +1,5 @@
-import { flag, runPathCliMain } from './path-cli.js';
+import { runPathCliMain } from './path-cli.js';
+import { flag } from './args.js';
 
 // probevane fix <dir> --task "<issues to fix>" [--model …] [--budget N]
 //

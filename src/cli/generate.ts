@@ -1,4 +1,4 @@
-import { resolve, join } from 'node:path';
+import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { isEasyTarget } from '../loop/triage.js';
@@ -9,6 +9,7 @@ import { anthropicBrain } from '../brain/anthropic-sdk.js';
 import { generateTests } from '../loop/run-generation.js';
 import { loadConfig, pick } from '../config.js';
 import type { TestKind } from '../adapters/adapter.js';
+import { flag, dirArg } from './args.js';
 
 // probevane generate <dir> [--kind unit|e2e] [--model …] [--max-steps N] [--max-targets N]
 //   [--min-tests N] [--min-coverage P] [--strict]
@@ -22,10 +23,6 @@ type Adapter = Awaited<ReturnType<typeof selectAdapterOrThrow>>;
 type GenOpts = Parameters<typeof generateTests>[0];
 type Outcome = Awaited<ReturnType<typeof generateTests>>;
 
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 const num = (s?: string) => (s !== undefined ? parseInt(s, 10) : undefined);
 
 function resolveKind(args: string[], cfg: Cfg): TestKind {
@@ -267,7 +264,7 @@ async function maybeSpec(args: string[], dir: string, adapter: Adapter): Promise
 
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const cfg = await loadConfig(dir);
   const kind = resolveKind(args, cfg);
   const adapter = await selectAdapterOrThrow(dir);

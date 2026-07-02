@@ -1,5 +1,5 @@
-import { resolve } from 'node:path';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
+import { flag, dirArg } from './args.js';
 import { loadConfig, type ProbevaneConfig } from '../config.js';
 import { runPath } from '../loop/run-path.js';
 import type { ProfileName } from '../loop/profiles.js';
@@ -10,12 +10,6 @@ import type { RunOutcome } from '../loop/engine.js';
 // fix / migrate / document). Each of those used to repeat the same flag parsing,
 // runPath call, ACCEPTED/NOT-ACCEPTED print and exit handling; they now resolve
 // only their own task-building and delegate the rest to runPathCli.
-
-/** Read the value following `name` in argv (`--flag value`), or undefined. */
-export function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 /** Per-CLI knobs for the bits that legitimately differ between path commands. */
 export interface PathCliSpec {
@@ -62,7 +56,7 @@ export async function runPathCli(
   spec: PathCliSpec = {},
 ): Promise<void> {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const cfg = await loadConfig(dir);
   const model = flag(args, '--model') ?? cfg.model ?? 'auto';
   const maxSteps = parseInt(flag(args, '--max-steps') ?? String(cfg.maxSteps ?? (spec.maxStepsDefault ?? 30)), 10);

@@ -1,22 +1,18 @@
 import { readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { changedFiles, isSourceFile } from '../git.js';
 import { buildGraph, resolveLocalImports } from '../mock/graph.js';
 import { impactedSpecs } from '../loop/impact.js';
+import { flag, dirArg } from './args.js';
 
 // probevane impact <dir> [--base <ref>] [--run] [--json]
 //   Test-impact analysis: which specs are affected by the changes since <base>.
 //   --run executes only those (via the adapter); otherwise prints the set.
 
-function flag(args: string[], n: string): string | undefined {
-  const i = args.indexOf(n);
-  return i >= 0 ? args[i + 1] : undefined;
-}
-
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const base = flag(args, '--base') ?? 'HEAD~1';
   const adapter = await selectAdapterOrThrow(dir);
 

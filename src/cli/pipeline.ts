@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { describePipeline, pipelineMermaid, fullModel, PHASES, type Phase } from '../loop/describe.js';
 import type { ProfileName, ProfileOpts } from '../loop/profiles.js';
+import { flag } from './args.js';
 
 // probevane pipeline — describe the loop pipeline a config assembles, WITHOUT running it.
 //   probevane pipeline --profile feature --kind unit [--quality --mutation --flake --a11y
@@ -12,10 +13,6 @@ import type { ProfileName, ProfileOpts } from '../loop/profiles.js';
 
 const PROFILES = ['write_tests', 'feature', 'refactor', 'repair', 'fix', 'migrate', 'document', 'bare'];
 
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 function has(args: string[], name: string): boolean {
   return args.includes(name);
 }

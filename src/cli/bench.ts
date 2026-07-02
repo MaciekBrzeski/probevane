@@ -1,7 +1,7 @@
-import { resolve } from 'node:path';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { scoreSuite } from '../loop/passk.js';
 import { mutationScore } from '../loop/mutation.js';
+import { flag, dirArg } from './args.js';
 
 // probevane bench <dir> [--mutants N]
 //
@@ -10,7 +10,7 @@ import { mutationScore } from '../loop/mutation.js';
 // after `generate` to compare generated-vs-human side by side.
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const mutants = parseInt(flag(args, '--mutants') ?? '6', 10);
   const adapter = await selectAdapterOrThrow(dir);
 
@@ -31,11 +31,6 @@ async function main() {
       '',
     ].join('\n'),
   );
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {

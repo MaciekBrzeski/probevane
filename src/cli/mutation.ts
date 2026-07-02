@@ -1,17 +1,12 @@
-import { resolve } from 'node:path';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { runMutation, type MutationRun } from '../loop/mutation.js';
+import { flag, dirArg } from './args.js';
 
 // probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--json]
 //   Full per-site mutation test: flips operators (===/!==/>=/<=/&&/true/+) one at
 //   a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss —
 //   the real signal that coverage isn't catching bugs). --min-score P exits 1 if
 //   below (CI gate). --budget caps mutants (sampled evenly); omit for the default 50.
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 function report(r: MutationRun): void {
   console.log(
@@ -35,7 +30,7 @@ function report(r: MutationRun): void {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const adapter = await selectAdapterOrThrow(dir);
   const only = flag(args, '--only');
   const r = await runMutation(dir, adapter, {
