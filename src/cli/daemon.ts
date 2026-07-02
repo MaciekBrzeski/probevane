@@ -11,6 +11,7 @@ import { computeAlerts, shouldHalt, DEFAULT_ALERT_OPTS } from '../observe/alerts
 import { buildAlertPayload, newAlerts, alertKey } from '../observe/notify.js';
 import { initControl, jobs, getQueue, isPaused, setPaused, loadJobs, loadQueue, supervise } from '../server/daemon-control.js';
 import { initRoutes, handle } from '../server/daemon-routes.js';
+import { flag } from './args.js';
 
 // probevane daemon [--port N] [--root <stateDir>] [--interval SEC]
 //
@@ -23,14 +24,10 @@ import { initRoutes, handle } from '../server/daemon-routes.js';
 // Read-only over state — never mutates a ledger or library.
 
 const args = process.argv.slice(2);
-const flag = (n: string) => {
-  const i = args.indexOf(n);
-  return i >= 0 ? args[i + 1] : undefined;
-};
 
-const PORT = Number(flag('--port') ?? process.env.PROBEVANE_DAEMON_PORT ?? 7766);
-const ROOT = resolve(flag('--root') ?? stateRoot());
-const INTERVAL = Number(flag('--interval') ?? 60) * 1000;
+const PORT = Number(flag(args, '--port') ?? process.env.PROBEVANE_DAEMON_PORT ?? 7766);
+const ROOT = resolve(flag(args, '--root') ?? stateRoot());
+const INTERVAL = Number(flag(args, '--interval') ?? 60) * 1000;
 const LOG_PATH = join(ROOT, 'daemon.log.jsonl'); // self-contained under the scanned root
 const JOBS_PATH = join(ROOT, 'jobs.jsonl'); // persisted launched-job history (restart-safe)
 const QUEUE_PATH = join(ROOT, 'queue.jsonl');

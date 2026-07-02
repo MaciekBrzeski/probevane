@@ -4,6 +4,7 @@ import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { auditFiles } from '../audit/core.js';
 import { saveExample, LIB_ROOT } from '../library/store.js';
 import { recordAudit } from '../observe/audit.js';
+import { flag, dirArg } from './args.js';
 
 // probevane learn <dir> --file <spec> --category <c> [--kind unit|e2e] [--bad]
 //
@@ -11,7 +12,7 @@ import { recordAudit } from '../observe/audit.js';
 // (good by default) with an audit-derived score, so future runs can few-shot it.
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const file = flag(args, '--file');
   const category = flag(args, '--category') ?? 'misc';
   const kind = (flag(args, '--kind') ?? 'unit') as 'unit' | 'e2e';
@@ -48,11 +49,6 @@ async function main() {
   });
 
   console.log(`[probevane] saved ${quality} example → ${join(LIB_ROOT, rel)} (score ${report.score}/5)`);
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {

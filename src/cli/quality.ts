@@ -1,10 +1,10 @@
-import { resolve } from 'node:path';
 import { loadConfig } from '../config.js';
 import { formatQuality, DEFAULT_QUALITY, type QualityConfig, type QualityReport } from '../quality/analyze.js';
 import { scanProject } from '../quality/scan.js';
 import { changedFiles, isSourceFile } from '../git.js';
 import { writeBaseline, applyBaseline } from '../quality/baseline.js';
 import { toSarif } from '../quality/sarif.js';
+import { flag, dirArg } from './args.js';
 
 // probevane quality <dir> [--json] [--strict] [--max-file N] [--max-fn N]
 //                        [--max-complexity N] [--max-cognitive N] [--max-nesting N]
@@ -14,11 +14,6 @@ import { toSarif } from '../quality/sarif.js';
 // complexity / nesting / params, long lines, debt markers, import fan-out, and
 // duplication. Reports a 0–100 health grade. --strict exits 1 on any error-severity
 // violation (CI gate), complementing audit (test specs), assert-score, bench.
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 // Parse + validate a numeric flag: a present-but-bad value (NaN / ≤0) is a hard
 // error, not a silent pass-through that would weaken the gate.
@@ -67,7 +62,7 @@ function printReport(args: string[], report: QualityReport): void {
 
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const cfg = await loadConfig(dir).catch(() => ({}) as any);
   const qc = buildConfig(args, cfg);
 

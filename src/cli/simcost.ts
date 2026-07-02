@@ -5,6 +5,7 @@ import { isEasyTarget } from '../loop/triage.js';
 import { formatReport, simulateCost, savings } from '../cost/simulate.js';
 import { readRuns } from '../cost/ledger.js';
 import { projectLedger, formatProjection } from '../cost/project.js';
+import { flag } from './args.js';
 
 // probevane simcost [dir] [--easy N --hard M] [--local-hit R] [--json]
 //   With a dir: triage discovered modules → easy/hard counts → simulate.
@@ -13,11 +14,6 @@ import { projectLedger, formatProjection } from '../cost/project.js';
 // probevane simcost --project [--json]
 //   Reprice the metered token volume of all $0 (bridge/local) runs in the ledger
 //   at haiku/sonnet/opus rates — the start-to-finish "$0 run → API cost" number.
-
-function flag(args: string[], n: string): string | undefined {
-  const i = args.indexOf(n);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 async function main() {
   const args = process.argv.slice(2);

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { appendLog } from '../library/improvement-log.js';
 import { scoreFixture, judge, type Baseline } from '../../eval/scorer.js';
+import { flag } from './args.js';
 
 // probevane eval [--live] [--flake N]
 //
@@ -281,11 +282,6 @@ async function prepareLive(c: EvalCase, src: string): Promise<string> {
   const adapter = await selectAdapterOrThrow(dst);
   for (const spec of await adapter.specFiles(dst)) await rm(join(dst, spec)).catch(() => {});
   return dst;
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {

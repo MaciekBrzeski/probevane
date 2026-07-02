@@ -1,6 +1,7 @@
 import { readRuns, summarize } from '../cost/ledger.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
 import { computeAlerts, shouldHalt } from '../observe/alerts.js';
+import { flag } from './args.js';
 
 // probevane history [--limit N] [--json] [--trend [--days N]]
 //
@@ -67,11 +68,6 @@ function trend(runs: Awaited<ReturnType<typeof readRuns>>, args: string[]) {
   } else {
     console.log('\nno alerts');
   }
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => { console.error(String(e)); process.exit(1); });

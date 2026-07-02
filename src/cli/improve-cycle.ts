@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { pickBetter, readModelPointer, writeModelPointer, type EvalResult } from '../distill/improve.js';
+import { flag } from './args.js';
 
 // probevane improve-cycle [--promote <model>] [--compare <a.json> <b.json>] [--status]
 //
@@ -8,10 +9,6 @@ import { pickBetter, readModelPointer, writeModelPointer, type EvalResult } from
 // loop's default (writes <state>/model.json, which generate reads), or compare two
 // eval results and promote the better. LoRA training stays `distill train
 // --execute` (GPU); this auto-measures/auto-promotes among available models.
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 async function main() {
   const args = process.argv.slice(2);

@@ -1,6 +1,6 @@
-import { resolve } from 'node:path';
 import { runDoctor } from '../doctor/checks.js';
 import { selectAdapter } from '../adapters/registry.js';
+import { dirArg } from './args.js';
 
 // probevane doctor <dir> [--fix] [--json]
 //
@@ -11,7 +11,7 @@ import { selectAdapter } from '../adapters/registry.js';
 // src/doctor/checks.ts for provenance. Exit 1 when unfixed errors remain.
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const fix = args.includes('--fix');
 
   const adapter = await selectAdapter(dir);

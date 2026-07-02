@@ -1,4 +1,4 @@
-import { resolve, join } from 'node:path';
+import { join } from 'node:path';
 import { access, appendFile, readFile } from 'node:fs/promises';
 import { selectAdapter } from '../adapters/registry.js';
 import { isEasyTarget } from '../loop/triage.js';
@@ -9,6 +9,7 @@ import { getDiff, reviewDiffText, findingsMarkdown, findingsTask } from '../revi
 import { groundFindings, verifyFindings } from '../review/verify.js';
 import { brainFor } from '../brain/select.js';
 import { sh } from '../util/exec.js';
+import { flag, dirArg } from './args.js';
 
 // probevane ci <dir> [--base <ref>] [--generate]
 //
@@ -108,7 +109,7 @@ async function costPreview(dir: string, untested: string[]): Promise<string> {
 
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const cfg = await loadConfig(dir);
   const base = flag(args, '--base') ?? 'HEAD~1';
   const doGenerate = args.includes('--generate');
@@ -151,10 +152,6 @@ async function emit(md: string): Promise<void> {
   if (summary) await appendFile(summary, md + '\n').catch(() => {});
 }
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 main().catch((e) => {
   console.error(String(e));

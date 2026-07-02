@@ -1,24 +1,20 @@
-import { resolve } from 'node:path';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { parseGaps } from '../coverage/gaps.js';
 import { scanProject } from '../quality/scan.js';
 import { scanMfe } from '../mfe/scan.js';
 import { buildPlan, untestedTargets, formatPlan } from '../plan/build.js';
 import type { TestKind } from '../adapters/adapter.js';
+import { flag, dirArg } from './args.js';
 
 // probevane plan <dir> [--kind unit|e2e] [--json]
 //
 // Read-only action plan ($0, no LLM): combine untested targets, coverage gaps,
 // source-quality errors, and MFE standards errors into a prioritized to-do list of
 // generate/refactor/fix/mfe-fix steps. The map before you point the loop at a repo.
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const kind = (flag(args, '--kind') ?? 'unit') as TestKind;
 
   const adapter = await selectAdapterOrThrow(dir);

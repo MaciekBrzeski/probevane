@@ -3,6 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { buildSearchIndex, rankBySimilarity, similarPairs } from '../search/index.js';
 import { embedText, embedModel } from '../search/embed.js';
+import { flag } from './args.js';
 
 // probevane search <dir> "<concept>"     — modules most similar to a concept
 // probevane search <dir> --similar       — semantically-duplicate module PAIRS
@@ -11,11 +12,6 @@ import { embedText, embedModel } from '../search/embed.js';
 // Embedding endpoint: local ollama by default; PROBEVANE_EMBED_URL/_MODEL/_API_KEY override.
 
 const VALUE_FLAGS = new Set(['--top', '--threshold', '--query']);
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
 
 function positionals(args: string[]): string[] {
   const pos: string[] = [];

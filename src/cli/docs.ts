@@ -1,6 +1,7 @@
-import { resolve, basename, isAbsolute, relative } from 'node:path';
+import { basename, isAbsolute, relative } from 'node:path';
 import { loadConfig } from '../config.js';
 import { runDocs } from '../loop/run-docs.js';
+import { flag, dirArg } from './args.js';
 
 // probevane docs <dir> [--out <path>] [--sections a,b,c] [--model …] [--max-steps N] [--budget N]
 //
@@ -12,7 +13,7 @@ const DEFAULT_SECTIONS = 'Overview,Architecture,Key concepts,Project layout,Gett
 
 async function main() {
   const args = process.argv.slice(2);
-  const dir = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
+  const dir = dirArg(args);
   const cfg = await loadConfig(dir);
   const name = basename(dir);
 
@@ -38,11 +39,6 @@ async function main() {
       `tokens=${outcome.tokensIn}/${outcome.tokensOut}${outcome.tookOver ? ' (took over)' : ''} -> ${out}`,
   );
   if (!outcome.accepted) process.exit(1);
-}
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 main().catch((e) => {
