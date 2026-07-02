@@ -76,3 +76,52 @@ describe('arch.archPrompt', () => {
     expect(p).toContain('3 modules');
   });
 });
+
+// ---------------------------------------------------------------------------
+// archDrift — snapshot diffing
+// ---------------------------------------------------------------------------
+import { archDrift, type ArchMetrics } from '../src/arch/metrics.js';
+
+const M = (over: Partial<ArchMetrics> = {}): ArchMetrics => ({
+  dirs: [{ dir: 'loop', files: 10, fanOut: 2, fanIn: 3, imports: ['brain', 'util'] }],
+  edges: [{ from: 'loop', to: 'brain', count: 5 }],
+  cycles: [],
+  ...over,
+});
+
+describe('archDrift', () => {
+  it('identical snapshots → no drift', () => {
+    expect(archDrift(M(), M())).toEqual([]);
+  });
+
+  it('reports added/removed dirs and file-count changes', () => {
+    const next = M({ dirs: [
+      { dir: 'loop', files: 12, fanOut: 2, fanIn: 3, imports: [] },
+      { dir: 'server', files: 2, fanOut: 1, fanIn: 0, imports: [] },
+    ] });
+    const d = archDrift(M(), next);
+    expect(d).toContain('~ loop/ files 10 → 12');
+    expect(d).toContain('+ dir server/ (2 files)');
+    const gone = archDrift(next, M());
+    expect(gone).toContain('- dir server/ removed');
+  });
+
+  it('edge deltas below the threshold are noise, above are drift', () => {
+    const next = M({ edges: [{ from: 'loop', to: 'brain', count: 7 }] });
+    expect(archDrift(M(), next)).toEqual([]); // +2 < default 3
+    const big = M({ edges: [{ from: 'loop', to: 'brain', count: 9 }] });
+    expect(archDrift(M(), big)).toContain('~ edge loop → brain 5 → 9');
+    expect(archDrift(M(), next, 2)).toContain('~ edge loop → brain 5 → 7'); // custom threshold
+  });
+
+  it('flags new cycles loudly and resolved ones positively', () => {
+    const withCycle = M({ cycles: [['library', 'observe']] });
+    expect(archDrift(M(), withCycle)).toContain('+ CYCLE library↔observe');
+    expect(archDrift(withCycle, M())).toContain('✓ cycle library↔observe resolved');
+  });
+
+  it('dropped heavy edge is reported', () => {
+    const next = M({ edges: [] });
+    expect(archDrift(M(), next)).toContain('- edge loop → brain dropped (was 5)');
+  });
+});

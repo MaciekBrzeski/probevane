@@ -48,19 +48,19 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `audit` | Static quality gate over the spec files (exit 1 on errors). |
 | `status` | Quick dashboard: adapter, suite result, coverage. |
 | `learn` | Save a spec to the cross-project learning library. |
-| `eval` | Run probevane's fixture eval (self-test of the harness); --live regenerates. |
+| `eval` | Run probevane's fixture eval (self-test of the harness); --live regenerates; --paths replays the refactor/feature/repair cassettes (--record --model bridge re-records for $0). |
 | `watch` | Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop. |
 | `skill` | Generate/check the probevane control skill (this doc). --check fails on drift. |
 | `improve-cycle` | Close the self-improvement loop — promote a model as the loop default (writes <state>/model.json, which generate reads when no --model/config given), or --compare two eval results and promote the better (higher acceptance, then lower cost). LoRA training stays distill train --execute; this auto-measures/auto-promotes. |
 | `distill` | Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:. |
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
-| `arch` | Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits. |
+| `arch` | Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits. --snapshot persists the coupling metrics (docs/arch-snapshot.json) and prints drift vs the previous snapshot — commit it to make coupling regressions visible over time. |
 | `design` | Combined design loop — write a Playwright spec that screenshots each page/tab, a vision model judges each shot for design practice, then rewrite the target html's <style> to address findings, and repeat. Leaves the spec as a visual-regression test. $0 vision via PROBEVANE_VISION_BASE (ollama cloud minimax-m3). |
 | `enqueue` | Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake. |
 | `scan` | Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon). |
 | `otel` | Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans — one per run — + metrics: token usage, runs, acceptance, cost by model) → write a file, POST to a collector (--endpoint / OTEL_EXPORTER_OTLP_ENDPOINT), or emit Prometheus text (--prometheus). $0, reads runs.jsonl. |
-| `history` | Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown. |
+| `history` | Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown; --trend adds the daily time-series + the daemon’s cost/acceptance alerts. |
 | `peek` | Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console. |
 | `revert` | Undo a run — restore the files a run edited to its pre-run checkpoint (or remove ones it created), from the diary record. Safety net for a crashed/bad run. |
 | `impact` | Test-impact analysis — which specs are affected by the diff since <base> (transitive import graph); --run executes only those to speed CI. |
@@ -286,10 +286,10 @@ probevane learn ./app --file src/x.test.ts --category crud
 ```
 
 ### eval
-Run probevane's fixture eval (self-test of the harness); --live regenerates.
+Run probevane's fixture eval (self-test of the harness); --live regenerates; --paths replays the refactor/feature/repair cassettes (--record --model bridge re-records for $0).
 
 ```
-probevane eval [--live] [--flake N]
+probevane eval [--live] [--flake N] [--paths [--record] [--model <m>]]
 # e.g.
 probevane eval
 ```
@@ -349,10 +349,10 @@ probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal
 ```
 
 ### arch
-Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits.
+Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits. --snapshot persists the coupling metrics (docs/arch-snapshot.json) and prints drift vs the previous snapshot — commit it to make coupling regressions visible over time.
 
 ```
-probevane arch <dir> [--no-llm] [--folder-only]
+probevane arch <dir> [--no-llm] [--folder-only] [--snapshot [--out <file>]]
 # e.g.
 probevane arch . --no-llm
 ```
@@ -394,12 +394,12 @@ probevane otel --prometheus
 ```
 
 ### history
-Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown.
+Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown; --trend adds the daily time-series + the daemon’s cost/acceptance alerts.
 
 ```
-probevane history [--limit N] [--json]
+probevane history [--limit N] [--json] [--trend [--days N]]
 # e.g.
-probevane history
+probevane history --trend
 ```
 
 ### peek
