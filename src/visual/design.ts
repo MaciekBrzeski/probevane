@@ -31,6 +31,9 @@ export interface DesignOpts {
   width?: number;
   settleMs?: number;
   log?: (l: string) => void;
+  /** Injectable seams (tests drive the loop without a browser/model). Default to the real fns. */
+  capture?: typeof capturePages;
+  ask?: (imagePath: string, system: string, user: string) => Promise<string>;
 }
 
 const JUDGE_SYSTEM =
@@ -111,6 +114,8 @@ export interface DesignRound {
 
 export async function designLoop(opts: DesignOpts): Promise<{ rounds: DesignRound[]; shots: string[] }> {
   const log = opts.log ?? (() => {});
+  const capture = opts.capture ?? capturePages;
+  const ask = opts.ask ?? visionAsk;
   const rounds = opts.rounds ?? 2;
   await mkdir(opts.outDir, { recursive: true });
   if (opts.specFile) {
@@ -122,11 +127,11 @@ export async function designLoop(opts: DesignOpts): Promise<{ rounds: DesignRoun
 
   for (let r = 1; r <= rounds; r++) {
     const capOpts = { width: opts.width, settleMs: opts.settleMs };
-    const shots = await capturePages(opts.url, opts.pages, opts.outDir, r, capOpts);
+    const shots = await capture(opts.url, opts.pages, opts.outDir, r, capOpts);
     allShots.push(...shots.map((s) => s.path));
     const findings: { name: string; text: string }[] = [];
     for (const s of shots) {
-      const verdict = (await visionAsk(s.path, JUDGE_SYSTEM, `GOAL: ${opts.goal}\nPAGE: ${s.name}`)).trim();
+      const verdict = (await ask(s.path, JUDGE_SYSTEM, `GOAL: ${opts.goal}\nPAGE: ${s.name}`)).trim();
       findings.push({ name: s.name, text: verdict });
       log(`[design] r${r} judge ${s.name}: ${/^OK\b/i.test(verdict) ? 'OK' : verdict.split('\n')[0].slice(0, 80)}`);
     }
@@ -138,7 +143,7 @@ export async function designLoop(opts: DesignOpts): Promise<{ rounds: DesignRoun
     if (!style) { log('[design] no <style> block in target — cannot rewrite'); history.push({ round: r, findings, edited: false }); break; }
     const findingText = actionable.map((f) => `## ${f.name}\n${f.text}`).join('\n\n');
     const worst = shots.find((s) => s.name === actionable[0].name)!.path;
-    const reply = await visionAsk(worst, REWRITE_SYSTEM, `FINDINGS:\n${findingText}\n\nCURRENT CSS:\n${style.css}`);
+    const reply = await ask(worst, REWRITE_SYSTEM, `FINDINGS:\n${findingText}\n\nCURRENT CSS:\n${style.css}`);
     const nextCss = extractFence(reply);
     if (!nextCss) { log(`[design] r${r}: no CSS returned — stopping`); history.push({ round: r, findings, edited: false }); break; }
     await writeFile(opts.targetFile, spliceStyle(html, nextCss));
