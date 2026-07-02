@@ -46,8 +46,10 @@ export function tracesPayload(records: RunRecord[]) {
       spanId: hashHex(r.runId + ':s', 16),
       name: r.label || 'probevane.run',
       kind: 1, // INTERNAL
-      startTimeUnixNano: t, // duration isn't tracked per run → zero-width span
-      endTimeUnixNano: t,
+      startTimeUnixNano: t,
+      // Real span width when the run recorded a duration; zero-width for
+      // ledger lines that predate the durationMs field.
+      endTimeUnixNano: String(BigInt(t) + BigInt(Math.max(0, Math.round(r.durationMs ?? 0))) * 1_000_000n),
       attributes: [
         attr('gen_ai.system', 'anthropic'),
         attr('gen_ai.request.model', r.model),

@@ -23,6 +23,8 @@ export interface RunRecord {
   tookOver: boolean;
   stopReason: string;
   steps: number;
+  /** Wall-clock run duration. Optional: older ledger lines predate the field. */
+  durationMs?: number;
 }
 
 export async function recordRun(rec: Omit<RunRecord, 'cost'>): Promise<void> {
@@ -52,6 +54,9 @@ export interface LedgerSummary {
   needsHand: number;
   byModel: Record<string, { runs: number; cost: number }>;
   byPath: Record<string, { runs: number; cost: number; accepted: number }>;
+  /** Total/average wall-clock over runs that recorded a duration. */
+  totalDurationMs: number;
+  avgDurationMs: number;
 }
 
 /** Roll the ledger up into the headline numbers + the harness-vs-hand split. */
@@ -59,9 +64,11 @@ export function summarize(records: RunRecord[]): LedgerSummary {
   const s: LedgerSummary = {
     runs: records.length, totalCost: 0, totalTokensIn: 0, totalTokensOut: 0,
     accepted: 0, acceptRate: 0, harnessOnly: 0, withTakeover: 0, needsHand: 0,
-    byModel: {}, byPath: {},
+    byModel: {}, byPath: {}, totalDurationMs: 0, avgDurationMs: 0,
   };
+  let timed = 0;
   for (const r of records) {
+    if (typeof r.durationMs === 'number') { s.totalDurationMs += r.durationMs; timed++; }
     s.totalCost += r.cost; s.totalTokensIn += r.tokensIn; s.totalTokensOut += r.tokensOut;
     if (r.accepted) { s.accepted++; if (r.tookOver) s.withTakeover++; else s.harnessOnly++; } else s.needsHand++;
     const m = (s.byModel[r.model] ??= { runs: 0, cost: 0 }); m.runs++; m.cost += r.cost;
@@ -73,5 +80,6 @@ export function summarize(records: RunRecord[]): LedgerSummary {
   }
   s.totalCost = Math.round(s.totalCost * 1e6) / 1e6;
   s.acceptRate = records.length ? +(s.accepted / records.length).toFixed(3) : 0;
+  s.avgDurationMs = timed ? Math.round(s.totalDurationMs / timed) : 0;
   return s;
 }

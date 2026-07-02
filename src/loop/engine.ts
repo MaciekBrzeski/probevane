@@ -124,7 +124,7 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   };
   return {
     opts, ctx, runes, messages, system, log, st,
-    runId, eventsOn, eventsPath, transcriptOn, transcriptPath,
+    runId, startedMs: Date.now(), eventsOn, eventsPath, transcriptOn, transcriptPath,
     maxSteps, forceStopAfter, consultAfter, consultAtStep, nudgeAfter, readBudget: READ_BUDGET,
   };
 }
@@ -142,6 +142,7 @@ async function finalizeRun(lr: LoopRun): Promise<RunOutcome> {
     tokensIn: st.tokensIn, tokensOut: st.tokensOut, cacheRead: st.cacheRead,
     accepted: st.accepted, tookOver: st.tookOver, stopReason: st.stopReason, steps: ctx.step,
     costUsd: st.costUsd || undefined,
+    durationMs: Date.now() - lr.startedMs,
   });
   for (const r of runes) await r.onStop?.(ctx);
 
