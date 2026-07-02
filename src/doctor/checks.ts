@@ -1,7 +1,12 @@
-import { readFile, readdir, access } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type { StackAdapter } from '../adapters/adapter.js';
 import { sh } from '../util/exec.js';
+import { exists, lastLine, walkSrc, type DoctorFinding, type DoctorFix, type DoctorReport } from './shared.js';
+
+// Re-exports keep the public surface stable (CLI + tests import from checks.js).
+export * from './shared.js';
+export * from './lanes.js';
 
 // probevane doctor — health checks distilled from real field failures. Each
 // check DETECTS a class of issue that silently degrades the harness or the
@@ -22,29 +27,6 @@ import { sh } from '../util/exec.js';
 // - stale-cassette: replay cassettes drifted against prompt changes; the only
 //   symptom was a cryptic per-request miss.
 
-export type DoctorSeverity = 'error' | 'warn';
-
-export interface DoctorFinding {
-  check: string;
-  severity: DoctorSeverity;
-  message: string;
-  /** Set when --fix can resolve this automatically. */
-  fixable?: boolean;
-  /** Exact remediation for the human when not auto-fixable (or after --fix). */
-  hint?: string;
-}
-
-export interface DoctorFix {
-  finding: DoctorFinding;
-  apply: () => Promise<string>; // returns a one-line "what happened"
-}
-
-export interface DoctorReport {
-  findings: DoctorFinding[];
-  fixes: DoctorFix[];
-}
-
-const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
 /** Generated-artifact names that must never be git-tracked (evals dirty the tree otherwise). */
 const ARTIFACT_PATTERNS = [
@@ -231,6 +213,11 @@ export async function checkStaleCassettes(dir: string): Promise<DoctorReport> {
 }
 
 /** Run every check; adapter is optional (repo-only checks still run without one). */
+import {
+  checkNodeModules, checkPlaywrightBrowsers, checkConfig,
+  checkCredentials, checkEvalBijection, checkStaleCoverageReport,
+} from './lanes.js';
+
 export async function runDoctor(dir: string, adapter?: StackAdapter): Promise<DoctorReport> {
   const parts = await Promise.all([
     adapter ? checkToolchain(dir, adapter) : { findings: [], fixes: [] },
@@ -239,6 +226,12 @@ export async function runDoctor(dir: string, adapter?: StackAdapter): Promise<Do
     checkTrackedArtifacts(dir),
     checkCiSwallow(dir),
     checkStaleCassettes(dir),
+    checkNodeModules(dir),
+    checkPlaywrightBrowsers(dir),
+    checkConfig(dir),
+    checkCredentials(dir),
+    checkEvalBijection(dir),
+    checkStaleCoverageReport(dir),
   ]);
   return {
     findings: parts.flatMap((p) => p.findings),
@@ -265,26 +258,8 @@ async function coverageExcludes(dir: string): Promise<RegExp[]> {
 function globToRe(glob: string): RegExp {
   const re = glob
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*/g, ' ')
+    .replace(/\*\*/g, '\u0000')
     .replace(/\*/g, '[^/]*')
-    .replace(/ /g, '.*');
+    .replace(/\u0000/g, '.*');
   return new RegExp(`^${re}$`);
-}
-
-function lastLine(s: string | undefined): string {
-  const lines = (s ?? '').trim().split('\n').filter(Boolean);
-  return (lines[lines.length - 1] ?? '').slice(0, 160);
-}
-
-const SKIP = new Set(['node_modules', 'dist', 'coverage', '.git', '__pycache__', '.venv']);
-async function walkSrc(root: string, dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (!SKIP.has(e.name)) out.push(...(await walkSrc(root, join(dir, e.name))));
-    } else {
-      out.push(relative(root, join(dir, e.name)));
-    }
-  }
-  return out;
 }
