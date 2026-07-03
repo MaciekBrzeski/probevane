@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { layoutDag, chainToDag } from '../src/ui/app/layout.ts';
+import { layoutDag, chainToDag } from '../src/tui/layout.ts';
 
 // Pure DAG layout for the console graphs — deterministic, no physics.
 describe('layoutDag', () => {

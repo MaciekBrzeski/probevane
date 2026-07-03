@@ -1,7 +1,8 @@
-// Deterministic layered DAG layout for the console's node graphs — no physics,
-// no dependencies, same input → same picture. Longest-path layering (roots
-// left), then barycenter-ish ordering within a layer (parents' mean row),
-// finally pixel positions on a fixed grid. Pure: unit-tested from tests/.
+// Deterministic layered DAG layout — no physics, no dependencies, same input →
+// same picture. Longest-path layering (roots left), then barycenter-ish
+// ordering within a layer (parents' mean row), finally positions on a fixed
+// grid. Pure + unit-tested. Shared: the browser SVG pipeline graph
+// (ui/app/components/NodeGraph.tsx) and the terminal ANSI pipeline both use it.
 
 export interface LayoutNode {
   id: string;

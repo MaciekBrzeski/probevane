@@ -1,4 +1,5 @@
 import { $, j } from './lib.ts';
+import { pipelineReducer, replayDelayMs, type PipelineState } from '../../observe/pipeline.ts';
 
 // --- console tab: rune pipeline + telemetry + module constellation ----------
 type PipeRune = { name: string; phase: string; summary: string };
@@ -55,19 +56,11 @@ export async function loadConsole() {
 // state map: a blocking gate flashes err, the next productive tool call cools
 // it to active ("retrying through"), accept cascades every rune to ok, a
 // terminal failure leaves the blockers red. openRunLive feeds this.
-let PIPE_STATE: Record<string, 'idle' | 'active' | 'ok' | 'err'> = {};
+let PIPE_STATE: PipelineState = {};
 
 export function consolePipelineEvent(ev: { tool?: string; gate?: string; accepted?: boolean; stopReason?: string }) {
   if (!PIPE_RUNES.length) return;
-  if (ev.gate) PIPE_STATE[ev.gate] = 'err';
-  else if (ev.tool) {
-    // Progress after a block: the red gate is being worked through.
-    for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === 'err') PIPE_STATE[k] = 'active';
-  }
-  if (ev.accepted) for (const r of PIPE_RUNES) PIPE_STATE[r.name] = 'ok';
-  else if (ev.stopReason && ev.stopReason !== 'accepted') {
-    for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === 'active') PIPE_STATE[k] = 'err';
-  }
+  PIPE_STATE = pipelineReducer(PIPE_STATE, ev, PIPE_RUNES.map((r) => r.name));
   renderPipeline(PIPE_STATE);
 }
 
@@ -102,14 +95,11 @@ export function consoleTheater(runId: string, events: TheaterEvent[], onTick?: (
   consolePipelineReset();
   const line = (e: TheaterEvent) =>
     `[step ${e.step ?? '?'}] ${e.gate ? 'BLOCK ' + e.gate : e.accepted ? 'ACCEPTED' : e.stopReason ?? e.tool ?? ''}`;
-  const at = (i: number) => (events[i]?.ts ? Date.parse(events[i].ts!) : NaN);
   const play = (i: number) => {
     if (i >= events.length) { THEATER_TIMER = null; return; }
     consolePipelineEvent(events[i]);
     onTick?.(line(events[i]), i);
-    const gap = at(i + 1) - at(i);
-    const wait = Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
-    THEATER_TIMER = setTimeout(() => play(i + 1), wait);
+    THEATER_TIMER = setTimeout(() => play(i + 1), replayDelayMs(events[i]?.ts, events[i + 1]?.ts));
   };
   play(0);
 }

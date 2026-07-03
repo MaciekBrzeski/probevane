@@ -366,7 +366,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "turn " + (t.role === "user" ? "user" : "") }, /* @__PURE__ */ h("div", { class: "thead" }, `${t.role}${t.model ? " \xB7 " + t.model : ""} \xB7 step ${t.step}`), t.text && /* @__PURE__ */ h("div", { class: "txt" }, t.text), (t.toolCalls || []).map((c) => /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, "\u2192 " + c.name), /* @__PURE__ */ h("pre", null, typeof c.input === "string" ? c.input : JSON.stringify(c.input, null, 2)))), (t.toolResults || []).map((r) => /* @__PURE__ */ h("details", { class: r.ok ? "ok" : "err" }, /* @__PURE__ */ h("summary", null, (r.ok ? "\u2713 " : "\u2717 ") + r.name), /* @__PURE__ */ h("pre", null, r.content))));
   }
 
-  // src/ui/app/layout.ts
+  // src/tui/layout.ts
   function computeLayers(input, ids) {
     const layer = /* @__PURE__ */ new Map();
     for (const n of input) layer.set(n.id, 0);
@@ -485,6 +485,24 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "spark-wrap" }, /* @__PURE__ */ h("div", { class: "spark-label" }, props.label), svg);
   }
 
+  // src/observe/pipeline.ts
+  function pipelineReducer(state, ev, runeNames) {
+    const next = { ...state };
+    if (ev.gate) next[ev.gate] = "err";
+    else if (ev.tool) {
+      for (const k of Object.keys(next)) if (next[k] === "err") next[k] = "active";
+    }
+    if (ev.accepted) for (const r of runeNames) next[r] = "ok";
+    else if (ev.stopReason && ev.stopReason !== "accepted") {
+      for (const k of Object.keys(next)) if (next[k] === "active") next[k] = "err";
+    }
+    return next;
+  }
+  function replayDelayMs(prevTs, ts) {
+    const gap = prevTs && ts ? Date.parse(ts) - Date.parse(prevTs) : NaN;
+    return Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
+  }
+
   // src/ui/app/console.tsx
   var PIPE_RUNES = [];
   function renderPipeline(states = {}) {
@@ -551,14 +569,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   var PIPE_STATE = {};
   function consolePipelineEvent(ev) {
     if (!PIPE_RUNES.length) return;
-    if (ev.gate) PIPE_STATE[ev.gate] = "err";
-    else if (ev.tool) {
-      for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === "err") PIPE_STATE[k] = "active";
-    }
-    if (ev.accepted) for (const r of PIPE_RUNES) PIPE_STATE[r.name] = "ok";
-    else if (ev.stopReason && ev.stopReason !== "accepted") {
-      for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === "active") PIPE_STATE[k] = "err";
-    }
+    PIPE_STATE = pipelineReducer(PIPE_STATE, ev, PIPE_RUNES.map((r) => r.name));
     renderPipeline(PIPE_STATE);
   }
   function consolePipelineReset() {
@@ -583,7 +594,6 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     if (THEATER_TIMER) clearTimeout(THEATER_TIMER);
     consolePipelineReset();
     const line = (e) => `[step ${e.step ?? "?"}] ${e.gate ? "BLOCK " + e.gate : e.accepted ? "ACCEPTED" : e.stopReason ?? e.tool ?? ""}`;
-    const at = (i) => events[i]?.ts ? Date.parse(events[i].ts) : NaN;
     const play = (i) => {
       if (i >= events.length) {
         THEATER_TIMER = null;
@@ -591,9 +601,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       }
       consolePipelineEvent(events[i]);
       onTick?.(line(events[i]), i);
-      const gap = at(i + 1) - at(i);
-      const wait = Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
-      THEATER_TIMER = setTimeout(() => play(i + 1), wait);
+      THEATER_TIMER = setTimeout(() => play(i + 1), replayDelayMs(events[i]?.ts, events[i + 1]?.ts));
     };
     play(0);
   }

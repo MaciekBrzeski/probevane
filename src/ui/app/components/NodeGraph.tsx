@@ -1,4 +1,4 @@
-import { layoutDag, type LayoutNode } from '../layout.ts';
+import { layoutDag, type LayoutNode } from '../../../tui/layout.ts';
 import { esc } from '../lib.ts';
 
 // SVG DAG renderer for the console: nodes as glowing capsules, edges as
