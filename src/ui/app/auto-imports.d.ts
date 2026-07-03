@@ -18,6 +18,7 @@ declare global {
   const ScanFrame: typeof import('./components/ScanFrame.tsx').ScanFrame;
   const Spark: typeof import('./components/Spark.tsx').Spark;
   const Tabs: typeof import('./components/Tabs.tsx').Tabs;
+  const TerminalPanel: typeof import('./components/TerminalPanel.tsx').TerminalPanel;
   const Turn: typeof import('./components/Turn.tsx').Turn;
   const WikiPanel: typeof import('./components/WikiPanel.tsx').WikiPanel;
 }
