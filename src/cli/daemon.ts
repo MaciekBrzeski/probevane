@@ -11,6 +11,8 @@ import { computeAlerts, shouldHalt, DEFAULT_ALERT_OPTS } from '../observe/alerts
 import { buildAlertPayload, newAlerts, alertKey } from '../observe/notify.js';
 import { initControl, jobs, getQueue, isPaused, setPaused, loadJobs, loadQueue, supervise } from '../server/daemon-control.js';
 import { initRoutes, handle } from '../server/daemon-routes.js';
+import { initTerminal, reapIdle, reap, sessions } from '../server/terminal.js';
+import { initTermRoutes } from '../server/terminal-routes.js';
 import { flag } from './args.js';
 
 // probevane daemon [--port N] [--root <stateDir>] [--interval SEC]
@@ -130,6 +132,15 @@ const BUDGET_WINDOW = Number(process.env.PROBEVANE_BUDGET_WINDOW ?? 24); // hour
 const QUARANTINE = Number(process.env.PROBEVANE_QUARANTINE ?? 3); // re-queue with backoff up to N attempts
 const HALT_ON_ALERT = process.env.PROBEVANE_HALT_ON_ALERT === '1';
 
+// Terminal tab (opt-in — it's a shell, bypasses the launch allowlist). Off by
+// default; PROBEVANE_TERMINAL=1 arms the /term/* routes (loopback bind is the
+// only auth). PTY via the stdlib python3 bridge (no node-pty native dep).
+const TERMINAL_ON = process.env.PROBEVANE_TERMINAL === '1';
+const PROBE_ROOT = process.env.PROBEVANE_ROOT ?? resolve('.');
+const TERM_MAX_SESSIONS = Number(process.env.PROBEVANE_TERM_SESSIONS ?? 4);
+const TERM_RING = Number(process.env.PROBEVANE_TERM_RING ?? 512 * 1024);
+const TERM_IDLE_MS = Number(process.env.PROBEVANE_TERM_IDLE_MIN ?? 30) * 60 * 1000;
+
 initControl({
   BIN, JOBS_PATH, QUEUE_PATH, JOB_TAIL, MAX_JOBS, MAX_BODY, QUEUE_ON, SHIP_ON, QUARANTINE,
   BUDGET_CAP, BUDGET_WINDOW, log, sendJson, scanRuns,
@@ -137,6 +148,16 @@ initControl({
 initRoutes({
   VERSION, STARTED, ROOT, QUEUE_ON, JOBS_RETURN, AUDIT_RETURN, DASHBOARD, WIKI_DIR, alertOpts, log, sendJson, scanRuns,
 });
+initTerminal({
+  BRIDGE: join(PROBE_ROOT, 'scripts', 'pty-bridge.py'),
+  PYTHON: process.env.PROBEVANE_PY ?? 'python3',
+  DEFAULT_CWD: PROBE_ROOT,
+  MAX_SESSIONS: TERM_MAX_SESSIONS, RING_BYTES: TERM_RING, log,
+});
+initTermRoutes({ sendJson, MAX_BODY, DEFAULT_CWD: PROBE_ROOT });
+const termReaper = TERMINAL_ON
+  ? setInterval(() => { for (const id of reapIdle(Date.now(), TERM_IDLE_MS)) reap(id); }, 60_000)
+  : null;
 
 const server = createServer((req, res) => {
   const t0 = Date.now();
@@ -196,6 +217,8 @@ async function shutdown(sig: string) {
   shuttingDown = true;
   if (timer) clearInterval(timer);
   if (queueTimer) clearInterval(queueTimer);
+  if (termReaper) clearInterval(termReaper);
+  for (const s of sessions.values()) s.proc.kill('SIGTERM'); // don't orphan PTYs
   await log('info', 'shutdown', { signal: sig }); // flush before we close
   server.close(() => process.exit(0));
   // Hard cap so a hung connection can't block exit forever.
@@ -220,6 +243,8 @@ server.listen(PORT, '127.0.0.1', async () => {
   console.log(`  /health  /aggregate  /alerts  /audit  /jobs  /queue  /metrics  /otel/{traces,metrics}  (POST /run, /enqueue, /cancel?id=)`);
   if (QUEUE_ON)
     console.log(`  supervisor ON (tick ${QUEUE_TICK / 1000}s${SHIP_ON ? ', ship' : ''}) — pulls /queue + dispatches`);
+  if (TERMINAL_ON)
+    console.log(`  TERMINAL tab ON — /term/* live (shell over loopback; ${TERM_MAX_SESSIONS} sessions max)`);
   await evalAlerts();
   timer = setInterval(() => void evalAlerts(), INTERVAL);
   if (QUEUE_ON) queueTimer = setInterval(() => void supervise(), QUEUE_TICK);

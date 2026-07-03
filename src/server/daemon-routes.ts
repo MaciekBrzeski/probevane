@@ -13,6 +13,7 @@ import { parseEvents } from '../loop/events.js';
 import { parseTranscript } from '../loop/transcript.js';
 import { scanProject } from '../quality/scan.js';
 import { jobs, getQueue, isPaused, snapshot, launch, cancelJob, enqueue, streamEvents, streamFiles } from './daemon-control.js';
+import { handleTerm } from './terminal-routes.js';
 
 // A runId / wiki filename is safe to interpolate into a path only if it has no
 // separators or traversal — defense in depth atop the 127.0.0.1 binding.
@@ -279,6 +280,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = full.split('?')[0];
   const query = new URLSearchParams(full.split('?')[1] ?? '');
   try {
+    if (url.startsWith('/term/')) { await handleTerm(url, query, req, res); return; }
     if (req.method === 'POST') {
       const posted = await handlePost(url, query, req, res);
       if (posted) return;
