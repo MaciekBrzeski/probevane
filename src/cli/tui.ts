@@ -37,7 +37,7 @@ function restore(): void {
   if (restored) return;
   restored = true;
   try { process.stdin.setRawMode?.(false); } catch { /* not a tty */ }
-  process.stdout.write('\x1b[?25h\x1b[?1049l'); // show cursor, leave alt screen
+  process.stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l'); // mouse off, cursor on, leave alt screen
 }
 
 async function main(): Promise<void> {
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     process.stderr.write(`probevane tui: daemon did not come up on :${PORT}\n`);
     process.exit(1);
   }
-  process.stdout.write('\x1b[?1049h\x1b[?25l'); // alt screen, hide cursor
+  process.stdout.write('\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h'); // alt screen, hide cursor, mouse (click + SGR coords)
   try { process.stdin.setRawMode?.(true); } catch { /* not a tty */ }
   process.stdin.resume();
   for (const sig of ['SIGINT', 'SIGTERM', 'exit'] as const) process.on(sig, () => { restore(); if (sig !== 'exit') process.exit(0); });

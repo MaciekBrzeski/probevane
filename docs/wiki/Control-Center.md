@@ -53,7 +53,11 @@ probevane tui                 # auto-launches the daemon if it isn't up, then re
 probevane tui --port 7766     # target a specific daemon; --root for a state dir
 ```
 
-It **auto-spawns the daemon** (probes `/health`; on refusal launches a detached `probevane daemon` and waits ≤10s), then paints four panes — cost sparkline, rune-pipeline light-show, active jobs + recent runs, alerts — on a **diff-flushed screen** (only changed cells emit ANSI, so no flicker). Keys: `q` quit · `r` refresh · `s` drop to a shell (run `generate`/`claude`, then come back) · `↑↓` select a run · `enter` to **replay its light show** in the pipeline pane. Ctrl-C restores the terminal (cursor back, normal screen).
+It **auto-spawns the daemon** (probes `/health`; on refusal launches a detached `probevane daemon` and waits ≤10s), then paints four panes — cost sparkline, rune-pipeline light-show, active jobs + recent runs, alerts — on a **diff-flushed screen** (only changed cells emit ANSI, so no flicker).
+
+Keys: `q` quit · `r` refresh · `l` **launch** · `s` shell · `↑↓` or **wheel** select a run · `enter` or **click** replay its light show. **Mouse**: click a run row to select it, click it again (or `enter`) to replay; wheel scrolls the selection. Ctrl-C restores the terminal.
+
+**Launch bar** (`l`): type a command. A probevane op (`generate`, `feature`, `repair`, `fix`, `quality`, …) is sent to the **daemon** (POST /run) so it appears in the Jobs pane with a **live light-show**; anything else (`claude`, `aider`, another harness) runs through your shell — the TUI suspends, the child owns the tty, and you're back when it exits. So the terminal command center both drives runs and watches them.
 
 It's a pure HTTP client of the same daemon the browser uses, and shares its internals: the **layered-DAG layout** and the **light-show state machine** (`src/observe/pipeline.ts` `pipelineReducer`) are the exact code the browser console runs — one machine, two renderers (SVG in the browser, ANSI in the terminal). The render "runtime" is a tiny cell-grid + diff (`src/tui/screen.ts`) — the terminal analog of the browser's `h()`; panes are pure functions painting into a screen (`src/tui/views.ts`), unit-tested by serializing the screen and asserting substrings.
 

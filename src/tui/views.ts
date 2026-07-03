@@ -56,15 +56,27 @@ export function pipelinePane(scr: Screen, r: Rect, runes: Rune[], state: Pipelin
 /** Active jobs + newest runs. */
 export function jobsPane(scr: Screen, r: Rect, jobs: Job[], runs: RunRow[]): void {
   box(scr, r.x, r.y, r.w, r.h, 'runs', DIM);
+  const active = jobs.filter((j) => j.status === 'running');
   let y = r.y + 1;
   const line = (s: string, st: Style) => { if (y < r.y + r.h - 1) putText(scr, r.x + 2, y++, trunc(s, r.w - 4), st); };
-  const active = jobs.filter((j) => j.status === 'running');
   line(active.length ? `▶ ${active.length} active` : 'no active runs', active.length ? ACC : DIM);
   for (const j of active.slice(0, 3)) line(`  ${j.op} · ${j.dir.split('/').pop()}`, statusStyle('running'));
   for (const rn of runs.slice(0, r.h - 4 - Math.min(3, active.length))) {
     const status = rn.accepted ? 'accepted' : rn.stopReason ?? '?';
     line(`${pad(status, 10)} ${trunc(rn.label ?? rn.runId, r.w - 20)}`, statusStyle(rn.accepted ? 'accepted' : status));
   }
+}
+
+/** First screen row of the selectable run list inside the jobs pane. */
+export function runRowStart(r: Rect, activeCount: number): number {
+  return r.y + 1 + 1 + Math.min(3, activeCount); // box top + "N active" line + active jobs
+}
+
+/** Run index at a clicked screen y within the jobs pane (or -1 outside the list). */
+export function runIndexAt(r: Rect, activeCount: number, y: number): number {
+  const start = runRowStart(r, activeCount);
+  const idx = y - start;
+  return idx >= 0 && y < r.y + r.h - 1 ? idx : -1;
 }
 
 /** Alerts pane. */
@@ -80,4 +92,12 @@ export function alertsPane(scr: Screen, r: Rect, alerts: Alert[]): void {
 /** Bottom key hints. */
 export function footer(scr: Screen, keys: string): void {
   putText(scr, 1, scr.h - 1, keys, DIM);
+}
+
+/** Launch input bar over the footer row (shown while typing a command). */
+export function inputBar(scr: Screen, prompt: string, buf: string): void {
+  const y = scr.h - 1;
+  for (let x = 0; x < scr.w; x++) putText(scr, x, y, ' ', {}); // clear the row
+  putText(scr, 1, y, prompt, { fg: FG.acc, bold: true });
+  putText(scr, 1 + prompt.length, y, trunc(buf + '▏', scr.w - prompt.length - 2), { fg: FG.fg });
 }
