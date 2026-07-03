@@ -72,6 +72,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `mfe-audit` | Micro-frontend (Module Federation) standards gate — per repo: boundaries (no deep cross-remote imports), shared singletons, runtime resilience (Suspense + error boundary), typed contracts; across repos: shared version alignment. Pure analysis ($0, no LLM) → grade + violations; --strict exits 1 (CI). The fitness function the refactor loop enforces. |
 | `mfe-contract` | Generate Module Federation contract tests (deterministic, $0) — remote-side compile-time conformance (exposed module satisfies its published contract) + host-side mocked tests (consume each federated remote against its contract). Auto-detects the type source (*-contracts pkg / sibling .contract.ts / @mf-types) and falls back to a structural smoke with a publish-types note. Dry-run by default; --write emits. |
 | `mfe` | Drive the micro-frontend (Module Federation) refactor pipeline over a polyrepo fleet — per repo: audit → (contract tests) → (generate) → (fix standards via refactor --mfe --quality), then cross-repo shared-version alignment + a combined report. Default (no LLM flags) = a $0 fleet standards report; --contract adds deterministic contract tests; --generate/--fix run the loop. |
+| `tui` | The control center IN THE TERMINAL. Auto-launches the daemon (if not already up), then renders panes — cost sparkline, rune-pipeline light show, active jobs, alerts — on a diff-flushed screen (no flicker). Keys: q quit · r refresh · s drop to a shell (run generate/claude, then come back) · ↑↓ select a run · enter to replay its light show. $0 (pure client of the daemon; Ctrl-C restores the terminal). |
 | `daemon` | Long-running OPERATE/OBSERVE + control-center service — the LCARS control center (/) — Projects/Runs/Docs/Launch/Cost/Quality/Console tabs; the Console renders the rune pipeline as a live node graph (gate blocks flash red during watched runs, accept cascades green), telemetry gauges/sparks, the module constellation, and THEATER replay of any captured run’s light show (no loop, ␤0). Routes: /health, /aggregate, /alerts, /audit, /jobs, /queue, /metrics (Prometheus), /otel/{traces,metrics}, /pipeline, /graph, /events?runId (theater), POST /run + /enqueue + /cancel?id=. PROBEVANE_UI_DEV=1 recompiles the TSX sources per request (edit → refresh); PROBEVANE_TERMINAL=1 arms a Terminal tab — a live browser shell over a PTY (run claude/any CLI in-console) via /term/{start,stream,input,resize,kill,sessions} (opt-in; it bypasses the launch allowlist, loopback bind is the only auth). With PROBEVANE_QUEUE=1 it becomes a SUPERVISOR — pulls <state>/queue.jsonl on a tick and dispatches runs (+ships on accept with PROBEVANE_SHIP=1), lights-out. Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval + optional webhook. Binds 127.0.0.1; read-only over ledgers. |
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
 | `docs` | Stack-agnostic narrative documentation loop — grounds a model on a language-agnostic project digest and writes a comprehensive long-form Markdown guide, gated so it cites only real paths (anti-hallucination). Unlike `document` (JSDoc on source) and `spec` (TS-import structured dump), works on any language. |
@@ -500,6 +501,15 @@ Drive the micro-frontend (Module Federation) refactor pipeline over a polyrepo f
 probevane mfe <repos.txt | dir...> [--contract] [--generate] [--fix] [--model …] [--concurrency N] [--report <path>] [--strict] [--json]
 # e.g.
 probevane mfe repos.txt --contract
+```
+
+### tui
+The control center IN THE TERMINAL. Auto-launches the daemon (if not already up), then renders panes — cost sparkline, rune-pipeline light show, active jobs, alerts — on a diff-flushed screen (no flicker). Keys: q quit · r refresh · s drop to a shell (run generate/claude, then come back) · ↑↓ select a run · enter to replay its light show. $0 (pure client of the daemon; Ctrl-C restores the terminal).
+
+```
+probevane tui [--port N] [--root <stateDir>]
+# e.g.
+probevane tui
 ```
 
 ### daemon

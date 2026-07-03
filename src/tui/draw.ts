@@ -1,7 +1,7 @@
 // Higher-level draw primitives for the TUI — pure string/number helpers on top
 // of the screen runtime. Colors mirror the web control center's palette.
 
-import type { Style } from './screen.ts';
+import type { Style } from './screen.js';
 
 // 8-color SGR foregrounds (bright variants 90-97).
 export const FG = { dim: 90, fg: 37, acc: 96, ok: 92, warn: 93, err: 91, mag: 95 } as const;

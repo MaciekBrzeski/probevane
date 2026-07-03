@@ -44,6 +44,21 @@ Run `claude` — or any agentic CLI — **inside the console**, next to the live
 
 > ⚠️ **Security.** The terminal is a shell — it deliberately bypasses the `LAUNCH_OPS` allowlist, which is exactly why it's opt-in. The only auth is the 127.0.0.1 bind: **anyone who can reach the port owns your shell.** Never port-forward the daemon without an SSH tunnel. Every session start/exit is logged with its full argv (`term_start`/`term_exit`) to `daemon.log.jsonl`.
 
+## `probevane tui` — the control center in the terminal
+
+Prefer a terminal? `probevane tui` is the whole command center without a browser:
+
+```sh
+probevane tui                 # auto-launches the daemon if it isn't up, then renders
+probevane tui --port 7766     # target a specific daemon; --root for a state dir
+```
+
+It **auto-spawns the daemon** (probes `/health`; on refusal launches a detached `probevane daemon` and waits ≤10s), then paints four panes — cost sparkline, rune-pipeline light-show, active jobs + recent runs, alerts — on a **diff-flushed screen** (only changed cells emit ANSI, so no flicker). Keys: `q` quit · `r` refresh · `s` drop to a shell (run `generate`/`claude`, then come back) · `↑↓` select a run · `enter` to **replay its light show** in the pipeline pane. Ctrl-C restores the terminal (cursor back, normal screen).
+
+It's a pure HTTP client of the same daemon the browser uses, and shares its internals: the **layered-DAG layout** and the **light-show state machine** (`src/observe/pipeline.ts` `pipelineReducer`) are the exact code the browser console runs — one machine, two renderers (SVG in the browser, ANSI in the terminal). The render "runtime" is a tiny cell-grid + diff (`src/tui/screen.ts`) — the terminal analog of the browser's `h()`; panes are pure functions painting into a screen (`src/tui/views.ts`), unit-tested by serializing the screen and asserting substrings.
+
+The shell drop closes the loop the whole console is about: run the harness (or `claude`) in the embedded shell, then watch the run appear and replay its light show — a terminal command center that both observes and drives the loop.
+
 ## How the UI is built
 
 `src/ui/control.html` is **GENERATED** — never hand-edit it. Sources live in `src/ui/app/`:
