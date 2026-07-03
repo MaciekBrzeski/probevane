@@ -5,6 +5,7 @@
 import { mount } from '../runtime.ts';
 import { $, j, esc, dirOf, type ProjectInfo, type RunRecord } from './lib.ts';
 import { loadConsole, consolePipelineEvent, consolePipelineReset, startTheater } from './console.tsx';
+import { loadTerminal, terminalActivated } from './terminal.ts';
 
 // CDN globals (loaded by shell.html script tags before this bundle runs).
 declare const marked: { parse(md: string, opts?: Record<string, unknown>): string };
@@ -25,6 +26,7 @@ mount(
     <CostPanel />
     <QualityPanel />
     <ConsolePanel />
+    <TerminalPanel />
     <Drawer />
   </>,
 );
@@ -41,6 +43,7 @@ $('tabs').addEventListener('click', (e) => {
   if (go === 'projects') loadProjects();
   if (go === 'runs') loadRuns();
   if (go === 'docs') loadWiki();
+  if (go === 'terminal') { loadTerminal(); terminalActivated(); }
 });
 
 // --- drawer ---
@@ -213,8 +216,7 @@ function followTranscript(dir: string, runId: string, tbox: HTMLElement) {
 
 function switchTab(go: string) { (document.querySelector(`nav.tabs button[data-go="${go}"]`) as HTMLElement).click(); }
 
-// Theater: replay a captured run's light show in the console — no loop, no
-// model, just the recorded event stream at (compressed) original cadence.
+// Theater: replay a captured run's recorded event stream in the console ($0).
 async function replayShow(runId: string) {
   drawer.classList.remove('open');
   switchTab('console');

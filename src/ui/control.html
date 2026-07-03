@@ -5,6 +5,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>probevane control center</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
 <style>
 :root { --bg:#04070f; --panel:#0b1220; --line:#1b2a44; --fg:#cfe3f5; --dim:#7d93ad;
         --ok:#2fe6a8; --warn:#ffb454; --err:#ff5d6c; --acc:#4fd6ff;
@@ -149,6 +150,10 @@ details.ok summary { color:var(--ok); }
 .sf-title { position:relative; padding:2px 14px 6px 72px; font-size:11.5px; font-weight:800; letter-spacing:.22em; text-transform:uppercase; color:var(--frame); text-shadow:var(--glow) currentColor; }
 .sf-body { padding:12px 16px 16px; }
 
+.term-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+.term-mount { height:min(70vh, 620px); background:#02060d; border:1px solid var(--line); border-radius:6px; padding:6px; }
+.term-mount .xterm { height:100%; }
+
 .theater-ticker { font-family:var(--num); font-size:12px; color:var(--acc); min-height:18px; margin-top:6px; letter-spacing:.06em; text-shadow:var(--glow) rgba(79,214,255,.35); }
 
 .gauges { display:flex; gap:18px; flex-wrap:wrap; margin-bottom:12px; }
@@ -232,6 +237,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 <div id="app"></div>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
 <script>
 "use strict";
 (() => {
@@ -281,7 +288,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 
   // src/ui/app/components/Tabs.tsx
   function Tabs() {
-    return /* @__PURE__ */ h("nav", { class: "tabs", id: "tabs" }, /* @__PURE__ */ h("button", { "data-go": "projects", class: "active" }, "Projects"), /* @__PURE__ */ h("button", { "data-go": "runs" }, "Runs"), /* @__PURE__ */ h("button", { "data-go": "docs" }, "Docs"), /* @__PURE__ */ h("button", { "data-go": "launch" }, "Launch"), /* @__PURE__ */ h("button", { "data-go": "cost" }, "Cost / Alerts"), /* @__PURE__ */ h("button", { "data-go": "quality" }, "Quality"), /* @__PURE__ */ h("button", { "data-go": "console" }, "Console"));
+    return /* @__PURE__ */ h("nav", { class: "tabs", id: "tabs" }, /* @__PURE__ */ h("button", { "data-go": "projects", class: "active" }, "Projects"), /* @__PURE__ */ h("button", { "data-go": "runs" }, "Runs"), /* @__PURE__ */ h("button", { "data-go": "docs" }, "Docs"), /* @__PURE__ */ h("button", { "data-go": "launch" }, "Launch"), /* @__PURE__ */ h("button", { "data-go": "cost" }, "Cost / Alerts"), /* @__PURE__ */ h("button", { "data-go": "quality" }, "Quality"), /* @__PURE__ */ h("button", { "data-go": "console" }, "Console"), /* @__PURE__ */ h("button", { "data-go": "terminal" }, "Terminal"));
   }
 
   // src/ui/app/components/ProjectsPanel.tsx
@@ -322,6 +329,11 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   // src/ui/app/components/ConsolePanel.tsx
   function ConsolePanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "console" }, /* @__PURE__ */ h("div", { class: "console-grid" }, /* @__PURE__ */ h("div", { class: "sf-hero" }, /* @__PURE__ */ h(ScanFrame, { title: "run pipeline", accent: "var(--acc)" }, /* @__PURE__ */ h("div", { id: "pipelineGraph", class: "muted" }, "standby\u2026"), /* @__PURE__ */ h("div", { id: "theaterTicker", class: "theater-ticker" }))), /* @__PURE__ */ h(ScanFrame, { title: "telemetry", accent: "var(--warn2)" }, /* @__PURE__ */ h("div", { class: "gauges", id: "gauges" }), /* @__PURE__ */ h("div", { id: "sparks" })), /* @__PURE__ */ h(ScanFrame, { title: "module constellation", accent: "var(--mag)" }, /* @__PURE__ */ h("div", { id: "constellation", class: "muted" }, "standby\u2026"))));
+  }
+
+  // src/ui/app/components/TerminalPanel.tsx
+  function TerminalPanel() {
+    return /* @__PURE__ */ h("section", { "data-tab": "terminal" }, /* @__PURE__ */ h(ScanFrame, { title: "terminal", accent: "var(--ok)" }, /* @__PURE__ */ h("div", { class: "term-toolbar" }, /* @__PURE__ */ h("button", { class: "ghost", id: "termBash" }, "bash"), /* @__PURE__ */ h("button", { class: "ghost", id: "termClaude" }, "claude"), /* @__PURE__ */ h("button", { class: "ghost", id: "termKill" }, "kill"), /* @__PURE__ */ h("span", { id: "termMsg", class: "muted" })), /* @__PURE__ */ h("div", { id: "termMount", class: "term-mount" })));
   }
 
   // src/ui/app/components/Drawer.tsx
@@ -586,10 +598,119 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     play(0);
   }
 
+  // src/ui/app/terminal.ts
+  var term = null;
+  var fit = null;
+  var es = null;
+  var sessionId = null;
+  var inited = false;
+  function msg(text) {
+    $("termMsg").textContent = text;
+  }
+  async function loadTerminal() {
+    if (!inited) {
+      inited = true;
+      $("termBash").onclick = () => startSession([]);
+      $("termClaude").onclick = () => startSession(["claude"]);
+      $("termKill").onclick = () => {
+        if (sessionId) void j("/term/kill?id=" + sessionId, { method: "POST" });
+      };
+    }
+    try {
+      const list = await j("/term/sessions");
+      const live = list.find((s) => s.live);
+      if (live && !sessionId) openStream(live.id);
+      else if (!sessionId) msg("pick a shell above");
+    } catch {
+      msg("terminal disabled \u2014 start the daemon with PROBEVANE_TERMINAL=1");
+    }
+  }
+  async function startSession(cmd) {
+    ensureTerm();
+    fit?.fit();
+    try {
+      const body = JSON.stringify({ cmd: cmd.length ? cmd : void 0, cols: term.cols, rows: term.rows });
+      const r = await j("/term/start", { method: "POST", headers: { "content-type": "application/json" }, body });
+      if (r.error) {
+        msg("\u2717 " + r.error);
+        return;
+      }
+      openStream(r.id);
+    } catch (e) {
+      msg("\u2717 " + String(e));
+    }
+  }
+  function ensureTerm() {
+    if (term) return;
+    term = new Terminal({
+      fontFamily: "ui-monospace, Menlo, monospace",
+      fontSize: 13,
+      cursorBlink: true,
+      theme: { background: "#02060d", foreground: "#cfe3f5", cursor: "#4fd6ff" }
+    });
+    fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    term.open($("termMount"));
+    fit.fit();
+    term.onData(sendInput);
+    window.addEventListener("resize", debouncedFit);
+  }
+  var inQueue = "";
+  var inTimer = null;
+  function sendInput(s) {
+    inQueue += s;
+    if (inTimer) return;
+    inTimer = setTimeout(() => {
+      const bytes = new TextEncoder().encode(inQueue);
+      inQueue = "";
+      inTimer = null;
+      if (sessionId) void fetch("/term/input?id=" + sessionId, { method: "POST", body: btoa(String.fromCharCode(...bytes)) });
+    }, 10);
+  }
+  function openStream(id) {
+    ensureTerm();
+    if (es) es.close();
+    sessionId = id;
+    msg("\u25B6 session " + id);
+    es = new EventSource("/term/stream?id=" + id);
+    es.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(ev.data);
+        if (m.b !== void 0) term.write(Uint8Array.from(atob(m.b), (c) => c.charCodeAt(0)));
+        else if (m.exit !== void 0) {
+          msg(`session ${id} exited (${m.exit})`);
+          es?.close();
+          es = null;
+          sessionId = null;
+        }
+      } catch {
+      }
+    };
+    fitAndResize();
+  }
+  function fitAndResize() {
+    if (!term || !fit) return;
+    fit.fit();
+    if (sessionId)
+      void fetch("/term/resize?id=" + sessionId, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cols: term.cols, rows: term.rows })
+      });
+  }
+  var fitTimer = null;
+  function debouncedFit() {
+    if (fitTimer) clearTimeout(fitTimer);
+    fitTimer = setTimeout(fitAndResize, 150);
+  }
+  function terminalActivated() {
+    if (term) setTimeout(fitAndResize, 0);
+  }
+
   // src/ui/app/main.tsx
   mount(
     document.getElementById("app"),
-    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(Drawer, null))
+    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
   );
   try {
     mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "dark" });
@@ -604,6 +725,10 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     if (go === "projects") loadProjects();
     if (go === "runs") loadRuns();
     if (go === "docs") loadWiki();
+    if (go === "terminal") {
+      loadTerminal();
+      terminalActivated();
+    }
   });
   var drawer = $("drawer");
   function openDrawer(title) {
@@ -782,8 +907,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     const tbox = /* @__PURE__ */ h("div", null);
     body.appendChild(tbox);
     consolePipelineReset();
-    const es = new EventSource("/stream?dir=" + encodeURIComponent(dir));
-    es.onmessage = (ev) => {
+    const es2 = new EventSource("/stream?dir=" + encodeURIComponent(dir));
+    es2.onmessage = (ev) => {
       try {
         const e = JSON.parse(ev.data);
         consolePipelineEvent(e);
@@ -794,19 +919,19 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       }
     };
     drawer.addEventListener("transitionend", () => {
-      if (!drawer.classList.contains("open")) es.close();
+      if (!drawer.classList.contains("open")) es2.close();
     }, { once: true });
     const once = (ev) => {
       try {
         const e = JSON.parse(ev.data);
         if (e.runId) {
-          es.removeEventListener("message", once);
+          es2.removeEventListener("message", once);
           followTranscript(dir, e.runId, tbox);
         }
       } catch {
       }
     };
-    es.addEventListener("message", once);
+    es2.addEventListener("message", once);
   }
   function followTranscript(dir, runId, tbox) {
     stopFollow();
