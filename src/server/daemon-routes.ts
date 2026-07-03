@@ -161,6 +161,19 @@ async function handleConsoleData(url: string, query: URLSearchParams, res: Serve
     }
     return true;
   }
+  if (url === '/events') {
+    // Theater replay: a run's durable event stream from the state root
+    // (survives workdir deletion — the whole point).
+    const runId = query.get('runId');
+    if (!runId || !SAFE_ID.test(runId)) { CTX.sendJson(res, 400, { error: 'valid runId required' }); return true; }
+    const { statePath } = await import('../util/state.js');
+    const txt =
+      (await readFile(statePath('events', `${runId}.jsonl`), 'utf8').catch(() => null)) ??
+      (await readFile(join(CTX.ROOT, 'events', `${runId}.jsonl`), 'utf8').catch(() => null));
+    if (txt === null) { CTX.sendJson(res, 404, { error: 'no captured events for this run' }); return true; }
+    CTX.sendJson(res, 200, { runId, events: parseEvents(txt) });
+    return true;
+  }
   if (url === '/graph') {
     // Module constellation: dependency graph + fan-in per node.
     const dir = query.get('dir') ?? process.env.PROBEVANE_ROOT ?? '.';

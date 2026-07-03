@@ -76,3 +76,40 @@ export function consolePipelineReset() {
   PIPE_STATE = {};
   renderPipeline(PIPE_STATE);
 }
+
+// --- Theater: replay a CAPTURED run's light show from its durable event
+// stream (no loop, no model — pure playback). Cadence follows the recorded
+// timestamps, clamped so long thinks don't stall the show and bursts stay
+// legible. One theater at a time.
+type TheaterEvent = { ts?: string; step?: number; tool?: string; gate?: string; accepted?: boolean; stopReason?: string };
+let THEATER_TIMER: ReturnType<typeof setTimeout> | null = null;
+
+/** Fetch a captured run's durable events and play them (ticker included). */
+export async function startTheater(runId: string): Promise<boolean> {
+  try {
+    const { events } = await j('/events?runId=' + encodeURIComponent(runId));
+    const ticker = $('theaterTicker');
+    ticker.textContent = `\u25b6 replaying ${runId}`;
+    consoleTheater(runId, events, (line) => { ticker.textContent = `\u25b6 ${runId}  ${line}`; });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function consoleTheater(runId: string, events: TheaterEvent[], onTick?: (line: string, i: number) => void) {
+  if (THEATER_TIMER) clearTimeout(THEATER_TIMER);
+  consolePipelineReset();
+  const line = (e: TheaterEvent) =>
+    `[step ${e.step ?? '?'}] ${e.gate ? 'BLOCK ' + e.gate : e.accepted ? 'ACCEPTED' : e.stopReason ?? e.tool ?? ''}`;
+  const at = (i: number) => (events[i]?.ts ? Date.parse(events[i].ts!) : NaN);
+  const play = (i: number) => {
+    if (i >= events.length) { THEATER_TIMER = null; return; }
+    consolePipelineEvent(events[i]);
+    onTick?.(line(events[i]), i);
+    const gap = at(i + 1) - at(i);
+    const wait = Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
+    THEATER_TIMER = setTimeout(() => play(i + 1), wait);
+  };
+  play(0);
+}

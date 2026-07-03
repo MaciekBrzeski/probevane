@@ -111,6 +111,9 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   ctx.checkpointSha = await headSha(workdir).catch(() => '');
   const eventsOn = process.env.PROBEVANE_EVENTS !== '0';
   const eventsPath = join(workdir, '.probevane', `events-${runId}.jsonl`);
+  const { statePath } = await import('../util/state.js');
+  const eventsStatePath = statePath('events', `${runId}.jsonl`);
+  if (eventsOn) mkdirSync(statePath('events'), { recursive: true });
   // Full transcript log → <workdir>/.probevane/transcript-<runId>.jsonl (PROBEVANE_TRANSCRIPT=0 disables).
   const transcriptOn = process.env.PROBEVANE_TRANSCRIPT !== '0';
   const transcriptPath = join(workdir, '.probevane', `transcript-${runId}.jsonl`);
@@ -124,7 +127,7 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   };
   return {
     opts, ctx, runes, messages, system, log, st,
-    runId, startedMs: Date.now(), eventsOn, eventsPath, transcriptOn, transcriptPath,
+    runId, startedMs: Date.now(), eventsOn, eventsPath, eventsStatePath, transcriptOn, transcriptPath,
     maxSteps, forceStopAfter, consultAfter, consultAtStep, nudgeAfter, readBudget: READ_BUDGET,
   };
 }
@@ -139,6 +142,7 @@ async function finalizeRun(lr: LoopRun): Promise<RunOutcome> {
   if (st.proposalText) log(`[engine] PROPOSAL:\n${st.proposalText}`);
   await recordRun({
     ts: new Date().toISOString(), runId, label: opts.label ?? 'run', model: st.brain.model,
+    dir: lr.ctx.workdir,
     tokensIn: st.tokensIn, tokensOut: st.tokensOut, cacheRead: st.cacheRead,
     accepted: st.accepted, tookOver: st.tookOver, stopReason: st.stopReason, steps: ctx.step,
     costUsd: st.costUsd || undefined,

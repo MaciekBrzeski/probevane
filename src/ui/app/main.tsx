@@ -4,7 +4,7 @@
 // Component tags resolve by convention (see scripts/build-ui.mjs) — no imports.
 import { mount } from '../runtime.ts';
 import { $, j, esc, dirOf, type ProjectInfo, type RunRecord } from './lib.ts';
-import { loadConsole, consolePipelineEvent, consolePipelineReset } from './console.tsx';
+import { loadConsole, consolePipelineEvent, consolePipelineReset, startTheater } from './console.tsx';
 
 // CDN globals (loaded by shell.html script tags before this bundle runs).
 declare const marked: { parse(md: string, opts?: Record<string, unknown>): string };
@@ -153,7 +153,10 @@ async function openRun(r: RunRecord) {
   stopFollow();
   openDrawer('run — ' + (r.label || r.runId));
   const body = $('drawerBody');
-  const dir = dirOf(r.label);
+  const dir = (r as { dir?: string }).dir ?? dirOf(r.label);
+  body.appendChild(
+    <button class="ghost" style="margin-bottom:8px" onClick={() => replayShow(r.runId)}>replay show ▶</button>,
+  );
   body.appendChild(<div class="muted">{`${r.runId} · ${r.model || ''} · ${r.accepted ? 'accepted' : r.stopReason} · $${r.cost ?? 0} · ${r.steps ?? '?'} steps`}</div>);
   try {
     const detail = await j('/run?dir=' + encodeURIComponent(dir) + '&runId=' + encodeURIComponent(r.runId));
@@ -209,6 +212,15 @@ function followTranscript(dir: string, runId: string, tbox: HTMLElement) {
 }
 
 function switchTab(go: string) { (document.querySelector(`nav.tabs button[data-go="${go}"]`) as HTMLElement).click(); }
+
+// Theater: replay a captured run's light show in the console — no loop, no
+// model, just the recorded event stream at (compressed) original cadence.
+async function replayShow(runId: string) {
+  drawer.classList.remove('open');
+  switchTab('console');
+  if (!(await startTheater(runId)))
+    $('theaterTicker').textContent = 'no captured events for this run (older than the theater feature)';
+}
 
 
 // --- header + cost/alerts/audit polling (kept) ---

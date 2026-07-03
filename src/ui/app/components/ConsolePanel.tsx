@@ -8,6 +8,7 @@ export function ConsolePanel(): Node {
         <div class="sf-hero">
           <ScanFrame title="run pipeline" accent="var(--acc)">
             <div id="pipelineGraph" class="muted">standby…</div>
+            <div id="theaterTicker" class="theater-ticker"></div>
           </ScanFrame>
         </div>
         <ScanFrame title="telemetry" accent="var(--warn2)">

@@ -51,6 +51,9 @@ export interface LoopRun {
   startedMs: number;
   eventsOn: boolean;
   eventsPath: string;
+  /** Durable copy under the state root — survives workdir deletion so the
+   *  console can THEATER-REPLAY any historical run's light show. */
+  eventsStatePath: string;
   maxSteps: number;
   forceStopAfter: number;
   consultAfter: number;
@@ -111,14 +114,13 @@ export function emit(lr: LoopRun, extra: Record<string, unknown>): void {
   if (!lr.eventsOn) return;
   const { ctx, st } = lr;
   try {
-    appendFileSync(
-      lr.eventsPath,
-      formatEvent({
-        ts: new Date().toISOString(), runId: lr.runId, step: ctx.step,
-        toolCalls: ctx.toolCalls, gateBlocks: ctx.gateBlocks, gateBlockReasons: ctx.gateBlockReasons,
-        tokensIn: st.tokensIn, tokensOut: st.tokensOut, editedFiles: [...ctx.editedFiles], ...extra,
-      }) + '\n',
-    );
+    const line = formatEvent({
+      ts: new Date().toISOString(), runId: lr.runId, step: ctx.step,
+      toolCalls: ctx.toolCalls, gateBlocks: ctx.gateBlocks, gateBlockReasons: ctx.gateBlockReasons,
+      tokensIn: st.tokensIn, tokensOut: st.tokensOut, editedFiles: [...ctx.editedFiles], ...extra,
+    }) + '\n';
+    appendFileSync(lr.eventsPath, line);
+    if (extra.delta === undefined) appendFileSync(lr.eventsStatePath, line); // no token spam in the durable copy
   } catch { /* observability is best-effort */ }
 }
 
