@@ -21,10 +21,12 @@ npm run coverage                           # v8; floors: stmts/lines/branches 90
 npm run test:e2e                           # playwright, testDir e2e-dash/ (own dashboard + visual snapshots)
 npm run eval                               # self-eval over fixtures/ vs eval/baseline/ ($0, no LLM); --live regenerates, --paths replays cassettes
 npm run wiki                               # living wiki server over docs/wiki/
+npm run build:ui                           # TSX sources (src/ui/app/) → generated src/ui/control.html; --check = CI drift gate
+PROBEVANE_UI_DEV=1 ./bin/probevane daemon  # control center at :7766; dev mode recompiles TSX per request
 ./bin/probevane <cmd> <dir>                # the CLI itself; dogfood with `./bin/probevane generate fixtures/react-todo`
 ```
 
-CI (`.github/workflows/ci.yml`) dogfoods the harness on itself: typecheck → coverage floors → dist build → `skill --check` drift gate → `quality . --strict` → `mutation . --min-score 0.5` → dashboard e2e → fixture + path eval.
+CI (`.github/workflows/ci.yml`) dogfoods the harness on itself: typecheck → coverage floors → dist build → `skill --check` drift gate → `quality . --strict` → `mutation . --min-score 0.6` → dashboard e2e → fixture + path eval.
 
 ## Architecture
 
@@ -36,6 +38,7 @@ The driving triad is **Adapter + Runes + Brain**, orchestrated by the loop engin
 - `src/audit/` — language-agnostic rule engine (`core.ts`; suppress with `probevane-allow: <rule-id>`) + per-language rules.
 - `src/library/` — cross-project learning library (append-only `index.jsonl` + graded markdown examples), stack-scoped retrieval feeding `context_inject`; fed by `library_promote`.
 - `eval/` + `fixtures/` — the harness's own measured eval: `cases.jsonl`/`path-cases.jsonl`, `scorer.ts`, `baseline/`, replay `cassettes/`, append-only `improvement-log.csv`.
+- `src/ui/` — the control center: TSX components in `app/` compiled by `scripts/build-ui.mjs` into the GENERATED, drift-gated `control.html` (never hand-edit). No framework: `runtime.ts` h() builds real DOM. Convention over imports — `<X/>` resolves to `app/components/X.tsx` at compile time (missing file = build error; local `h`/`Fragment` = build error). Console tab: live rune-pipeline light show + theater replay (`<state>/events/<runId>.jsonl` durable sink, `/events?runId`). See `docs/wiki/Control-Center.md` + ADR-015.
 - Supporting subsystems (one line each): `review/` LLM diff-review with 2-gate adversarial verification of findings; `quality/` heuristic source-quality analyzer + baseline ratchet; `mock/` MSW/mock-boundary synthesis for hermetic tests; `spec/` SPEC.md generation from module graph + probes; `factory/` fleet runner over many repos (isolated state each); `observe/` + `server/` daemon/dashboard/queue; `cost/` per-run ledger + budgets; `distill/` trace capture → fine-tune dataset → auto-promote via `<state>/model.json`; `ship/` accepted run → branch → PR (never touches default branch); `mfe/` Module Federation audit/contract tests; `arch/` report-only structural critique; `skill/` command catalog (source of truth) → SKILL.md + wiki.
 
 State root: `PROBEVANE_STATE ?? ~/.local/share/probevane` (library, `runs.jsonl` ledger, bridge queue, model pointer). Per-run logs in `<dir>/.probevane/` (events + transcript jsonl). Config: `probevane.config.{ts,js,mjs,json}` in the **target** dir, schema-validated; precedence flag > config > default.

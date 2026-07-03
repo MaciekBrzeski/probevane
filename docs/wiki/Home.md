@@ -23,6 +23,7 @@ You point probevane at a project. An **adapter** detects the stack (React first)
 - [Task paths](Paths.md) — write-tests · refactor · feature · repair · fix
 - [Worktree mode](Worktree.md) — isolated, reviewed (self-)improvement runs
 - [Commands](Commands.md) — full CLI reference (generated, gated)
+- [Control Center](Control-Center.md) — the daemon's LCARS console: live pipeline light show, theater replay, TSX build
 - [Architecture](Architecture.md) — the pieces and how they connect
 - [The Loop](The-Loop.md) — turn-by-turn control flow
 - [Runes & Gates](Runes-and-Gates.md) — what blocks the model and why
