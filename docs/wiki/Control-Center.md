@@ -8,6 +8,7 @@ The daemon's web UI — an LCARS-styled console over the whole fleet: projects, 
 ./bin/probevane daemon --port 7766            # → http://127.0.0.1:7766/
 PROBEVANE_UI_DEV=1 ./bin/probevane daemon …   # dev: runtime compiler (see below)
 PROBEVANE_QUEUE=1  ./bin/probevane daemon …   # lights-out supervisor mode
+PROBEVANE_TERMINAL=1 ./bin/probevane daemon … # arm the Terminal tab (see below)
 ```
 
 Binds 127.0.0.1 only. `--root <stateDir>` points it at a different ledger root.
@@ -23,6 +24,7 @@ Binds 127.0.0.1 only. `--root <stateDir>` points it at a different ledger root.
 | Cost / Alerts | daily cost bars, alert list, library audit trail |
 | Quality | on-demand `quality` scan of any dir |
 | Console | the Trek panel — see below |
+| Terminal | a live shell in the browser (opt-in) — see below |
 
 ## The Console
 
@@ -33,6 +35,14 @@ Binds 127.0.0.1 only. `--root <stateDir>` points it at a different ledger root.
 ### Theater — replay any captured run
 
 Every run writes a **durable event stream** to `<state>/events/<runId>.jsonl` (workdir copies die with eval/live temp dirs; this one survives). Runs tab → open a run → **replay show ▶** plays it through the console at compressed original cadence — no loop, no model, $0. Runs recorded before the feature 404 politely.
+
+## The Terminal tab (opt-in)
+
+Run `claude` — or any agentic CLI — **inside the console**, next to the live pipeline. `PROBEVANE_TERMINAL=1` arms it; without the env the `/term/*` routes return `403` and the tab shows the opt-in hint. Presets spawn `$SHELL`/`bash`/`claude`; xterm renders full ANSI + a real cursor, resize is wired (fit addon → `TIOCSWINSZ`), and a session reattaches after a page reload.
+
+**How it works.** No node-pty (that's a native module — it would break the two-runtime-dep invariant). Instead `scripts/pty-bridge.py` (stdlib `pty.fork` + a select loop) allocates the tty; the daemon streams its raw output down over SSE as base64 frames (`/term/stream`) and forwards keystrokes/resize/kill up via POST (`/term/input`, `/term/resize`, `/term/kill`). xterm.js is a CDN `<script>` like marked/mermaid. Sessions: 4 max, 512 KB scrollback each, 30-min idle reap (all `PROBEVANE_TERM_*` overridable). Output is glyph-rendered by xterm — never innerHTML — so a malicious escape sequence can't inject DOM.
+
+> ⚠️ **Security.** The terminal is a shell — it deliberately bypasses the `LAUNCH_OPS` allowlist, which is exactly why it's opt-in. The only auth is the 127.0.0.1 bind: **anyone who can reach the port owns your shell.** Never port-forward the daemon without an SSH tunnel. Every session start/exit is logged with its full argv (`term_start`/`term_exit`) to `daemon.log.jsonl`.
 
 ## How the UI is built
 
