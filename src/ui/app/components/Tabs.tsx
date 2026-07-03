@@ -9,6 +9,7 @@ export function Tabs(): Node {
       <button data-go="launch">Launch</button>
       <button data-go="cost">Cost / Alerts</button>
       <button data-go="quality">Quality</button>
+      <button data-go="console">Console</button>
     </nav>
   );
 }

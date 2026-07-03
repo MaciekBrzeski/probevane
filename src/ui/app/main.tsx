@@ -4,6 +4,7 @@
 // Component tags resolve by convention (see scripts/build-ui.mjs) — no imports.
 import { mount } from '../runtime.ts';
 import { $, j, esc, dirOf, type ProjectInfo, type RunRecord } from './lib.ts';
+import { loadConsole } from './console.tsx';
 
 // CDN globals (loaded by shell.html script tags before this bundle runs).
 declare const marked: { parse(md: string, opts?: Record<string, unknown>): string };
@@ -23,6 +24,7 @@ mount(
     <LaunchPanel />
     <CostPanel />
     <QualityPanel />
+    <ConsolePanel />
     <Drawer />
   </>,
 );
@@ -199,6 +201,7 @@ function followTranscript(dir: string, runId: string, tbox: HTMLElement) {
 
 function switchTab(go: string) { (document.querySelector(`nav.tabs button[data-go="${go}"]`) as HTMLElement).click(); }
 
+
 // --- header + cost/alerts/audit polling (kept) ---
 async function loadOps() { try { const { ops } = await j('/ops'); $('op').innerHTML = ops.map((o: string) => `<option>${esc(o)}</option>`).join(''); } catch {} }
 
@@ -215,8 +218,8 @@ function setStat(id: string, text: string) {
 
 async function poll() {
   try {
-    const h = await j('/health');
-    $('health').textContent = `v${h.version} · ${h.ledgers} ledger(s) · up ${h.uptimeSec}s`;
+    const hlth = await j('/health');
+    $('health').textContent = `v${hlth.version} · ${hlth.ledgers} ledger(s) · up ${hlth.uptimeSec}s`;
     $('health').classList.remove('connecting');
     $('healthDot').style.background = 'var(--ok)'; $('healthDot').classList.add('live');
   } catch {
@@ -257,4 +260,4 @@ $('qbtn').onclick = async () => {
   } catch (e) { $('quality').textContent = '✗ ' + String(e); }
 };
 
-loadOps(); loadProjects(); poll(); setInterval(poll, 4000);
+loadOps(); loadProjects(); loadConsole(); poll(); setInterval(poll, 4000);

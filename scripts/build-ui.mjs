@@ -27,6 +27,14 @@ const OUT = join(ROOT, 'src', 'ui', 'control.html');
 const TAG_RE = /(?<![\w)])<([A-Z][A-Za-z0-9]*)[\s/>]/g;
 
 function autoImports(source, filePath) {
+  // A local named h/Fragment silently shadows the JSX factory (esbuild resolves
+  // the factory lexically) — the whole component then crashes at runtime. Ban it.
+  const shadow = source.match(/\b(?:const|let|var|function)\s+(h|Fragment)\b/);
+  if (shadow) {
+    throw new Error(
+      `build-ui: ${filePath.replace(ROOT + '/', '')} declares a local "${shadow[1]}" — it shadows the JSX factory; rename it`,
+    );
+  }
   const tags = new Set();
   for (const m of source.matchAll(TAG_RE)) tags.add(m[1]);
   tags.delete('Fragment');

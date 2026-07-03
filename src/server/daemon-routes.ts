@@ -144,6 +144,36 @@ async function handleData(
     return true;
   }
   if (url.startsWith('/wiki/raw/')) return handleWikiRaw(url, res);
+  return handleConsoleData(url, query, res);
+}
+
+/** Console-tab data: rune pipeline + module constellation. Returns true if handled. */
+async function handleConsoleData(url: string, query: URLSearchParams, res: ServerResponse): Promise<boolean> {
+  if (url === '/pipeline') {
+    // Rune pipeline for the console's live node graph — always derived from
+    // the real profiles (describePipeline), never a stale committed model.
+    const { describePipeline } = await import('../loop/describe.js');
+    const profile = (query.get('profile') ?? 'write_tests') as Parameters<typeof describePipeline>[0];
+    try {
+      CTX.sendJson(res, 200, describePipeline(profile, { kind: 'unit' }));
+    } catch {
+      CTX.sendJson(res, 400, { error: `unknown profile ${String(profile)}` });
+    }
+    return true;
+  }
+  if (url === '/graph') {
+    // Module constellation: dependency graph + fan-in per node.
+    const dir = query.get('dir') ?? process.env.PROBEVANE_ROOT ?? '.';
+    const { buildGraph } = await import('../mock/graph.js');
+    const g = await buildGraph(resolve(dir));
+    const fanIn = new Map<string, number>();
+    for (const n of g.nodes.values()) for (const dep of n.imports) fanIn.set(dep, (fanIn.get(dep) ?? 0) + 1);
+    CTX.sendJson(res, 200, {
+      nodes: [...g.nodes.values()].map((n) => ({ ...n, fanIn: fanIn.get(n.path) ?? 0 })),
+      order: g.order,
+    });
+    return true;
+  }
   return false;
 }
 

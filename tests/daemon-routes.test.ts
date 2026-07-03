@@ -358,3 +358,29 @@ describe('error handling', () => {
     }
   });
 });
+
+describe('console data routes', () => {
+  it('GET /pipeline returns the write_tests rune chain (derived, not stale)', async () => {
+    const res = fakeRes();
+    await handle(fakeReq('/pipeline', 'GET'), res as never);
+    const body = JSON.parse(res.body);
+    expect(body.profile).toBe('write_tests');
+    expect(body.runes.length).toBeGreaterThan(5);
+    expect(body.runes.map((r: { name: string }) => r.name)).toContain('plan_first');
+  });
+
+  it('GET /pipeline with an unknown profile → 400', async () => {
+    const res = fakeRes();
+    await handle(fakeReq('/pipeline?profile=nope', 'GET'), res as never);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('GET /graph returns nodes with fan-in over the requested dir', async () => {
+    const res = fakeRes();
+    await handle(fakeReq(`/graph?dir=${encodeURIComponent(process.cwd())}`, 'GET'), res as never);
+    const body = JSON.parse(res.body);
+    expect(body.nodes.length).toBeGreaterThan(10);
+    const withFanIn = body.nodes.filter((n: { fanIn: number }) => n.fanIn > 0);
+    expect(withFanIn.length).toBeGreaterThan(0);
+  }, 30_000);
+});
