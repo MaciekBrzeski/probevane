@@ -5,7 +5,9 @@
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, -apple-system, sans-serif;
        background-image:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79,214,255,.07), transparent),
-         repeating-linear-gradient(0deg, transparent 0 2px, rgba(120,180,255,.012) 2px 4px); }
+         repeating-linear-gradient(0deg, transparent 0 2px, rgba(120,180,255,.012) 2px 4px);
+       /* the glow is a single vignette — tiled, it stacks as giant bands */
+       background-repeat:no-repeat, repeat; background-attachment:fixed, scroll; }
 
 /* Header & Nav Improvements */
 header { display:flex; align-items:center; gap:24px; padding:12px 20px; border-bottom:1px solid var(--line); background:linear-gradient(180deg, rgba(79,214,255,.06), transparent), var(--panel); position:sticky; top:0; z-index:2; box-shadow:0 1px 0 rgba(79,214,255,.15); }

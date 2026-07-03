@@ -13,7 +13,9 @@
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, -apple-system, sans-serif;
        background-image:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79,214,255,.07), transparent),
-         repeating-linear-gradient(0deg, transparent 0 2px, rgba(120,180,255,.012) 2px 4px); }
+         repeating-linear-gradient(0deg, transparent 0 2px, rgba(120,180,255,.012) 2px 4px);
+       /* the glow is a single vignette — tiled, it stacks as giant bands */
+       background-repeat:no-repeat, repeat; background-attachment:fixed, scroll; }
 
 /* Header & Nav Improvements */
 header { display:flex; align-items:center; gap:24px; padding:12px 20px; border-bottom:1px solid var(--line); background:linear-gradient(180deg, rgba(79,214,255,.06), transparent), var(--panel); position:sticky; top:0; z-index:2; box-shadow:0 1px 0 rgba(79,214,255,.15); }
@@ -355,18 +357,18 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     const layer = /* @__PURE__ */ new Map();
     for (const n of input) layer.set(n.id, 0);
     for (let pass = 0; pass < input.length; pass++) {
-      let changed = false;
+      let changed2 = false;
       for (const n of input) {
         for (const d of n.deps) {
           if (!ids.has(d)) continue;
           const want = (layer.get(d) ?? 0) + 1;
           if (want > (layer.get(n.id) ?? 0) && want < input.length) {
             layer.set(n.id, want);
-            changed = true;
+            changed2 = true;
           }
         }
       }
-      if (!changed) break;
+      if (!changed2) break;
     }
     return layer;
   }
@@ -797,6 +799,13 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     void n.offsetWidth;
     n.classList.add("bump");
   }
+  var LAST = {};
+  function changed(key, payload) {
+    const j2 = JSON.stringify(payload);
+    if (LAST[key] === j2) return false;
+    LAST[key] = j2;
+    return true;
+  }
   async function poll() {
     try {
       const hlth = await j("/health");
@@ -813,7 +822,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     try {
       const a = await j("/aggregate");
       const max = Math.max(1, ...a.daily.map((d) => d.cost));
-      $("bars").innerHTML = a.daily.map((d) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} \xB7 ${esc(d.accepted)}/${esc(d.runs)} \xB7 ${esc(d.errors)} err" style="height:${Math.round(d.cost / max * 100)}%"></div>`).join("");
+      if (changed("bars", a.daily))
+        $("bars").innerHTML = a.daily.map((d) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} \xB7 ${esc(d.accepted)}/${esc(d.runs)} \xB7 ${esc(d.errors)} err" style="height:${Math.round(d.cost / max * 100)}%"></div>`).join("");
       $("aggMeta").textContent = `${a.totals.runs} runs \xB7 $${a.totals.totalCost} \xB7 accept ${(a.totals.acceptRate * 100).toFixed(0)}%`;
       setStat("cost", "$" + a.totals.totalCost);
       setStat("accept", (a.totals.acceptRate * 100).toFixed(0) + "%");
@@ -822,7 +832,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     try {
       const { alerts } = await j("/alerts");
       setStat("alertN", String(alerts.length));
-      $("alerts").innerHTML = alerts.length ? alerts.map((a) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> \u2014 ${esc(a.message)}</div>`).join("") : '<span class="muted">none</span>';
+      if (changed("alerts", alerts))
+        $("alerts").innerHTML = alerts.length ? alerts.map((a) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> \u2014 ${esc(a.message)}</div>`).join("") : '<span class="muted">none</span>';
     } catch {
     }
     try {
@@ -834,7 +845,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   $("run").onclick = async () => {
     const dir = $("dir").value.trim();
     const op = $("op").value;
-    const flags = $("flags").value.trim().split(/\s+/).filter(Boolean);
+    const flags = ($("flags").value.match(/"[^"]*"|\S+/g) ?? []).map((f) => f.replace(/^"|"$/g, ""));
     if (!dir) {
       $("runMsg").textContent = "enter a dir";
       return;

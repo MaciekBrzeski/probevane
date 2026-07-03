@@ -225,6 +225,16 @@ function setStat(id: string, text: string) {
   n.classList.add('bump');
 }
 
+// innerHTML rewrites restart CSS entrance animations — only touch the DOM
+// when the payload actually changed (the 4s poll otherwise replays them).
+const LAST: Record<string, string> = {};
+function changed(key: string, payload: unknown): boolean {
+  const j2 = JSON.stringify(payload);
+  if (LAST[key] === j2) return false;
+  LAST[key] = j2;
+  return true;
+}
+
 async function poll() {
   try {
     const hlth = await j('/health');
@@ -237,19 +247,22 @@ async function poll() {
   }
   try {
     const a = await j('/aggregate'); const max = Math.max(1, ...a.daily.map((d: { cost: number }) => d.cost));
-    $('bars').innerHTML = a.daily.map((d: { date: string; cost: number; accepted: number; runs: number; errors: number }) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} · ${esc(d.accepted)}/${esc(d.runs)} · ${esc(d.errors)} err" style="height:${Math.round((d.cost / max) * 100)}%"></div>`).join('');
+    if (changed('bars', a.daily))
+      $('bars').innerHTML = a.daily.map((d: { date: string; cost: number; accepted: number; runs: number; errors: number }) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} · ${esc(d.accepted)}/${esc(d.runs)} · ${esc(d.errors)} err" style="height:${Math.round((d.cost / max) * 100)}%"></div>`).join('');
     $('aggMeta').textContent = `${a.totals.runs} runs · $${a.totals.totalCost} · accept ${(a.totals.acceptRate * 100).toFixed(0)}%`;
     setStat('cost', '$' + a.totals.totalCost); setStat('accept', (a.totals.acceptRate * 100).toFixed(0) + '%');
   } catch {}
   try { const { alerts } = await j('/alerts'); setStat('alertN', String(alerts.length));
-    $('alerts').innerHTML = alerts.length ? alerts.map((a: { severity: string; kind: string; message: string }) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> — ${esc(a.message)}</div>`).join('') : '<span class="muted">none</span>';
+    if (changed('alerts', alerts))
+      $('alerts').innerHTML = alerts.length ? alerts.map((a: { severity: string; kind: string; message: string }) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> — ${esc(a.message)}</div>`).join('') : '<span class="muted">none</span>';
   } catch {}
   try { const { entries } = await j('/audit'); $('audit').textContent = entries.slice(-30).reverse().map((e: { ts: string; action: string; target: string }) => `${e.ts.slice(0, 19)}  ${e.action}  ${e.target}`).join('\n') || 'no library mutations yet'; } catch {}
 }
 
 $('run').onclick = async () => {
   const dir = ($('dir') as HTMLInputElement).value.trim(); const op = ($('op') as HTMLSelectElement).value;
-  const flags = ($('flags') as HTMLInputElement).value.trim().split(/\s+/).filter(Boolean);
+  // Quote-aware: --task "add multiply()" must survive as ONE flag value.
+  const flags = (($('flags') as HTMLInputElement).value.match(/"[^"]*"|\S+/g) ?? []).map((f) => f.replace(/^"|"$/g, ''));
   if (!dir) { $('runMsg').textContent = 'enter a dir'; return; }
   $('runMsg').textContent = 'launching…';
   try {

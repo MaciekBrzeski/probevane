@@ -84,7 +84,7 @@ describe('control center XSS guard (asset)', () => {
   });
   it('every innerHTML site in the app escapes interpolations or injects trusted markdown/mermaid only', () => {
     const main = ui('app/main.tsx');
-    for (const line of main.split('\n').filter((l) => l.includes('innerHTML'))) {
+    for (const line of main.split('\n').filter((l) => l.includes('innerHTML') && !l.trim().startsWith('//'))) {
       expect(line, line).toMatch(/esc\(|= html|= svg|'<span class="muted">none<\/span>'/);
     }
   });
