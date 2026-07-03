@@ -51,12 +51,28 @@ export async function loadConsole() {
   } catch { $('constellation').textContent = 'graph unavailable'; }
 }
 
-// Live pipeline: map SSE run events onto node states (gate blocks flash err,
-// accept cascades ok). Called from openRunLive's event stream.
+// Live pipeline — the light show. SSE run events accumulate into a persistent
+// state map: a blocking gate flashes err, the next productive tool call cools
+// it to active ("retrying through"), accept cascades every rune to ok, a
+// terminal failure leaves the blockers red. openRunLive feeds this.
+let PIPE_STATE: Record<string, 'idle' | 'active' | 'ok' | 'err'> = {};
+
 export function consolePipelineEvent(ev: { tool?: string; gate?: string; accepted?: boolean; stopReason?: string }) {
   if (!PIPE_RUNES.length) return;
-  const states: Record<string, 'idle' | 'active' | 'ok' | 'err'> = {};
-  if (ev.gate) states[ev.gate] = ev.accepted === false ? 'err' : 'active';
-  if (ev.accepted) for (const r of PIPE_RUNES) states[r.name] = 'ok';
-  renderPipeline(states);
+  if (ev.gate) PIPE_STATE[ev.gate] = 'err';
+  else if (ev.tool) {
+    // Progress after a block: the red gate is being worked through.
+    for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === 'err') PIPE_STATE[k] = 'active';
+  }
+  if (ev.accepted) for (const r of PIPE_RUNES) PIPE_STATE[r.name] = 'ok';
+  else if (ev.stopReason && ev.stopReason !== 'accepted') {
+    for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === 'active') PIPE_STATE[k] = 'err';
+  }
+  renderPipeline(PIPE_STATE);
+}
+
+/** New run watched → clear the previous run's lights. */
+export function consolePipelineReset() {
+  PIPE_STATE = {};
+  renderPipeline(PIPE_STATE);
 }

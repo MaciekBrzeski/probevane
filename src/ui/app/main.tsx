@@ -4,7 +4,7 @@
 // Component tags resolve by convention (see scripts/build-ui.mjs) — no imports.
 import { mount } from '../runtime.ts';
 import { $, j, esc, dirOf, type ProjectInfo, type RunRecord } from './lib.ts';
-import { loadConsole } from './console.tsx';
+import { loadConsole, consolePipelineEvent, consolePipelineReset } from './console.tsx';
 
 // CDN globals (loaded by shell.html script tags before this bundle runs).
 declare const marked: { parse(md: string, opts?: Record<string, unknown>): string };
@@ -185,8 +185,17 @@ async function openRunLive(dir: string) {
   body.appendChild(<h3>transcript (live)</h3>);
   const tbox = (<div></div>) as HTMLElement;
   body.appendChild(tbox);
+  consolePipelineReset();
   const es = new EventSource('/stream?dir=' + encodeURIComponent(dir));
-  es.onmessage = (ev) => { try { const e = JSON.parse(ev.data); pre.textContent += (e.delta !== undefined ? e.delta : `[step ${e.step ?? '?'}] ${e.tool ?? e.stopReason ?? ''}\n`); pre.scrollTop = pre.scrollHeight; } catch {} };
+  es.onmessage = (ev) => {
+    try {
+      const e = JSON.parse(ev.data);
+      // Light show: every event also drives the console tab's pipeline graph.
+      consolePipelineEvent(e);
+      pre.textContent += (e.delta !== undefined ? e.delta : `[step ${e.step ?? '?'}] ${e.gate ? 'BLOCK ' + e.gate : e.tool ?? e.stopReason ?? ''}\n`);
+      pre.scrollTop = pre.scrollHeight;
+    } catch {}
+  };
   drawer.addEventListener('transitionend', () => { if (!drawer.classList.contains('open')) es.close(); }, { once: true });
   // Follow the newest transcript for this dir. runId unknown up front → the stream
   // events carry it; grab the first runId then follow that transcript file.

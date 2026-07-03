@@ -1,6 +1,6 @@
 import { readdir, readFile, access } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import type {
   StackAdapter,
   TestKind,
@@ -28,7 +28,9 @@ async function exists(p: string): Promise<boolean> {
 
 async function pyBin(dir: string): Promise<string> {
   if (process.env.PROBEVANE_PY) return process.env.PROBEVANE_PY;
-  const venv = join(dir, '.venv', 'bin', 'python');
+  // Absolute: sh() runs with cwd=dir, so a dir-relative interpreter path would
+  // resolve against itself (dir/dir/.venv/…) for relative callers.
+  const venv = resolve(dir, '.venv', 'bin', 'python');
   if (await exists(venv)) return venv;
   return 'python3';
 }
@@ -57,7 +59,7 @@ export const pythonAdapter: StackAdapter = {
     if (!process.env.PROBEVANE_PY && py === 'python3') {
       // System python without pytest — PEP 668 hosts also refuse `pip install`
       // into it. Bootstrap a project-local .venv instead (pyBin prefers it).
-      const venv = join(dir, '.venv', 'bin', 'python');
+      const venv = resolve(dir, '.venv', 'bin', 'python');
       if (!(await exists(venv))) {
         const mk = await sh('python3 -m venv .venv', dir, 120_000);
         if (!mk.ok) throw new Error(`probevane: venv create failed\n${mk.stderr.slice(-1500)}`);
@@ -172,7 +174,7 @@ export const pythonAdapter: StackAdapter = {
 
   commands(dir: string): AdapterCommands {
     // Sync mirror of pyBin: PROBEVANE_PY > project .venv > python3.
-    const venv = join(dir, '.venv', 'bin', 'python');
+    const venv = resolve(dir, '.venv', 'bin', 'python');
     const py = process.env.PROBEVANE_PY ?? (existsSync(venv) ? venv : 'python3');
     return {
       typecheck: 'true', // mypy optional; don't block test-adding

@@ -165,6 +165,7 @@ async function applyToolCalls(lr: LoopRun, resp: BrainResponse): Promise<ToolRes
     if (decision.kind === 'block') {
       ctx.gateBlocks++;
       ctx.noteBlock(decision.reason);
+      emit(lr, { gate: decision.rune });
       results.push({ id: call.id, content: decision.inject ?? decision.reason, isError: true });
       log(`[engine]   ${call.name} BLOCKED: ${decision.reason}`);
       continue;
@@ -210,6 +211,7 @@ async function tryTextExtract(lr: LoopRun, resp: BrainResponse): Promise<boolean
   const decision = await firstBlockBefore(runes, call, ctx);
   if (decision.kind === 'block') {
     ctx.gateBlocks++; ctx.barren++; ctx.noteBlock(decision.reason);
+    emit(lr, { gate: decision.rune });
     messages.push({ role: 'assistant', toolCalls: [call] });
     messages.push({
       role: 'user',
@@ -236,6 +238,7 @@ async function runStopGate(lr: LoopRun): Promise<'break' | 'fallthrough'> {
     ctx.gateBlocks++;
     ctx.barren++;
     ctx.noteBlock(decision.reason);
+    emit(lr, { gate: decision.rune });
     log(`[engine]   stop BLOCKED: ${decision.reason}`);
     let inject = decision.inject ?? decision.reason;
     // Selective retrieval (fourier-nca: failures-only +5.5%, blanket = 0):

@@ -532,6 +532,23 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       $("constellation").textContent = "graph unavailable";
     }
   }
+  var PIPE_STATE = {};
+  function consolePipelineEvent(ev) {
+    if (!PIPE_RUNES.length) return;
+    if (ev.gate) PIPE_STATE[ev.gate] = "err";
+    else if (ev.tool) {
+      for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === "err") PIPE_STATE[k] = "active";
+    }
+    if (ev.accepted) for (const r of PIPE_RUNES) PIPE_STATE[r.name] = "ok";
+    else if (ev.stopReason && ev.stopReason !== "accepted") {
+      for (const k of Object.keys(PIPE_STATE)) if (PIPE_STATE[k] === "active") PIPE_STATE[k] = "err";
+    }
+    renderPipeline(PIPE_STATE);
+  }
+  function consolePipelineReset() {
+    PIPE_STATE = {};
+    renderPipeline(PIPE_STATE);
+  }
 
   // src/ui/app/main.tsx
   mount(
@@ -725,11 +742,13 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     body.appendChild(/* @__PURE__ */ h("h3", null, "transcript (live)"));
     const tbox = /* @__PURE__ */ h("div", null);
     body.appendChild(tbox);
+    consolePipelineReset();
     const es = new EventSource("/stream?dir=" + encodeURIComponent(dir));
     es.onmessage = (ev) => {
       try {
         const e = JSON.parse(ev.data);
-        pre.textContent += e.delta !== void 0 ? e.delta : `[step ${e.step ?? "?"}] ${e.tool ?? e.stopReason ?? ""}
+        consolePipelineEvent(e);
+        pre.textContent += e.delta !== void 0 ? e.delta : `[step ${e.step ?? "?"}] ${e.gate ? "BLOCK " + e.gate : e.tool ?? e.stopReason ?? ""}
 `;
         pre.scrollTop = pre.scrollHeight;
       } catch {
