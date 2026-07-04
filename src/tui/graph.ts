@@ -144,15 +144,9 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
   const focused = (e: { from: string; to: string }): boolean => e.from === focusId || e.to === focusId;
 
   const dimSt: Style = { fg: mix(FG.line, FG.bg, 0.55) }; // faint background mesh (recedes; focus pops)
+  const brightSt: Style = { fg: glow(FG.acc, pulse(t, 1200)) }; // focused pipes gently pulse
   edges.forEach((e, i) => { if (!focused(e)) routeEdge(scr, e.a, e.b, chOf(i), dimSt); }); // dim first
-  edges.forEach((e, i) => { // focused edges bright, on top, with a flowing dot
-    if (!focused(e)) return;
-    const path = routeEdge(scr, e.a, e.b, chOf(i), { fg: FG.acc });
-    if (path.length) {
-      const d = path[Math.floor(t / 130 + i * 4) % path.length]!;
-      putText(scr, d.x, d.y, '•', { fg: glow(FG.acc, pulse(t, 700)), bold: true });
-    }
-  });
+  edges.forEach((e, i) => { if (focused(e)) routeEdge(scr, e.a, e.b, chOf(i), brightSt); }); // focused pipes, on top — continuous (no dot breaking the line)
   for (const n of lay.nodes) {
     const a = anchor.get(n.id)!;
     if (a.cy >= bottom) continue;
