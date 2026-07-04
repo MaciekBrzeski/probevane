@@ -14,7 +14,6 @@ import type { ConstellationNode } from '../observe/constellation.js';
 interface Rect { x: number; y: number; w: number; h: number }
 interface Anchor { lx: number; rx: number; cy: number; layer: number }
 type Pt = { x: number; y: number };
-const MAX_NODES = 8;
 const WIRE = '─│┌┐└┘┼';
 
 /** The graph needs room; below this the caller falls back to a ranked hub list. */
@@ -27,17 +26,21 @@ const accentOf = (n: ConstellationNode): number =>
 const pill = (n: ConstellationNode, w: number): string => `( ${trunc(n.label, w)} )`;
 
 /**
- * Show the LARGEST connected component of the hub graph (up to `n`, weight-sorted).
- * Top-fan-in hubs are sinks (few edges among them), so a plain top-N slice is
- * mostly isolated leaves; a connected component guarantees every node links.
+ * Select the connected clusters to show. Top-fan-in hubs are sinks (few edges
+ * among them), so a plain top-N slice is mostly isolated leaves. Instead: find
+ * the connected components (undirected), drop singletons, and greedily add whole
+ * components largest-first up to `budget` — filling the pane with real clusters,
+ * never a lone pill.
  */
-function connectedCore(hubs: ConstellationNode[], n: number): ConstellationNode[] {
+/** Undirected connected components of the hub graph with ≥2 nodes, largest first. */
+function components(hubs: ConstellationNode[]): string[][] {
   const ids = new Set(hubs.map((h) => h.id));
   const adj = new Map<string, Set<string>>();
   const link = (a: string, b: string): void => { (adj.get(a) ?? adj.set(a, new Set()).get(a)!).add(b); };
   for (const h of hubs) for (const d of h.deps) if (ids.has(d)) { link(h.id, d); link(d, h.id); }
+
   const seen = new Set<string>();
-  let best: string[] = [];
+  const comps: string[][] = [];
   for (const h of hubs) {
     if (seen.has(h.id)) continue;
     const comp: string[] = [];
@@ -48,12 +51,16 @@ function connectedCore(hubs: ConstellationNode[], n: number): ConstellationNode[
       comp.push(x);
       for (const y of adj.get(x) ?? []) if (!seen.has(y)) { seen.add(y); q.push(y); }
     }
-    if (comp.length > best.length) best = comp;
+    if (comp.length >= 2) comps.push(comp);
   }
-  const inBest = new Set(best);
-  const chosen = hubs.filter((h) => inBest.has(h.id)).slice(0, n);
-  const kept = new Set(chosen.map((h) => h.id));
-  return chosen.map((h) => ({ ...h, deps: h.deps.filter((d) => kept.has(d)) }));
+  return comps.sort((a, b) => b.length - a.length);
+}
+
+function connectedCore(hubs: ConstellationNode[], budget: number): ConstellationNode[] {
+  const keep = new Set<string>();
+  for (const c of components(hubs)) { if (keep.size + c.length > budget) continue; for (const id of c) keep.add(id); }
+  const chosen = hubs.filter((h) => keep.has(h.id));
+  return chosen.map((h) => ({ ...h, deps: h.deps.filter((d) => keep.has(d)) }));
 }
 
 /** Draw a wire glyph; where two different wires meet, merge to ┼ (never a false turn). */
@@ -81,7 +88,10 @@ function routeEdge(scr: Screen, a: Anchor, b: Anchor, chX: number, st: Style): P
 export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t = 0): void {
   const iw = r.w - 3, ih = r.h - 2;
   if (iw < 2 || ih < 2) return;
-  const nodes = connectedCore(hubs, MAX_NODES);
+  // Budget scales with pane height (2 columns, ~2 rows/node) so a tall pane shows
+  // more clusters instead of a lot of empty space. Capped at the constellation's 24.
+  const budget = Math.min(24, Math.max(6, ih));
+  const nodes = connectedCore(hubs, budget);
   const lay = layoutDag(nodes.map((n): LayoutNode => ({ id: n.id, deps: n.deps })), { colGap: 1, rowGap: 1, pad: 0 });
   const maxC = Math.max(0, ...lay.nodes.map((n) => n.x));
   const maxR = Math.max(0, ...lay.nodes.map((n) => n.y));

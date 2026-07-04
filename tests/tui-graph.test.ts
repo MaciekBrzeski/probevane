@@ -42,7 +42,7 @@ describe('renderGraph (facet nodeGraph adapter)', () => {
     expect(s.cells.some((c) => c.st.fg === FG.dim)).toBe(true);
   });
 
-  it('shows only the largest connected component (drops isolated hubs)', () => {
+  it('shows connected clusters only (drops isolated hubs)', () => {
     const s = blank(56, 12);
     renderGraph(s, R(56, 12), [
       N('a', 'alpha', ['b', 'c'], 'active'), N('b', 'beta', []), N('c', 'gamma', []), // connected trio
