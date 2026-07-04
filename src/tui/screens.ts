@@ -45,11 +45,11 @@ export function layoutFor(tab: string, w: number, h: number): Record<string, Rec
   return out;
 }
 
-export function paintConsole(scr: Screen, w: number, h: number, s: Snapshot, pipe: PipelineState, a: Anim): void {
+export function paintConsole(scr: Screen, w: number, h: number, s: Snapshot, pipe: PipelineState, a: Anim, focus = 0): void {
   const L = layoutFor('console', w, h);
   pipelinePane(scr, L.pipeline, s.runes, pipe, a.t);
   telemetryPane(scr, L.telemetry, s.totals, s.daily, a);
-  constellationPane(scr, L.constellation, s.hubs, a.t);
+  constellationPane(scr, L.constellation, s.hubs, a.t, focus);
 }
 
 /** Runs body — `sel` marks the highlighted run row. */

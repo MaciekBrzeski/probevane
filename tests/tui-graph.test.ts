@@ -55,6 +55,17 @@ describe('renderGraph (facet nodeGraph adapter)', () => {
     expect(out).not.toContain('epsilon');
   });
 
+  it('focus mode: ↑↓ moves which node’s edges light up (bright cells shift)', () => {
+    const nodes = [N('a', 'aa', ['b']), N('b', 'bb', []), N('c', 'cc', ['d']), N('d', 'dd', [])]; // two clusters
+    const bright = (f: number): string => {
+      const s = blank(56, 12);
+      renderGraph(s, R(56, 12), nodes, 0, f);
+      return s.cells.map((c, i) => (c.st.fg === FG.acc ? i : -1)).filter((i) => i >= 0).join(',');
+    };
+    expect(bright(0)).not.toBe(''); // some node/edges lit
+    expect(bright(0)).not.toBe(bright(2)); // focusing a different cluster lights different cells
+  });
+
   it('renders inside the pane rect (inset past the frame rail)', () => {
     const s = blank(56, 12);
     renderGraph(s, { x: 0, y: 0, w: 56, h: 12 }, HUBS);

@@ -126,6 +126,7 @@ class TuiApp {
   input: string | null = null; // non-null = typing a launch command
   status = '';
   ui: Ui = { docsSel: 0, docsBody: '', quality: '' }; // interactive per-tab state
+  constFocus = 0; // ↑↓ cycles the highlighted constellation node on the Console tab
   private t0 = Date.now();
   private tabEnter = Date.now();
   private anim: ReturnType<typeof setInterval> | null = null;
@@ -155,7 +156,7 @@ class TuiApp {
   private paintTab(scr: Screen, w: number, h: number, a: { t: number; reveal: number }) {
     const d = this.data;
     const painters: Record<string, () => void> = {
-      console: () => paintConsole(scr, w, h, d, this.pipe, a),
+      console: () => paintConsole(scr, w, h, d, this.pipe, a, this.constFocus),
       runs: () => paintRuns(scr, w, h, d, this.sel),
       cost: () => paintCost(scr, w, h, d, a),
       projects: () => paintProjects(scr, w, h, d),
@@ -216,12 +217,13 @@ class TuiApp {
     return this.keys[k]?.();
   }
 
-  /** ↑↓ — selects a run on the Runs tab, a wiki page on the Docs tab. */
+  /** ↑↓ — run on Runs, wiki page on Docs, focused constellation node on Console. */
   private moveSel(delta: number) {
     if (this.tab === 'docs') {
       this.ui.docsSel = Math.max(0, Math.min(this.data.wikiPages.length - 1, this.ui.docsSel + delta));
       this.draw(); return void this.loadDocsPage();
     }
+    if (this.tab === 'console') { this.constFocus += delta; return this.draw(); } // graph clamps/wraps
     this.sel = Math.max(0, Math.min(this.data.runs.length - 1, this.sel + delta));
     this.draw();
   }

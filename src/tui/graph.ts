@@ -6,7 +6,7 @@
 
 import { putText } from './screen.js';
 import { pulse, glow, mix } from './anim.js';
-import { layoutDag, type LayoutNode } from './layout.js';
+import { layoutDag, type LayoutNode, type Layout } from './layout.js';
 import { trunc, FG } from './draw.js';
 import type { Screen, Style } from './screen.js';
 import type { ConstellationNode } from '../observe/constellation.js';
@@ -84,21 +84,20 @@ function routeEdge(scr: Screen, a: Anchor, b: Anchor, chX: number, st: Style): P
   return path;
 }
 
-/** Render the connected hub core as an orthogonally-routed node graph, inside pane `r`. */
-export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t = 0): void {
-  const iw = r.w - 3, ih = r.h - 2;
-  if (iw < 2 || ih < 2) return;
-  // Budget scales with pane height (2 columns, ~2 rows/node) so a tall pane shows
-  // more clusters instead of a lot of empty space. Capped at the constellation's 24.
-  const budget = Math.min(24, Math.max(6, ih));
-  const nodes = connectedCore(hubs, budget);
+interface Placed {
+  lay: Layout;
+  anchor: Map<string, Anchor>;
+  byId: Map<string, ConstellationNode>;
+  nodeW: number; gapL: number; gapR: number;
+}
+
+/** Lay the nodes out into cell anchors + the channel gap. */
+function placeGraph(nodes: ConstellationNode[], r: Rect, iw: number, ih: number): Placed {
   const lay = layoutDag(nodes.map((n): LayoutNode => ({ id: n.id, deps: n.deps })), { colGap: 1, rowGap: 1, pad: 0 });
   const maxC = Math.max(0, ...lay.nodes.map((n) => n.x));
   const maxR = Math.max(0, ...lay.nodes.map((n) => n.y));
   const nodeW = Math.max(6, Math.min(16, Math.floor(iw / (maxC + 1)) - 2));
   const colStep = maxC > 0 ? Math.floor((iw - nodeW) / maxC) : 0;
-  // Keep rows tight (≤2 apart) so a small cluster doesn't stretch across a tall
-  // pane, and top-align it (empty space falls below, not as a blank header).
   const rowStep = maxR > 0 ? Math.min(2, Math.max(1, Math.floor((ih - 1) / maxR))) : 1;
   const x0 = r.x + 2, y0 = r.y + 1;
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -111,24 +110,53 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
   const cols = [...anchor.values()];
   const leftRx = Math.max(r.x, ...cols.filter((a) => a.layer === 0).map((a) => a.rx));
   const rightLx = Math.min(r.x + r.w, ...cols.filter((a) => a.layer > 0).map((a) => a.lx));
-  const wireSt: Style = { fg: mix(FG.acc, FG.line, 0.5) };
+  return { lay, anchor, byId, nodeW, gapL: leftRx + 2, gapR: Math.max(leftRx + 2, rightLx - 2) };
+}
+
+/** Pill colour: the focused node pulses bright (its own state hue), its neighbours pop, the rest fade back. */
+function pillStyle(nn: ConstellationNode, isFocus: boolean, isNbr: boolean, t: number): Style {
+  if (isFocus) return { fg: glow(accentOf(nn), pulse(t, 900)), bold: true };
+  if (isNbr) return { fg: accentOf(nn), bold: true };
+  return { fg: mix(accentOf(nn), FG.bg, 0.55) };
+}
+
+/**
+ * Focus-mode node graph: all nodes drawn, but only the FOCUSED node's edges light
+ * up (the rest fade to a faint mesh) — the readable way to show a dense graph in
+ * cells. `focus` indexes the shown nodes; the driver cycles it with ↑↓.
+ */
+export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t = 0, focus = 0): void {
+  const iw = r.w - 3, ih = r.h - 2;
+  if (iw < 2 || ih < 2) return;
+  const nodes = connectedCore(hubs, Math.min(24, Math.max(6, ih))); // ~2 rows/node, cap 24
+  if (!nodes.length) return;
+  const { lay, anchor, byId, nodeW, gapL, gapR } = placeGraph(nodes, r, iw, ih);
   const bottom = r.y + r.h - 1;
-  lay.edges.forEach((e, i) => {
-    const a = anchor.get(e.from), b = anchor.get(e.to);
-    if (!a || !b || a.cy >= bottom || b.cy >= bottom) return;
-    const chX = Math.min(rightLx - 2, leftRx + 2 + i); // each edge its own channel column
-    const path = routeEdge(scr, a, b, chX, wireSt);
+  const focusId = nodes[((focus % nodes.length) + nodes.length) % nodes.length]!.id;
+
+  const edges = lay.edges
+    .map((e) => ({ from: e.from, to: e.to, a: anchor.get(e.from), b: anchor.get(e.to) }))
+    .filter((e): e is { from: string; to: string; a: Anchor; b: Anchor } => !!e.a && !!e.b && e.a.cy < bottom && e.b.cy < bottom)
+    .sort((p, q) => p.b.cy - q.b.cy || p.a.cy - q.a.cy);
+  const nbr = new Set<string>();
+  for (const e of edges) if (e.from === focusId || e.to === focusId) { nbr.add(e.from); nbr.add(e.to); }
+  const chOf = (i: number): number => (edges.length <= 1 ? gapL : Math.round(gapL + (i / (edges.length - 1)) * (gapR - gapL)));
+  const focused = (e: { from: string; to: string }): boolean => e.from === focusId || e.to === focusId;
+
+  const dimSt: Style = { fg: mix(FG.line, FG.bg, 0.55) }; // faint background mesh (recedes; focus pops)
+  edges.forEach((e, i) => { if (!focused(e)) routeEdge(scr, e.a, e.b, chOf(i), dimSt); }); // dim first
+  edges.forEach((e, i) => { // focused edges bright, on top, with a flowing dot
+    if (!focused(e)) return;
+    const path = routeEdge(scr, e.a, e.b, chOf(i), { fg: FG.acc });
     if (path.length) {
-      const dot = path[Math.floor(t / 130 + i * 4) % path.length]!;
-      putText(scr, dot.x, dot.y, '•', { fg: glow(FG.acc, pulse(t, 700)), bold: true });
+      const d = path[Math.floor(t / 130 + i * 4) % path.length]!;
+      putText(scr, d.x, d.y, '•', { fg: glow(FG.acc, pulse(t, 700)), bold: true });
     }
   });
   for (const n of lay.nodes) {
     const a = anchor.get(n.id)!;
     if (a.cy >= bottom) continue;
     const nn = byId.get(n.id)!;
-    const st: Style = { fg: accentOf(nn) };
-    if (nn.state !== 'idle') st.bold = true; // active/err pop; idle stays dim
-    putText(scr, a.lx, a.cy, pill(nn, nodeW - 4), st);
+    putText(scr, a.lx, a.cy, pill(nn, nodeW - 4), pillStyle(nn, n.id === focusId, nbr.has(n.id), t));
   }
 }
