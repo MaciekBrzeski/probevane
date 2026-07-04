@@ -136,9 +136,6 @@ export function spanToBox(span: [number, number, number, number], area: Box): Bo
   const y = area.y + Math.round(y0 * area.h);
   return { x, y, w: area.x + Math.round(x1 * area.w) - x, h: area.y + Math.round(y1 * area.h) - y };
 }
-/** Absolute-inset CSS for the browser — a pane positioned by the SAME span (0..1 fractions). */
-export function spanToCss(span: [number, number, number, number]): string {
-  const [x0, y0, x1, y1] = span;
-  const pc = (v: number) => `${(v * 100).toFixed(2)}%`;
-  return `left:${pc(x0)};top:${pc(y0)};width:${pc(x1 - x0)};height:${pc(y1 - y0)}`;
-}
+// Absolute-inset CSS for the browser — the SAME span math the engine ships,
+// so it's re-exported from @facet/core (spanToBox keeps its cell-rounding here).
+export { spanToCss } from '@facet/core';
