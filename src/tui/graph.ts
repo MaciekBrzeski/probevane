@@ -87,11 +87,10 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
   const maxR = Math.max(0, ...lay.nodes.map((n) => n.y));
   const nodeW = Math.max(6, Math.min(16, Math.floor(iw / (maxC + 1)) - 2));
   const colStep = maxC > 0 ? Math.floor((iw - nodeW) / maxC) : 0;
-  // Keep rows tight (≤2 apart) rather than stretched across a tall pane, then
-  // centre the compact graph vertically so it doesn't sit as sparse gaps.
+  // Keep rows tight (≤2 apart) so a small cluster doesn't stretch across a tall
+  // pane, and top-align it (empty space falls below, not as a blank header).
   const rowStep = maxR > 0 ? Math.min(2, Math.max(1, Math.floor((ih - 1) / maxR))) : 1;
-  const x0 = r.x + 2;
-  const y0 = r.y + 1 + Math.max(0, Math.floor((ih - 1 - maxR * rowStep) / 2));
+  const x0 = r.x + 2, y0 = r.y + 1;
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const anchor = new Map<string, Anchor>();
   for (const n of lay.nodes) {
