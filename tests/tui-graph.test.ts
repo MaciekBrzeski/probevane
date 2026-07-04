@@ -42,6 +42,19 @@ describe('renderGraph (facet nodeGraph adapter)', () => {
     expect(s.cells.some((c) => c.st.fg === FG.dim)).toBe(true);
   });
 
+  it('shows only the largest connected component (drops isolated hubs)', () => {
+    const s = blank(56, 12);
+    renderGraph(s, R(56, 12), [
+      N('a', 'alpha', ['b', 'c'], 'active'), N('b', 'beta', []), N('c', 'gamma', []), // connected trio
+      N('d', 'delta', []), N('e', 'epsilon', []), // isolated → excluded
+    ]);
+    const out = plain(serialize(s));
+    expect(out).toContain('( alpha )');
+    expect(out).toContain('( beta )');
+    expect(out).not.toContain('delta'); // isolated hub not rendered
+    expect(out).not.toContain('epsilon');
+  });
+
   it('renders inside the pane rect (inset past the frame rail)', () => {
     const s = blank(56, 12);
     renderGraph(s, { x: 0, y: 0, w: 56, h: 12 }, HUBS);
