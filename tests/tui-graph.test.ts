@@ -32,7 +32,7 @@ describe('renderGraph (facet nodeGraph adapter)', () => {
     expect(out).toContain('( beta )');
     expect(out).toContain('( gamma )');
     // an edge trace (box-drawing straight run or braille curve)
-    expect(out).toMatch(/─|[⠀-⣿]/);
+    expect(out).toMatch(/[─│┌┐└┘┼]/); // orthogonal box-drawing edge
   });
 
   it('colours a network/err hub red and an idle hub dim', () => {

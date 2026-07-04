@@ -84,7 +84,7 @@ describe('tui views', () => {
     expect(out).toContain('( core )');    // node pill
     expect(out).toContain('( net )');
     expect(s.cells.some((c) => c.st.fg === FG.err)).toBe(true); // net calls network → red
-    expect(out).toMatch(/─|[⠀-⣿]/);       // an edge trace (box run or braille curve)
+    expect(out).toMatch(/[─│┼]/);          // an orthogonal edge trace
   });
   it('constellationPane falls back to the hub list when the pane is small', () => {
     const s = blank(30, 6); // too narrow for the graph

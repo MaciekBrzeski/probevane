@@ -126,7 +126,7 @@ export function telemetryPane(scr: Screen, r: Rect, t: Totals, daily: Daily[], a
 export function constellationPane(scr: Screen, r: Rect, hubs: ConstellationNode[], t = 0): void {
   lcarsFrame(scr, r, 'module constellation', FG.mag);
   if (!hubs.length) { putText(scr, r.x + 2, r.y + 1, 'graph unavailable', DIM); return; }
-  if (graphFits(r, hubs.length)) return renderGraph(scr, r, hubs);
+  if (graphFits(r, hubs.length)) return renderGraph(scr, r, hubs, t);
   const bw = Math.max(3, r.w - LABEL_W - 10);
   hubs.slice(0, r.h - 2).forEach((n, i) => {
     const y = r.y + 1 + i;
