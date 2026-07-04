@@ -1,11 +1,11 @@
-// Control-center entry: mounts the static shell components into #app, then
-// ports the original inline script (fetch/SSE polling, tab switching, drawer,
-// markdown+mermaid rendering, run filtering) as plain module functions.
-// Component tags resolve by convention (see scripts/build-ui.mjs) — no imports.
+// Control-center entry: mounts shell components into #app, then ports the old
+// inline script (polling, tabs, drawer, markdown/mermaid, filtering) as functions.
 import { mount } from '../runtime.ts';
-import { $, j, esc, dirOf, type ProjectInfo, type RunRecord } from './lib.ts';
+import { $, j, esc, dirOf, applyPalette, type ProjectInfo, type RunRecord } from './lib.ts';
+import { RUN_COLUMNS } from '../theme.ts';
 import { loadConsole, consolePipelineEvent, consolePipelineReset, startTheater } from './console.tsx';
 import { loadTerminal, terminalActivated } from './terminal.ts';
+applyPalette(); // shared palette SSOT → :root custom-props (see src/ui/theme.ts)
 
 // CDN globals (loaded by shell.html script tags before this bundle runs).
 declare const marked: { parse(md: string, opts?: Record<string, unknown>): string };
@@ -147,7 +147,7 @@ async function loadRuns() {
     if (RUN_FILTER) runs = runs.filter((r: RunRecord) => (r.label || '').includes(RUN_FILTER));
     $('runsMeta').textContent = RUN_FILTER ? `filtered by "${RUN_FILTER}" (${runs.length}/${total})` : `${total} total`;
     const tb = (<tbody></tbody>) as HTMLElement;
-    if (!runs.length) tb.appendChild(<tr><td class="muted" colSpan={6}>none</td></tr>);
+    if (!runs.length) tb.appendChild(<tr><td class="muted" colSpan={RUN_COLUMNS.length}>none</td></tr>);
     for (const r of runs) tb.appendChild(<RunRow r={r} onOpen={openRun} />);
     $('runs').querySelector('tbody')!.replaceWith(tb);
   } catch {}

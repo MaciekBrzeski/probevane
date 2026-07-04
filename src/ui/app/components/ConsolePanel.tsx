@@ -1,23 +1,36 @@
 // The Trek console tab: live rune pipeline (nodes light up over SSE) +
 // project module constellation + ring gauges/sparks fed by /aggregate.
-// Containers are filled by main.tsx (loadConsole/consoleTick).
+// Regions + accents + positions come from the shared theme SSOT (CONSOLE_PANES)
+// — the SAME manifest the terminal console lays out from (spanToBox). Each
+// pane is absolutely positioned by its span; inner containers are filled by
+// main.tsx (loadConsole/consoleTick).
+import { CONSOLE_PANES, cssVar, spanToCss } from '../../theme.ts';
+
+const PANE_BODY: Record<string, () => Node> = {
+  pipeline: () => (
+    <>
+      <div id="pipelineGraph" class="muted">standby…</div>
+      <div id="theaterTicker" class="theater-ticker"></div>
+    </>
+  ),
+  telemetry: () => (
+    <>
+      <div class="gauges" id="gauges"></div>
+      <div id="sparks"></div>
+    </>
+  ),
+  constellation: () => <div id="constellation" class="muted">standby…</div>,
+};
+
 export function ConsolePanel(): Node {
   return (
     <section data-tab="console">
       <div class="console-grid">
-        <div class="sf-hero">
-          <ScanFrame title="run pipeline" accent="var(--acc)">
-            <div id="pipelineGraph" class="muted">standby…</div>
-            <div id="theaterTicker" class="theater-ticker"></div>
-          </ScanFrame>
-        </div>
-        <ScanFrame title="telemetry" accent="var(--warn2)">
-          <div class="gauges" id="gauges"></div>
-          <div id="sparks"></div>
-        </ScanFrame>
-        <ScanFrame title="module constellation" accent="var(--mag)">
-          <div id="constellation" class="muted">standby…</div>
-        </ScanFrame>
+        {CONSOLE_PANES.map((p) => (
+          <div class="console-pane" style={spanToCss(p.span)}>
+            <ScanFrame title={p.title} accent={cssVar(p.accent)}>{PANE_BODY[p.id]()}</ScanFrame>
+          </div>
+        ))}
       </div>
     </section>
   );

@@ -91,8 +91,10 @@ describe('control center XSS guard (asset)', () => {
   it('renders wiki markdown only with mermaid securityLevel strict', () => {
     expect(html).toMatch(/securityLevel:\s*["\']strict["\']/);
   });
-  it('has the control-center tabs (Tabs.tsx by convention)', () => {
-    const tabs = ui('app/components/Tabs.tsx');
-    for (const t of ['projects', 'runs', 'docs', 'launch', 'cost', 'quality']) expect(tabs).toContain(`data-go="${t}"`);
+  it('has the control-center tabs (rendered from the theme SSOT)', async () => {
+    const { TABS } = await import('../src/ui/theme.js');
+    const ids = TABS.map((t) => t.id);
+    for (const t of ['projects', 'runs', 'docs', 'launch', 'cost', 'quality', 'console', 'terminal']) expect(ids).toContain(t);
+    expect(ui('app/components/Tabs.tsx')).toContain('TABS'); // Tabs renders from the model, not literal markup
   });
 });

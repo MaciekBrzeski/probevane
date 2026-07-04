@@ -7,10 +7,10 @@
 <title>probevane control center</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
 <style>
-:root { --bg:#04070f; --panel:#0b1220; --line:#1b2a44; --fg:#cfe3f5; --dim:#7d93ad;
-        --ok:#2fe6a8; --warn:#ffb454; --err:#ff5d6c; --acc:#4fd6ff;
-        --warn2:#ffb454; --mag:#c792ea; --frame:var(--acc);
-        --glow:0 0 10px; --num:ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* Palette custom-props (--bg/--acc/--ok/… + --warn2/--frame aliases) are set on
+   :root at boot by main.tsx from the shared SSOT src/ui/theme.ts — NOT hardcoded
+   here, so one edit repaints the browser and the terminal. Non-palette tokens stay: */
+:root { --glow:0 0 10px; --num:ui-monospace, SFMono-Regular, Menlo, monospace; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, -apple-system, sans-serif;
        background-image:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79,214,255,.07), transparent),
@@ -142,8 +142,13 @@ details.ok summary { color:var(--ok); }
 .empty-state h3 { font-size: 16px; color: var(--fg); margin-bottom: 8px; font-style: normal; opacity: 1; }
 
 /* --- Console (LCARS): frames, gauges, sparks, node graphs ------------------ */
-.console-grid { display:grid; grid-template-columns:1fr 1.2fr; gap:18px; }
-.console-grid .sf-hero { grid-column:1 / -1; }
+/* Panes are absolutely positioned from the shared CONSOLE_PANES manifest
+   (src/ui/theme.ts spanToCss) — the SAME spans the terminal console lays out
+   from (spanToBox). Edit the manifest, both move together. */
+.console-grid { position:relative; height:min(74vh, 680px); }
+.console-pane { position:absolute; padding:9px; }
+.console-pane > .scanframe { height:100%; }
+.console-pane .sf-body { height:calc(100% - 30px); overflow:auto; }
 
 .scanframe { position:relative; border:1px solid var(--line); border-left:14px solid var(--frame); border-radius:26px 12px 12px 26px; background:linear-gradient(160deg, rgba(79,214,255,.04), transparent 40%), var(--panel); padding:0; overflow:hidden; }
 .sf-elbow { position:absolute; top:0; left:0; width:60px; height:22px; background:var(--frame); border-radius:0 0 18px 0; opacity:.9; }
@@ -286,9 +291,99 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("header", null, /* @__PURE__ */ h("h1", null, "probevane ", /* @__PURE__ */ h("span", { class: "muted" }, "control center")), /* @__PURE__ */ h("span", { class: "stat" }, /* @__PURE__ */ h("span", { id: "healthDot", class: "dot", style: "background:var(--dim)" }), /* @__PURE__ */ h("span", { id: "health", class: "connecting" }, "connecting\u2026")), /* @__PURE__ */ h("span", { class: "stat" }, "cost ", /* @__PURE__ */ h("b", { id: "cost" }, "\u2013"), " \xB7 accept ", /* @__PURE__ */ h("b", { id: "accept" }, "\u2013"), " \xB7 alerts ", /* @__PURE__ */ h("b", { id: "alertN" }, "\u2013")), /* @__PURE__ */ h("span", { class: "spacer" }), /* @__PURE__ */ h("a", { href: "/demo/pipeline", target: "_blank" }, "pipeline \u2197"));
   }
 
+  // src/ui/theme.ts
+  var PALETTE = {
+    bg: "#04070f",
+    panel: "#0b1220",
+    line: "#1b2a44",
+    fg: "#cfe3f5",
+    dim: "#7d93ad",
+    ok: "#2fe6a8",
+    warn: "#ffb454",
+    err: "#ff5d6c",
+    acc: "#4fd6ff",
+    mag: "#c792ea"
+  };
+  var cssVar = (n) => `var(--${n})`;
+  function cssVars() {
+    const vars = {};
+    for (const k of Object.keys(PALETTE)) vars[`--${k}`] = PALETTE[k];
+    vars["--warn2"] = PALETTE.warn;
+    vars["--frame"] = PALETTE.acc;
+    return vars;
+  }
+  var clamp01 = (k) => k < 0 ? 0 : k > 1 ? 1 : k;
+  var TABS = [
+    { id: "projects", title: "Projects", accent: "acc", terminal: true },
+    { id: "runs", title: "Runs", accent: "mag", terminal: true },
+    { id: "docs", title: "Docs", accent: "acc", terminal: true },
+    { id: "launch", title: "Launch", accent: "acc", terminal: true },
+    { id: "cost", title: "Cost / Alerts", accent: "warn", terminal: true },
+    { id: "quality", title: "Quality", accent: "ok", terminal: true },
+    { id: "console", title: "Console", accent: "acc", terminal: true },
+    { id: "terminal", title: "Terminal", accent: "acc", terminal: true }
+  ];
+  var TERMINAL_TABS = TABS.filter((t) => t.terminal);
+  function gauges(totals) {
+    const acc = totals.acceptRate ?? 0, runs = totals.runs ?? 0;
+    return [
+      { id: "accept", label: "acceptance", value: clamp01(acc), raw: `${Math.round(acc * 100)}%`, accent: "ok" },
+      { id: "runs", label: "runs / 500", value: Math.min(1, runs / 500), raw: String(runs), accent: "warn" }
+    ];
+  }
+  var RUN_COLUMNS = [
+    { id: "when", header: "when", w: 19, muted: true, get: (r) => (r.ts || "").slice(0, 19).replace("T", " ") },
+    { id: "label", header: "label", w: 16, grow: true, get: (r) => r.label || r.runId || "" },
+    { id: "model", header: "model", w: 8, muted: true, get: (r) => r.model || "" },
+    { id: "status", header: "status", w: 10, get: (r) => r.accepted ? "accepted" : r.stopReason || "?" },
+    { id: "cost", header: "cost", w: 6, align: "r", muted: true, get: (r) => "$" + (r.cost ?? 0) },
+    { id: "steps", header: "steps", w: 6, align: "r", muted: true, get: (r) => String(r.steps ?? "") }
+  ];
+  var LAYOUTS = {
+    // pipeline hero across the top, telemetry + constellation across the bottom
+    console: [
+      { id: "pipeline", title: "run pipeline", accent: "acc", span: [0, 0, 1, 0.5] },
+      { id: "telemetry", title: "telemetry", accent: "warn", span: [0, 0.5, 0.5, 1] },
+      { id: "constellation", title: "module constellation", accent: "mag", span: [0.5, 0.5, 1, 1] }
+    ],
+    // run list (left) + alerts (right)
+    runs: [
+      { id: "jobs", title: "runs", accent: "mag", span: [0, 0, 0.6, 1] },
+      { id: "alerts", title: "alerts", accent: "warn", span: [0.6, 0, 1, 1] }
+    ],
+    // cost (left) + alerts over telemetry (right)
+    cost: [
+      { id: "cost", title: "cost / day", accent: "acc", span: [0, 0, 0.5, 1] },
+      { id: "alerts", title: "alerts", accent: "warn", span: [0.5, 0, 1, 0.5] },
+      { id: "telemetry", title: "telemetry", accent: "warn", span: [0.5, 0.5, 1, 1] }
+    ],
+    // project cards, full width
+    projects: [{ id: "projects", title: "projects", accent: "acc", span: [0, 0, 1, 1] }],
+    // wiki page list (left) + selected page body (right) — mirrors the browser Docs split
+    docs: [
+      { id: "pages", title: "docs", accent: "acc", span: [0, 0, 0.3, 1] },
+      { id: "page", title: "page", accent: "acc", span: [0.3, 0, 1, 1] }
+    ],
+    // launch form: ops (left) + hint/recent (right)
+    launch: [
+      { id: "ops", title: "operations", accent: "acc", span: [0, 0, 0.4, 1] },
+      { id: "launchHint", title: "launch", accent: "acc", span: [0.4, 0, 1, 1] }
+    ],
+    // source-quality scorecard, full width
+    quality: [{ id: "quality", title: "quality", accent: "ok", span: [0, 0, 1, 1] }],
+    // embedded-shell hint, full width
+    terminal: [{ id: "terminal", title: "terminal", accent: "acc", span: [0, 0, 1, 1] }]
+  };
+  var CONSOLE_PANES = LAYOUTS.console;
+  function spanToCss(span) {
+    const [x0, y0, x1, y1] = span;
+    const pc = (v) => `${(v * 100).toFixed(2)}%`;
+    return `left:${pc(x0)};top:${pc(y0)};width:${pc(x1 - x0)};height:${pc(y1 - y0)}`;
+  }
+
   // src/ui/app/components/Tabs.tsx
   function Tabs() {
-    return /* @__PURE__ */ h("nav", { class: "tabs", id: "tabs" }, /* @__PURE__ */ h("button", { "data-go": "projects", class: "active" }, "Projects"), /* @__PURE__ */ h("button", { "data-go": "runs" }, "Runs"), /* @__PURE__ */ h("button", { "data-go": "docs" }, "Docs"), /* @__PURE__ */ h("button", { "data-go": "launch" }, "Launch"), /* @__PURE__ */ h("button", { "data-go": "cost" }, "Cost / Alerts"), /* @__PURE__ */ h("button", { "data-go": "quality" }, "Quality"), /* @__PURE__ */ h("button", { "data-go": "console" }, "Console"), /* @__PURE__ */ h("button", { "data-go": "terminal" }, "Terminal"));
+    return /* @__PURE__ */ h("nav", { class: "tabs", id: "tabs" }, TABS.map((t, i) => /* @__PURE__ */ h("button", { "data-go": t.id, class: i === 0 ? "active" : void 0 }, t.title)));
   }
 
   // src/ui/app/components/ProjectsPanel.tsx
@@ -298,7 +393,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 
   // src/ui/app/components/RunsPanel.tsx
   function RunsPanel() {
-    return /* @__PURE__ */ h("section", { "data-tab": "runs" }, /* @__PURE__ */ h("div", { class: "panel wide", style: "margin-bottom:12px" }, /* @__PURE__ */ h("h2", null, "active runs"), /* @__PURE__ */ h("div", { id: "activeRuns", class: "muted" }, "no active runs")), /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "run history ", /* @__PURE__ */ h("span", { id: "runsMeta", class: "muted" })), /* @__PURE__ */ h("table", { id: "runs" }, /* @__PURE__ */ h("thead", null, /* @__PURE__ */ h("tr", null, /* @__PURE__ */ h("th", null, "when"), /* @__PURE__ */ h("th", null, "label"), /* @__PURE__ */ h("th", null, "model"), /* @__PURE__ */ h("th", null, "status"), /* @__PURE__ */ h("th", null, "cost"), /* @__PURE__ */ h("th", null, "steps"))), /* @__PURE__ */ h("tbody", null, /* @__PURE__ */ h("tr", null, /* @__PURE__ */ h("td", { class: "muted", colSpan: 6 }, "loading\u2026"))))));
+    return /* @__PURE__ */ h("section", { "data-tab": "runs" }, /* @__PURE__ */ h("div", { class: "panel wide", style: "margin-bottom:12px" }, /* @__PURE__ */ h("h2", null, "active runs"), /* @__PURE__ */ h("div", { id: "activeRuns", class: "muted" }, "no active runs")), /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "run history ", /* @__PURE__ */ h("span", { id: "runsMeta", class: "muted" })), /* @__PURE__ */ h("table", { id: "runs" }, /* @__PURE__ */ h("thead", null, /* @__PURE__ */ h("tr", null, RUN_COLUMNS.map((c) => /* @__PURE__ */ h("th", null, c.header)))), /* @__PURE__ */ h("tbody", null, /* @__PURE__ */ h("tr", null, /* @__PURE__ */ h("td", { class: "muted", colSpan: RUN_COLUMNS.length }, "loading\u2026"))))));
   }
 
   // src/ui/app/components/WikiPanel.tsx
@@ -327,8 +422,13 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   }
 
   // src/ui/app/components/ConsolePanel.tsx
+  var PANE_BODY = {
+    pipeline: () => /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { id: "pipelineGraph", class: "muted" }, "standby\u2026"), /* @__PURE__ */ h("div", { id: "theaterTicker", class: "theater-ticker" })),
+    telemetry: () => /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "gauges", id: "gauges" }), /* @__PURE__ */ h("div", { id: "sparks" })),
+    constellation: () => /* @__PURE__ */ h("div", { id: "constellation", class: "muted" }, "standby\u2026")
+  };
   function ConsolePanel() {
-    return /* @__PURE__ */ h("section", { "data-tab": "console" }, /* @__PURE__ */ h("div", { class: "console-grid" }, /* @__PURE__ */ h("div", { class: "sf-hero" }, /* @__PURE__ */ h(ScanFrame, { title: "run pipeline", accent: "var(--acc)" }, /* @__PURE__ */ h("div", { id: "pipelineGraph", class: "muted" }, "standby\u2026"), /* @__PURE__ */ h("div", { id: "theaterTicker", class: "theater-ticker" }))), /* @__PURE__ */ h(ScanFrame, { title: "telemetry", accent: "var(--warn2)" }, /* @__PURE__ */ h("div", { class: "gauges", id: "gauges" }), /* @__PURE__ */ h("div", { id: "sparks" })), /* @__PURE__ */ h(ScanFrame, { title: "module constellation", accent: "var(--mag)" }, /* @__PURE__ */ h("div", { id: "constellation", class: "muted" }, "standby\u2026"))));
+    return /* @__PURE__ */ h("section", { "data-tab": "console" }, /* @__PURE__ */ h("div", { class: "console-grid" }, CONSOLE_PANES.map((p) => /* @__PURE__ */ h("div", { class: "console-pane", style: spanToCss(p.span) }, /* @__PURE__ */ h(ScanFrame, { title: p.title, accent: cssVar(p.accent) }, PANE_BODY[p.id]())))));
   }
 
   // src/ui/app/components/TerminalPanel.tsx
@@ -343,6 +443,10 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 
   // src/ui/app/lib.ts
   var $ = (id) => document.getElementById(id);
+  var applyPalette = () => {
+    const root = document.documentElement.style;
+    for (const [k, v] of Object.entries(cssVars())) root.setProperty(k, v);
+  };
   var j = async (u, o) => (await fetch(u, o)).json();
   var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   function dirOf(label) {
@@ -358,7 +462,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 
   // src/ui/app/components/RunRow.tsx
   function RunRow({ r, onOpen }) {
-    return /* @__PURE__ */ h("tr", { class: "clickable", onClick: () => onOpen(r) }, /* @__PURE__ */ h("td", { class: "muted" }, (r.ts || "").slice(0, 19).replace("T", " ")), /* @__PURE__ */ h("td", null, r.label || ""), /* @__PURE__ */ h("td", { class: "muted" }, r.model || ""), /* @__PURE__ */ h("td", null, /* @__PURE__ */ h("span", { class: "tag " + (r.accepted ? "accepted" : esc(r.stopReason)) }, r.accepted ? "accepted" : r.stopReason)), /* @__PURE__ */ h("td", { class: "muted" }, "$" + (r.cost ?? 0)), /* @__PURE__ */ h("td", { class: "muted" }, String(r.steps ?? "")));
+    return /* @__PURE__ */ h("tr", { class: "clickable", onClick: () => onOpen(r) }, RUN_COLUMNS.map(
+      (c) => c.id === "status" ? /* @__PURE__ */ h("td", null, /* @__PURE__ */ h("span", { class: "tag " + (r.accepted ? "accepted" : esc(r.stopReason)) }, r.accepted ? "accepted" : r.stopReason)) : /* @__PURE__ */ h("td", { class: c.muted ? "muted" : void 0 }, c.get(r))
+    ));
   }
 
   // src/ui/app/components/Turn.tsx
@@ -366,7 +472,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "turn " + (t.role === "user" ? "user" : "") }, /* @__PURE__ */ h("div", { class: "thead" }, `${t.role}${t.model ? " \xB7 " + t.model : ""} \xB7 step ${t.step}`), t.text && /* @__PURE__ */ h("div", { class: "txt" }, t.text), (t.toolCalls || []).map((c) => /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, "\u2192 " + c.name), /* @__PURE__ */ h("pre", null, typeof c.input === "string" ? c.input : JSON.stringify(c.input, null, 2)))), (t.toolResults || []).map((r) => /* @__PURE__ */ h("details", { class: r.ok ? "ok" : "err" }, /* @__PURE__ */ h("summary", null, (r.ok ? "\u2713 " : "\u2717 ") + r.name), /* @__PURE__ */ h("pre", null, r.content))));
   }
 
-  // src/tui/layout.ts
+  // ../facet/packages/core/src/layout.ts
   function computeLayers(input, ids) {
     const layer = /* @__PURE__ */ new Map();
     for (const n of input) layer.set(n.id, 0);
@@ -389,16 +495,19 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   function computeRows(input, layer) {
     const byLayer = /* @__PURE__ */ new Map();
     for (const n of input) {
-      const l = layer.get(n.id);
-      (byLayer.get(l) ?? byLayer.set(l, []).get(l)).push(n.id);
+      const l = layer.get(n.id) ?? 0;
+      const bucket = byLayer.get(l) ?? [];
+      bucket.push(n.id);
+      byLayer.set(l, bucket);
     }
     const row = /* @__PURE__ */ new Map();
     for (const l of [...byLayer.keys()].sort((a, b) => a - b)) {
       const parentRow = (id) => {
-        const deps = input.find((n) => n.id === id).deps.filter((d) => row.has(d));
-        return deps.length ? deps.reduce((s, d) => s + row.get(d), 0) / deps.length : Number.MAX_SAFE_INTEGER;
+        const node = input.find((n) => n.id === id);
+        const deps = (node?.deps ?? []).filter((d) => row.has(d));
+        return deps.length ? deps.reduce((s, d) => s + (row.get(d) ?? 0), 0) / deps.length : Number.MAX_SAFE_INTEGER;
       };
-      byLayer.get(l).map((id, i) => ({ id, key: parentRow(id), i })).sort((a, b) => a.key - b.key || a.i - b.i).forEach(({ id }, r) => row.set(id, r));
+      (byLayer.get(l) ?? []).map((id, i) => ({ id, key: parentRow(id), i })).sort((a, b) => a.key - b.key || a.i - b.i).forEach(({ id }, r) => row.set(id, r));
     }
     return row;
   }
@@ -411,9 +520,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     const row = computeRows(input, layer);
     const nodes = input.map((n) => ({
       id: n.id,
-      layer: layer.get(n.id),
-      x: pad + layer.get(n.id) * colGap,
-      y: pad + row.get(n.id) * rowGap
+      layer: layer.get(n.id) ?? 0,
+      x: pad + (layer.get(n.id) ?? 0) * colGap,
+      y: pad + (row.get(n.id) ?? 0) * rowGap
     }));
     const edges = input.flatMap(
       (n) => n.deps.filter((d) => ids.has(d)).map((d) => ({ from: d, to: n.id }))
@@ -422,6 +531,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     const height = pad + Math.max(0, ...nodes.map((n) => n.y)) + rowGap;
     return { nodes, edges, width, height };
   }
+
+  // ../facet/packages/core/src/widgets/gauge.ts
+  var TOP = -Math.PI / 2;
 
   // src/ui/app/components/NodeGraph.tsx
   function NodeGraph(props) {
@@ -485,6 +597,35 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "spark-wrap" }, /* @__PURE__ */ h("div", { class: "spark-label" }, props.label), svg);
   }
 
+  // src/observe/constellation.ts
+  var POOL = 40;
+  var MAX = 24;
+  var basename = (p) => p.split("/").pop().replace(/\.[tj]sx?$/, "");
+  function constellation(nodes) {
+    const pool = [...nodes].sort((a, b) => b.fanIn - a.fanIn).slice(0, POOL);
+    const poolIds = new Set(pool.map((n) => n.path));
+    const linked = /* @__PURE__ */ new Set();
+    for (const n of pool) for (const d of n.imports) if (poolIds.has(d)) {
+      linked.add(n.path);
+      linked.add(d);
+    }
+    const top = pool.filter((n) => linked.has(n.path)).slice(0, MAX);
+    const keep = new Set(top.map((n) => n.path));
+    const maxFan = Math.max(1, ...top.map((n) => n.fanIn));
+    return top.map((n) => {
+      const weight = n.fanIn / maxFan;
+      return {
+        id: n.path,
+        label: basename(n.path),
+        title: `${n.path} \xB7 fan-in ${n.fanIn}`,
+        deps: n.imports.filter((d) => keep.has(d)),
+        weight,
+        callsNetwork: n.callsNetwork,
+        state: n.callsNetwork ? "err" : weight > 0.5 ? "active" : "idle"
+      };
+    });
+  }
+
   // src/observe/pipeline.ts
   function pipelineReducer(state, ev, runeNames) {
     const next = { ...state };
@@ -530,8 +671,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       const a = await j("/aggregate");
       const g = $("gauges");
       g.textContent = "";
-      g.appendChild(/* @__PURE__ */ h(Gauge, { value: a.totals.acceptRate, label: "acceptance" }));
-      g.appendChild(/* @__PURE__ */ h(Gauge, { value: Math.min(1, a.totals.runs / 500), label: "runs/500", color: "var(--warn2)" }));
+      for (const spec of gauges(a.totals)) g.appendChild(/* @__PURE__ */ h(Gauge, { value: spec.value, label: spec.label, color: cssVar(spec.accent) }));
       const sp = $("sparks");
       sp.textContent = "";
       sp.appendChild(/* @__PURE__ */ h(Spark, { points: a.daily.map((d) => d.cost), label: "cost / day" }));
@@ -541,23 +681,13 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     }
     try {
       const g = await j("/graph");
-      const pool = g.nodes.sort((a, b) => b.fanIn - a.fanIn).slice(0, 40);
-      const poolIds = new Set(pool.map((n) => n.path));
-      const linked = /* @__PURE__ */ new Set();
-      for (const n of pool) for (const d of n.imports) if (poolIds.has(d)) {
-        linked.add(n.path);
-        linked.add(d);
-      }
-      const top = pool.filter((n) => linked.has(n.path)).slice(0, 24);
-      const keep = new Set(top.map((n) => n.path));
-      const maxFan = Math.max(1, ...top.map((n) => n.fanIn));
-      const nodes = top.map((n) => ({
-        id: n.path,
-        label: n.path.split("/").pop().replace(/\.[tj]sx?$/, ""),
-        title: `${n.path} \xB7 fan-in ${n.fanIn}`,
-        deps: n.imports.filter((d) => keep.has(d)),
-        weight: n.fanIn / maxFan,
-        state: n.callsNetwork ? "err" : n.fanIn / maxFan > 0.5 ? "active" : "idle"
+      const nodes = constellation(g.nodes).map((n) => ({
+        id: n.id,
+        label: n.label,
+        title: n.title,
+        deps: n.deps,
+        weight: n.weight,
+        state: n.state
       }));
       const box = $("constellation");
       box.textContent = "";
@@ -716,6 +846,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   }
 
   // src/ui/app/main.tsx
+  applyPalette();
   mount(
     document.getElementById("app"),
     /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
@@ -868,7 +999,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       if (RUN_FILTER) runs = runs.filter((r) => (r.label || "").includes(RUN_FILTER));
       $("runsMeta").textContent = RUN_FILTER ? `filtered by "${RUN_FILTER}" (${runs.length}/${total})` : `${total} total`;
       const tb = /* @__PURE__ */ h("tbody", null);
-      if (!runs.length) tb.appendChild(/* @__PURE__ */ h("tr", null, /* @__PURE__ */ h("td", { class: "muted", colSpan: 6 }, "none")));
+      if (!runs.length) tb.appendChild(/* @__PURE__ */ h("tr", null, /* @__PURE__ */ h("td", { class: "muted", colSpan: RUN_COLUMNS.length }, "none")));
       for (const r of runs) tb.appendChild(/* @__PURE__ */ h(RunRow, { r, onOpen: openRun }));
       $("runs").querySelector("tbody").replaceWith(tb);
     } catch {

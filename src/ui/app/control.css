@@ -1,7 +1,7 @@
-:root { --bg:#04070f; --panel:#0b1220; --line:#1b2a44; --fg:#cfe3f5; --dim:#7d93ad;
-        --ok:#2fe6a8; --warn:#ffb454; --err:#ff5d6c; --acc:#4fd6ff;
-        --warn2:#ffb454; --mag:#c792ea; --frame:var(--acc);
-        --glow:0 0 10px; --num:ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* Palette custom-props (--bg/--acc/--ok/… + --warn2/--frame aliases) are set on
+   :root at boot by main.tsx from the shared SSOT src/ui/theme.ts — NOT hardcoded
+   here, so one edit repaints the browser and the terminal. Non-palette tokens stay: */
+:root { --glow:0 0 10px; --num:ui-monospace, SFMono-Regular, Menlo, monospace; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, -apple-system, sans-serif;
        background-image:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79,214,255,.07), transparent),
@@ -133,8 +133,13 @@ details.ok summary { color:var(--ok); }
 .empty-state h3 { font-size: 16px; color: var(--fg); margin-bottom: 8px; font-style: normal; opacity: 1; }
 
 /* --- Console (LCARS): frames, gauges, sparks, node graphs ------------------ */
-.console-grid { display:grid; grid-template-columns:1fr 1.2fr; gap:18px; }
-.console-grid .sf-hero { grid-column:1 / -1; }
+/* Panes are absolutely positioned from the shared CONSOLE_PANES manifest
+   (src/ui/theme.ts spanToCss) — the SAME spans the terminal console lays out
+   from (spanToBox). Edit the manifest, both move together. */
+.console-grid { position:relative; height:min(74vh, 680px); }
+.console-pane { position:absolute; padding:9px; }
+.console-pane > .scanframe { height:100%; }
+.console-pane .sf-body { height:calc(100% - 30px); overflow:auto; }
 
 .scanframe { position:relative; border:1px solid var(--line); border-left:14px solid var(--frame); border-radius:26px 12px 12px 26px; background:linear-gradient(160deg, rgba(79,214,255,.04), transparent 40%), var(--panel); padding:0; overflow:hidden; }
 .sf-elbow { position:absolute; top:0; left:0; width:60px; height:22px; background:var(--frame); border-radius:0 0 18px 0; opacity:.9; }

@@ -2,9 +2,15 @@
 // of the screen runtime. Colors mirror the web control center's palette.
 
 import type { Style } from './screen.js';
+import { PALETTE, packed, type ColorName } from '../ui/theme.js';
 
-// 8-color SGR foregrounds (bright variants 90-97).
-export const FG = { dim: 90, fg: 37, acc: 96, ok: 92, warn: 93, err: 91, mag: 95 } as const;
+// Palette — packed 24-bit 0xRRGGBB derived from the shared theme SSOT
+// (src/ui/theme.ts), the SAME hexes the browser :root uses. screen.ts sgr()
+// emits truecolor, 256-color fallback on plain terminals. One edit in theme.ts
+// repaints both renderers.
+export const FG = Object.fromEntries(
+  (Object.keys(PALETTE) as ColorName[]).map((k) => [k, packed(k)]),
+) as Record<ColorName, number>;
 
 const BLOCKS = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 

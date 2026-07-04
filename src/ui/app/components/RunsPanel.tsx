@@ -1,4 +1,8 @@
 // Runs tab: active runs box + run-history table (tbody swapped by loadRuns()).
+// Column headers come from the shared RUN_COLUMNS schema — the SAME columns the
+// terminal run list renders.
+import { RUN_COLUMNS } from '../../theme.ts';
+
 export function RunsPanel(): Node {
   return (
     <section data-tab="runs">
@@ -8,7 +12,10 @@ export function RunsPanel(): Node {
       </div>
       <div class="panel wide">
         <h2>run history <span id="runsMeta" class="muted"></span></h2>
-        <table id="runs"><thead><tr><th>when</th><th>label</th><th>model</th><th>status</th><th>cost</th><th>steps</th></tr></thead><tbody><tr><td class="muted" colSpan={6}>loading…</td></tr></tbody></table>
+        <table id="runs">
+          <thead><tr>{RUN_COLUMNS.map((c) => <th>{c.header}</th>)}</tr></thead>
+          <tbody><tr><td class="muted" colSpan={RUN_COLUMNS.length}>loading…</td></tr></tbody>
+        </table>
       </div>
     </section>
   );

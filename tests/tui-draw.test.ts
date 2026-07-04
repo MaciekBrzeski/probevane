@@ -29,12 +29,12 @@ describe('pad / trunc', () => {
 });
 
 describe('statusStyle + lamp', () => {
-  it('colors statuses by class', () => {
-    expect(statusStyle('running').fg).toBe(FG.acc);
-    expect(statusStyle('done').fg).toBe(FG.ok);
-    expect(statusStyle('error').fg).toBe(FG.err);
-    expect(statusStyle('cancelled').fg).toBe(FG.warn);
-    expect(statusStyle('queued').fg).toBe(FG.dim);
+  it('colors statuses by class (bold on the live/terminal classes)', () => {
+    expect(statusStyle('running')).toEqual({ fg: FG.acc, bold: true });
+    expect(statusStyle('done')).toEqual({ fg: FG.ok, bold: true });
+    expect(statusStyle('error')).toEqual({ fg: FG.err, bold: true });
+    expect(statusStyle('cancelled')).toEqual({ fg: FG.warn, bold: true });
+    expect(statusStyle('queued')).toEqual({ fg: FG.dim }); // no bold on the default
   });
   it('lamp glyph + color per pipeline state', () => {
     expect(lamp('ok')).toEqual({ ch: '●', st: { fg: FG.ok, bold: true } });

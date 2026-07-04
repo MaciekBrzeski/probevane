@@ -1,7 +1,15 @@
 // Non-component helpers for the control center — ported verbatim from the old
 // inline script in control.html (which is now GENERATED from these sources).
+import { cssVars } from '../theme.ts';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id)!;
+
+/** Apply the shared palette SSOT (src/ui/theme.ts) to :root custom-props — the
+ *  browser adapter; the terminal renderer derives the same hexes. */
+export const applyPalette = (): void => {
+  const root = document.documentElement.style;
+  for (const [k, v] of Object.entries(cssVars())) root.setProperty(k, v);
+};
 
 export const j = async (u: string, o?: RequestInit) => (await fetch(u, o)).json();
 
