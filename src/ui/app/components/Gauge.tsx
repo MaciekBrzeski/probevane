@@ -1,26 +1,24 @@
-// SVG ring gauge — value 0..1 drawn as a glowing arc (stroke-dashoffset
-// animates the sweep via the .gauge-arc CSS). Pure render; callers re-mount
-// to update.
-export function Gauge(props: { value: number; label: string; color?: string; size?: number }): Node {
+// Ring gauge — now a thin wrapper over the shared engine's `gauge` widget
+// (@facet/core), drawn with a SvgPainter. The value arc is tagged `gauge-arc`
+// so the existing CSS animates its draw-in; the % text is tagged `gauge-num`.
+import { SvgPainter } from '@facet/render-dom';
+import { gauge } from '@facet/core';
+import { packed } from '../../theme.ts';
+
+export function Gauge(props: { value: number; label: string; accent?: number; size?: number }): Node {
   const size = props.size ?? 96;
-  const r = size / 2 - 8;
-  const c = 2 * Math.PI * r;
-  const v = Math.max(0, Math.min(1, props.value));
-  const color = props.color ?? 'var(--acc)';
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-  svg.setAttribute('class', 'gauge');
-  svg.setAttribute('width', String(size));
-  svg.setAttribute('height', String(size));
-  svg.innerHTML =
-    `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--line)" stroke-width="6" opacity="0.5"/>` +
-    `<circle class="gauge-arc" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="6" ` +
-    `stroke-linecap="round" transform="rotate(-90 ${size / 2} ${size / 2})" ` +
-    `stroke-dasharray="${c.toFixed(1)}" style="--dash:${(c * (1 - v)).toFixed(1)}; stroke-dashoffset:${(c * (1 - v)).toFixed(1)}"/>` +
-    `<text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" class="gauge-num">${Math.round(v * 100)}%</text>`;
+  const p = new SvgPainter(size, size);
+  gauge(p, {
+    cx: size / 2, cy: size / 2, r: size / 2 - 8, value: props.value,
+    accent: props.accent ?? packed('acc'), track: packed('line'),
+    trackTag: 'gauge-track', valueTag: 'gauge-arc', valuePathLength: 1,
+  });
+  const t = p.items.find((i) => i.tag === 'text'); if (t) t.attrs.class = 'gauge-num';
+  const host = document.createElement('div');
+  host.innerHTML = p.toSvg(); // trusted: SVG built from numbers only
   return (
     <div class="gauge-wrap">
-      {svg}
+      {host.firstChild!}
       <div class="gauge-label">{props.label}</div>
     </div>
   );

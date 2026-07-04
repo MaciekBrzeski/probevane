@@ -43,6 +43,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
     "@facet/core": "file:../facet/packages/core",
+    "@facet/render-dom": "file:../facet/packages/render-dom",
     "@facet/render-term": "file:../facet/packages/render-term",
     "ts-morph": "^28.0.0"
   }

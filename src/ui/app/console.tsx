@@ -1,5 +1,5 @@
 import { $, j } from './lib.ts';
-import { gauges, cssVar } from '../theme.ts';
+import { gauges, packed } from '../theme.ts';
 import { constellation } from '../../observe/constellation.ts';
 import { pipelineReducer, replayDelayMs, type PipelineState } from '../../observe/pipeline.ts';
 
@@ -26,10 +26,10 @@ export async function loadConsole() {
   try {
     const a = await j('/aggregate');
     const g = $('gauges'); g.textContent = '';
-    for (const spec of gauges(a.totals)) g.appendChild(<Gauge value={spec.value} label={spec.label} color={cssVar(spec.accent)} />);
+    for (const spec of gauges(a.totals)) g.appendChild(<Gauge value={spec.value} label={spec.label} accent={packed(spec.accent)} />);
     const sp = $('sparks'); sp.textContent = '';
-    sp.appendChild(<Spark points={a.daily.map((d: { cost: number }) => d.cost)} label="cost / day" />);
-    sp.appendChild(<Spark points={a.daily.map((d: { tokensOut: number }) => d.tokensOut)} label="tokens out / day" color="var(--mag)" />);
+    sp.appendChild(<Spark points={a.daily.map((d: { cost: number }) => d.cost)} label="cost / day" accent={packed('acc')} />);
+    sp.appendChild(<Spark points={a.daily.map((d: { tokensOut: number }) => d.tokensOut)} label="tokens out / day" accent={packed('mag')} />);
   } catch (e) { console.error('telemetry', e); }
   try {
     const g = await j('/graph');

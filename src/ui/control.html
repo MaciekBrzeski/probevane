@@ -165,8 +165,9 @@ details.ok summary { color:var(--ok); }
 .gauge-wrap { text-align:center; }
 .gauge-num { fill:var(--fg); font-family:var(--num); font-size:18px; font-weight:700; }
 .gauge-label { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.14em; margin-top:4px; }
-.gauge-arc { filter:drop-shadow(0 0 5px currentColor); animation:gauge-sweep 1s cubic-bezier(.2,.7,.3,1) backwards; }
-@keyframes gauge-sweep { from { stroke-dashoffset:280; } }
+.gauge-track { stroke-width:6; opacity:.5; }
+.gauge-arc { stroke-width:6; filter:drop-shadow(0 0 5px currentColor); stroke-dasharray:1; stroke-dashoffset:1; animation:gauge-draw 1s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes gauge-draw { to { stroke-dashoffset:0; } }
 
 .spark-wrap { margin-bottom:10px; }
 .spark { width:100%; height:64px; display:block; }
@@ -304,6 +305,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     acc: "#4fd6ff",
     mag: "#c792ea"
   };
+  var packed = (n) => parseInt(PALETTE[n].slice(1), 16);
   var cssVar = (n) => `var(--${n})`;
   function cssVars() {
     const vars = {};
@@ -472,6 +474,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "turn " + (t.role === "user" ? "user" : "") }, /* @__PURE__ */ h("div", { class: "thead" }, `${t.role}${t.model ? " \xB7 " + t.model : ""} \xB7 step ${t.step}`), t.text && /* @__PURE__ */ h("div", { class: "txt" }, t.text), (t.toolCalls || []).map((c) => /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, "\u2192 " + c.name), /* @__PURE__ */ h("pre", null, typeof c.input === "string" ? c.input : JSON.stringify(c.input, null, 2)))), (t.toolResults || []).map((r) => /* @__PURE__ */ h("details", { class: r.ok ? "ok" : "err" }, /* @__PURE__ */ h("summary", null, (r.ok ? "\u2713 " : "\u2717 ") + r.name), /* @__PURE__ */ h("pre", null, r.content))));
   }
 
+  // ../facet/packages/core/src/style.ts
+  var hex = (c) => "#" + (c & 16777215).toString(16).padStart(6, "0");
+
   // ../facet/packages/core/src/layout.ts
   function computeLayers(input, ids) {
     const layer = /* @__PURE__ */ new Map();
@@ -534,6 +539,34 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 
   // ../facet/packages/core/src/widgets/gauge.ts
   var TOP = -Math.PI / 2;
+  function gauge(p, m) {
+    const v = m.value < 0 ? 0 : m.value > 1 ? 1 : m.value;
+    const trackSt = { stroke: m.track, width: 1 };
+    if (m.trackTag) trackSt.tag = m.trackTag;
+    p.arc(m.cx, m.cy, m.r, TOP, TOP + 2 * Math.PI, trackSt);
+    if (v > 0) {
+      const st = { stroke: m.accent, width: 2 };
+      if (m.valueTag) st.tag = m.valueTag;
+      if (m.valuePathLength !== void 0) st.pathLength = m.valuePathLength;
+      p.arc(m.cx, m.cy, m.r, TOP, TOP + 2 * Math.PI * v, st);
+    }
+    p.text(m.cx, m.cy, `${Math.round(v * 100)}%`, { fill: m.accent, align: "c", bold: true });
+  }
+
+  // ../facet/packages/core/src/widgets/sparkline.ts
+  function sparkline(p, m) {
+    const pts = m.points;
+    if (pts.length < 2) return;
+    const { x, y, w, h: h2 } = m.rect;
+    const max = Math.max(1, ...pts);
+    const at = (i) => ({ x: x + i / (pts.length - 1) * w, y: y + h2 - pts[i] / max * h2 });
+    const line = pts.map((_, i) => at(i));
+    if (m.area) p.polygon([{ x, y: y + h2 }, ...line, { x: x + w, y: y + h2 }], { fill: m.accent, gradient: true });
+    const st = { stroke: m.accent, width: m.strokeWidth ?? 1 };
+    if (m.tag) st.tag = m.tag;
+    if (m.pathLength !== void 0) st.pathLength = m.pathLength;
+    p.polyline(line, st);
+  }
 
   // src/ui/app/components/NodeGraph.tsx
   function NodeGraph(props) {
@@ -564,37 +597,142 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "nodegraph-wrap" }, svg);
   }
 
+  // ../facet/packages/render-dom/src/svg-painter.ts
+  var esc2 = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+  var SvgPainter = class {
+    constructor(w, h2) {
+      this.w = w;
+      this.h = h2;
+    }
+    w;
+    h;
+    caps = { subpixel: true, curves: true, glyphGrid: false, cellW: 1, cellH: 1 };
+    items = [];
+    stack = [];
+    gradients = /* @__PURE__ */ new Map();
+    ox() {
+      return this.stack.reduce((s, p) => s + p.x, 0);
+    }
+    oy() {
+      return this.stack.reduce((s, p) => s + p.y, 0);
+    }
+    // Common SVG-hint attrs applied to every element.
+    hint(st) {
+      const a = {};
+      if (st.tag) a.class = st.tag;
+      if (st.pathLength !== void 0) a.pathLength = st.pathLength;
+      for (const [k, v] of Object.entries(st.data ?? {})) a[`data-${k}`] = v;
+      return a;
+    }
+    stroke(st) {
+      const grad = st.gradient && st.fill !== void 0;
+      const a = { fill: st.fill !== void 0 ? grad ? `url(#${this.gradId(st.fill)})` : hex(st.fill) : "none" };
+      if (st.stroke !== void 0) {
+        a.stroke = hex(st.stroke);
+        a["stroke-width"] = st.width ?? 1;
+        a["stroke-linecap"] = "round";
+      }
+      if (st.dash) a["stroke-dasharray"] = st.dash;
+      return { ...a, ...this.hint(st) };
+    }
+    gradId(color) {
+      let id = this.gradients.get(color);
+      if (!id) {
+        id = `fg${this.gradients.size}`;
+        this.gradients.set(color, id);
+      }
+      return id;
+    }
+    push(dx, dy) {
+      this.stack.push({ x: dx, y: dy });
+    }
+    pop() {
+      this.stack.pop();
+    }
+    rect(x, y, w, h2, st) {
+      this.items.push({ tag: "rect", attrs: { x: x + this.ox(), y: y + this.oy(), width: w, height: h2, ...this.stroke(st) } });
+    }
+    line(x0, y0, x1, y1, st) {
+      this.items.push({ tag: "line", attrs: { x1: x0 + this.ox(), y1: y0 + this.oy(), x2: x1 + this.ox(), y2: y1 + this.oy(), ...this.stroke(st) } });
+    }
+    polyline(pts, st) {
+      this.items.push({ tag: "polyline", attrs: { points: this.points(pts), ...this.stroke(st) } });
+    }
+    polygon(pts, st) {
+      this.items.push({ tag: "polygon", attrs: { points: this.points(pts), ...this.stroke(st) } });
+    }
+    circle(cx, cy, r, st) {
+      this.items.push({ tag: "circle", attrs: { cx: cx + this.ox(), cy: cy + this.oy(), r, ...this.stroke(st) } });
+    }
+    arc(cx, cy, r, a0, a1, st) {
+      const ox = this.ox(), oy = this.oy();
+      const x0 = cx + ox + r * Math.cos(a0), y0 = cy + oy + r * Math.sin(a0);
+      const x1 = cx + ox + r * Math.cos(a1), y1 = cy + oy + r * Math.sin(a1);
+      const large = Math.abs(a1 - a0) > Math.PI ? 1 : 0;
+      const sweep = a1 > a0 ? 1 : 0;
+      this.items.push({ tag: "path", attrs: { d: `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} ${sweep} ${x1.toFixed(2)} ${y1.toFixed(2)}`, ...this.stroke(st) } });
+    }
+    text(x, y, str, st) {
+      const anchor = st.align === "c" ? "middle" : st.align === "r" ? "end" : "start";
+      this.items.push({
+        tag: "text",
+        attrs: { x: x + this.ox(), y: y + this.oy(), fill: hex(st.fill ?? st.stroke ?? 16777215), "text-anchor": anchor, "font-weight": st.bold ? 700 : 400, ...this.hint(st) },
+        text: str
+      });
+    }
+    points(pts) {
+      return pts.map((p) => `${p.x + this.ox()},${p.y + this.oy()}`).join(" ");
+    }
+    defs() {
+      if (!this.gradients.size) return "";
+      const grads = [...this.gradients.entries()].map(([color, id]) => `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hex(color)}" stop-opacity="0.35"/><stop offset="1" stop-color="${hex(color)}" stop-opacity="0"/></linearGradient>`).join("");
+      return `<defs>${grads}</defs>`;
+    }
+    toSvg() {
+      const body = this.items.map((it) => {
+        const at = Object.entries(it.attrs).map(([k, v]) => `${k}="${v}"`).join(" ");
+        return it.tag === "text" ? `<text ${at}>${esc2(it.text ?? "")}</text>` : `<${it.tag} ${at}/>`;
+      }).join("");
+      return `<svg viewBox="0 0 ${this.w} ${this.h}" width="${this.w}" height="${this.h}">${this.defs()}${body}</svg>`;
+    }
+  };
+
   // src/ui/app/components/Gauge.tsx
   function Gauge(props) {
     const size = props.size ?? 96;
-    const r = size / 2 - 8;
-    const c = 2 * Math.PI * r;
-    const v = Math.max(0, Math.min(1, props.value));
-    const color = props.color ?? "var(--acc)";
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
-    svg.setAttribute("class", "gauge");
-    svg.setAttribute("width", String(size));
-    svg.setAttribute("height", String(size));
-    svg.innerHTML = `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--line)" stroke-width="6" opacity="0.5"/><circle class="gauge-arc" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" transform="rotate(-90 ${size / 2} ${size / 2})" stroke-dasharray="${c.toFixed(1)}" style="--dash:${(c * (1 - v)).toFixed(1)}; stroke-dashoffset:${(c * (1 - v)).toFixed(1)}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" class="gauge-num">${Math.round(v * 100)}%</text>`;
-    return /* @__PURE__ */ h("div", { class: "gauge-wrap" }, svg, /* @__PURE__ */ h("div", { class: "gauge-label" }, props.label));
+    const p = new SvgPainter(size, size);
+    gauge(p, {
+      cx: size / 2,
+      cy: size / 2,
+      r: size / 2 - 8,
+      value: props.value,
+      accent: props.accent ?? packed("acc"),
+      track: packed("line"),
+      trackTag: "gauge-track",
+      valueTag: "gauge-arc",
+      valuePathLength: 1
+    });
+    const t = p.items.find((i) => i.tag === "text");
+    if (t) t.attrs.class = "gauge-num";
+    const host = document.createElement("div");
+    host.innerHTML = p.toSvg();
+    return /* @__PURE__ */ h("div", { class: "gauge-wrap" }, host.firstChild, /* @__PURE__ */ h("div", { class: "gauge-label" }, props.label));
   }
 
   // src/ui/app/components/Spark.tsx
   function Spark(props) {
     const w = props.width ?? 260;
     const ht = props.height ?? 64;
-    const color = props.color ?? "var(--acc)";
+    const accent = props.accent ?? packed("acc");
     const pts = props.points.length ? props.points : [0];
+    const p = new SvgPainter(w, ht);
+    sparkline(p, { rect: { x: 0, y: 6, w, h: ht - 16 }, points: pts, accent, area: true, strokeWidth: 2, tag: "spark-line", pathLength: 1 });
     const max = Math.max(1e-9, ...pts);
-    const step = pts.length > 1 ? w / (pts.length - 1) : w;
-    const xy = pts.map((p, i) => `${(i * step).toFixed(1)},${(ht - 6 - p / max * (ht - 16)).toFixed(1)}`);
-    const gid = `sg-${props.label.replace(/\W/g, "")}`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", `0 0 ${w} ${ht}`);
-    svg.setAttribute("class", "spark");
-    svg.innerHTML = `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity="0.35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><polygon points="0,${ht} ${xy.join(" ")} ${w},${ht}" fill="url(#${gid})"/><polyline class="spark-line" points="${xy.join(" ")}" fill="none" stroke="${color}" stroke-width="2" pathLength="1"/><circle cx="${xy[xy.length - 1].split(",")[0]}" cy="${xy[xy.length - 1].split(",")[1]}" r="3" fill="${color}" class="spark-dot"/>`;
-    return /* @__PURE__ */ h("div", { class: "spark-wrap" }, /* @__PURE__ */ h("div", { class: "spark-label" }, props.label), svg);
+    const lastY = 6 + (ht - 16) - pts[pts.length - 1] / max * (ht - 16);
+    p.circle(w, lastY, 3, { fill: accent, tag: "spark-dot" });
+    const host = document.createElement("div");
+    host.innerHTML = p.toSvg();
+    return /* @__PURE__ */ h("div", { class: "spark-wrap" }, /* @__PURE__ */ h("div", { class: "spark-label" }, props.label), host.firstChild);
   }
 
   // src/observe/constellation.ts
@@ -671,11 +809,11 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       const a = await j("/aggregate");
       const g = $("gauges");
       g.textContent = "";
-      for (const spec of gauges(a.totals)) g.appendChild(/* @__PURE__ */ h(Gauge, { value: spec.value, label: spec.label, color: cssVar(spec.accent) }));
+      for (const spec of gauges(a.totals)) g.appendChild(/* @__PURE__ */ h(Gauge, { value: spec.value, label: spec.label, accent: packed(spec.accent) }));
       const sp = $("sparks");
       sp.textContent = "";
-      sp.appendChild(/* @__PURE__ */ h(Spark, { points: a.daily.map((d) => d.cost), label: "cost / day" }));
-      sp.appendChild(/* @__PURE__ */ h(Spark, { points: a.daily.map((d) => d.tokensOut), label: "tokens out / day", color: "var(--mag)" }));
+      sp.appendChild(/* @__PURE__ */ h(Spark, { points: a.daily.map((d) => d.cost), label: "cost / day", accent: packed("acc") }));
+      sp.appendChild(/* @__PURE__ */ h(Spark, { points: a.daily.map((d) => d.tokensOut), label: "tokens out / day", accent: packed("mag") }));
     } catch (e) {
       console.error("telemetry", e);
     }
