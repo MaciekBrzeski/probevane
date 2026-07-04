@@ -85,10 +85,13 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
   const lay = layoutDag(nodes.map((n): LayoutNode => ({ id: n.id, deps: n.deps })), { colGap: 1, rowGap: 1, pad: 0 });
   const maxC = Math.max(0, ...lay.nodes.map((n) => n.x));
   const maxR = Math.max(0, ...lay.nodes.map((n) => n.y));
-  const x0 = r.x + 2, y0 = r.y + 1;
   const nodeW = Math.max(6, Math.min(16, Math.floor(iw / (maxC + 1)) - 2));
   const colStep = maxC > 0 ? Math.floor((iw - nodeW) / maxC) : 0;
-  const rowStep = maxR > 0 ? Math.max(1, Math.floor((ih - 1) / maxR)) : 1;
+  // Keep rows tight (≤2 apart) rather than stretched across a tall pane, then
+  // centre the compact graph vertically so it doesn't sit as sparse gaps.
+  const rowStep = maxR > 0 ? Math.min(2, Math.max(1, Math.floor((ih - 1) / maxR))) : 1;
+  const x0 = r.x + 2;
+  const y0 = r.y + 1 + Math.max(0, Math.floor((ih - 1 - maxR * rowStep) / 2));
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const anchor = new Map<string, Anchor>();
   for (const n of lay.nodes) {
