@@ -13,8 +13,7 @@ import type { ConstellationNode } from '../observe/constellation.js';
 
 interface Rect { x: number; y: number; w: number; h: number }
 interface Anchor { lx: number; rx: number; cy: number; layer: number }
-type Pt = { x: number; y: number };
-const WIRE = '─│┌┐└┘┼';
+const WIRE = '─│┌┐└┘┼├┤┬┴';
 
 /** The graph needs room; below this the caller falls back to a ranked hub list. */
 export function graphFits(r: Rect, nodeCount: number): boolean {
@@ -69,26 +68,41 @@ function wire(scr: Screen, x: number, y: number, g: string, st: Style): void {
   putText(scr, x, y, cur && cur !== g && WIRE.includes(cur) ? '┼' : g, st);
 }
 
-/** Route one edge a→b through vertical channel `chX`; returns the path cells (for the signal dot). */
-function routeEdge(scr: Screen, a: Anchor, b: Anchor, chX: number, st: Style): Pt[] {
-  const path: Pt[] = [];
-  const hseg = (y: number, x0: number, x1: number): void => {
-    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) { wire(scr, x, y, '─', st); path.push({ x, y }); }
-  };
-  const down = b.cy > a.cy;
-  hseg(a.cy, a.rx + 1, chX - 1);
-  wire(scr, chX, a.cy, a.cy === b.cy ? '─' : down ? '┐' : '┘', st); path.push({ x: chX, y: a.cy });
-  for (let y = Math.min(a.cy, b.cy) + 1; y < Math.max(a.cy, b.cy); y++) { wire(scr, chX, y, '│', st); path.push({ x: chX, y }); }
-  if (a.cy !== b.cy) { wire(scr, chX, b.cy, down ? '└' : '┌', st); path.push({ x: chX, y: b.cy }); }
-  hseg(b.cy, chX + 1, b.lx - 1);
-  return path;
+// Box-drawing glyph for a junction given its arms (bits: up=1 down=2 left=4 right=8).
+const JUNCTION: Record<number, string> = {
+  3: '│', 12: '─', 11: '├', 7: '┤', 14: '┬', 13: '┴', 15: '┼', 10: '┌', 6: '┐', 9: '└', 5: '┘',
+};
+
+/**
+ * Route ALL of the focused node's edges as ONE spine-and-branch tree: a single
+ * vertical spine beside the node, with a clean ├ branch to each neighbour on its
+ * own row. No per-edge channels → no crossing grid, just smooth pipes.
+ */
+function bundle(scr: Screen, f: Anchor, neighbors: Anchor[], toRight: boolean, st: Style): void {
+  const spineX = toRight ? f.rx + 2 : f.lx - 2;
+  const hseg = (y: number, x0: number, x1: number): void => { for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) wire(scr, x, y, '─', st); };
+  const rowsLeft = new Set<number>(), rowsRight = new Set<number>();
+  (toRight ? rowsLeft : rowsRight).add(f.cy); // the branch back to the focused node
+  for (const o of neighbors) (toRight ? rowsRight : rowsLeft).add(o.cy);
+  const rows = [f.cy, ...neighbors.map((o) => o.cy)];
+  const top = Math.min(...rows), bot = Math.max(...rows);
+  for (let y = top; y <= bot; y++) {
+    let arm = 0;
+    if (y > top) arm |= 1;
+    if (y < bot) arm |= 2;
+    if (rowsLeft.has(y)) arm |= 4;
+    if (rowsRight.has(y)) arm |= 8;
+    putText(scr, spineX, y, JUNCTION[arm] ?? '│', st);
+  }
+  if (toRight) hseg(f.cy, f.rx + 1, spineX - 1); else hseg(f.cy, spineX + 1, f.lx - 1);
+  for (const o of neighbors) { if (toRight) hseg(o.cy, spineX + 1, o.lx - 1); else hseg(o.cy, o.rx + 1, spineX - 1); }
 }
 
 interface Placed {
   lay: Layout;
   anchor: Map<string, Anchor>;
   byId: Map<string, ConstellationNode>;
-  nodeW: number; gapL: number; gapR: number;
+  nodeW: number;
 }
 
 /** Lay the nodes out into cell anchors + the channel gap. */
@@ -107,10 +121,7 @@ function placeGraph(nodes: ConstellationNode[], r: Rect, iw: number, ih: number)
     const len = [...pill(byId.get(n.id)!, nodeW - 4)].length;
     anchor.set(n.id, { lx: px, rx: px + len - 1, cy: py, layer: n.x });
   }
-  const cols = [...anchor.values()];
-  const leftRx = Math.max(r.x, ...cols.filter((a) => a.layer === 0).map((a) => a.rx));
-  const rightLx = Math.min(r.x + r.w, ...cols.filter((a) => a.layer > 0).map((a) => a.lx));
-  return { lay, anchor, byId, nodeW, gapL: leftRx + 2, gapR: Math.max(leftRx + 2, rightLx - 2) };
+  return { lay, anchor, byId, nodeW };
 }
 
 /** Pill colour: the focused node pulses bright (its own state hue), its neighbours pop, the rest fade back. */
@@ -130,7 +141,7 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
   if (iw < 2 || ih < 2) return;
   const nodes = connectedCore(hubs, Math.min(24, Math.max(6, ih))); // ~2 rows/node, cap 24
   if (!nodes.length) return;
-  const { lay, anchor, byId, nodeW, gapL, gapR } = placeGraph(nodes, r, iw, ih);
+  const { lay, anchor, byId, nodeW } = placeGraph(nodes, r, iw, ih);
   const bottom = r.y + r.h - 1;
   const focusId = nodes[((focus % nodes.length) + nodes.length) % nodes.length]!.id;
 
@@ -140,13 +151,14 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
     .sort((p, q) => p.b.cy - q.b.cy || p.a.cy - q.a.cy);
   const nbr = new Set<string>();
   for (const e of edges) if (e.from === focusId || e.to === focusId) { nbr.add(e.from); nbr.add(e.to); }
-  const chOf = (i: number): number => (edges.length <= 1 ? gapL : Math.round(gapL + (i / (edges.length - 1)) * (gapR - gapL)));
   const focused = (e: { from: string; to: string }): boolean => e.from === focusId || e.to === focusId;
 
-  const dimSt: Style = { fg: mix(FG.line, FG.bg, 0.55) }; // faint background mesh (recedes; focus pops)
+  // Only the focused node's edges are drawn — as ONE clean spine tree. No mesh of
+  // other edges → no crossings; ↑↓ walks the graph one node at a time.
   const brightSt: Style = { fg: glow(FG.acc, pulse(t, 1200)) }; // focused pipes gently pulse
-  edges.forEach((e, i) => { if (!focused(e)) routeEdge(scr, e.a, e.b, chOf(i), dimSt); }); // dim first
-  edges.forEach((e, i) => { if (focused(e)) routeEdge(scr, e.a, e.b, chOf(i), brightSt); }); // focused pipes, on top — continuous (no dot breaking the line)
+  const f = anchor.get(focusId);
+  const neighborAnchors = edges.filter(focused).map((e) => (e.from === focusId ? e.b : e.a));
+  if (f && neighborAnchors.length) bundle(scr, f, neighborAnchors, f.layer === 0, brightSt);
   for (const n of lay.nodes) {
     const a = anchor.get(n.id)!;
     if (a.cy >= bottom) continue;
