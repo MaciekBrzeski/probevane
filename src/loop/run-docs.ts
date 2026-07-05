@@ -3,7 +3,7 @@ import { brainFor, isDirectModel } from '../brain/select.js';
 import { routeModels } from './complexity.js';
 import { runLoop, type RunOutcome } from './engine.js';
 import { nullAdapter } from '../adapters/null-adapter.js';
-import { buildDocsDigest } from '../docs/digest.js';
+import { buildDocsDigest } from './digest.js';
 import { planFirst } from './runes/plan_first.js';
 import { sessionDiary } from './runes/session_diary.js';
 import { caveatHarvest } from './runes/caveat_harvest.js';

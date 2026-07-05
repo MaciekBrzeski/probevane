@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildDocsDigest } from '../src/docs/digest.js';
+import { buildDocsDigest } from '../src/loop/digest.js';
 import { RunCtx } from '../src/loop/ctx.js';
 import { nullAdapter } from '../src/adapters/null-adapter.js';
 import {

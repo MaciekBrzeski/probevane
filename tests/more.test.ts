@@ -9,7 +9,7 @@ import { auditSource } from '../src/audit/core.js';
 import { jsAuditRules } from '../src/audit/rules-js.js';
 import { goAuditRules } from '../src/audit/rules-go.js';
 import { pyAuditRules } from '../src/audit/rules-py.js';
-import { a11yRules } from '../src/a11y/rules.js';
+import { a11yRules } from '../src/audit/a11y-rules.js';
 import { buildExamples, splitExamples, statsByStack } from '../src/distill/dataset.js';
 import type { Trace } from '../src/distill/collect.js';
 import { stripFences, baseValue } from '../src/distill/bases.js';

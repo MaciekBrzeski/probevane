@@ -1,7 +1,7 @@
 import { resolve, join, relative } from 'node:path';
 import { readdir, readFile, appendFile } from 'node:fs/promises';
 import { auditSource, formatViolations } from '../audit/core.js';
-import { a11yRules } from '../a11y/rules.js';
+import { a11yRules } from '../audit/a11y-rules.js';
 
 // probevane a11y <dir>
 //   Static accessibility audit of component source (JSX/Vue/Svelte): missing
