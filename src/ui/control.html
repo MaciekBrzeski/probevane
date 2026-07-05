@@ -393,6 +393,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     p.polyline(line, st);
   }
 
+  // ../facet/packages/core/src/widgets/charts.ts
+  var TOP2 = -Math.PI / 2;
+
   // src/ui/theme.ts
   var PALETTE = {
     bg: "#04070f",
@@ -895,8 +898,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       };
     }
     try {
-      const list = await j("/term/sessions");
-      const live = list.find((s) => s.live);
+      const list2 = await j("/term/sessions");
+      const live = list2.find((s) => s.live);
       if (live && !sessionId) openStream(live.id);
       else if (!sessionId) msg("pick a shell above");
     } catch {
@@ -1062,14 +1065,14 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   async function loadWiki() {
     try {
       const { core, projects } = await j("/wiki");
-      const list = $("wikiList");
-      list.textContent = "";
-      list.classList.remove("muted");
+      const list2 = $("wikiList");
+      list2.textContent = "";
+      list2.classList.remove("muted");
       const group = (title, files) => {
         if (!files.length) return;
-        list.appendChild(/* @__PURE__ */ h("div", { class: "muted" }, title));
+        list2.appendChild(/* @__PURE__ */ h("div", { class: "muted" }, title));
         for (const f of files) {
-          list.appendChild(
+          list2.appendChild(
             /* @__PURE__ */ h("div", { style: "cursor:pointer;padding:2px 0;color:var(--acc)", onClick: () => openDoc(f) }, f.replace(/\.md$/, "").replace(/^project-/, "\xB7 "))
           );
         }
