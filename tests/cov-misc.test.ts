@@ -19,7 +19,7 @@ import { buildSpec, type SpecOptions } from '../src/spec/build.js';
 import type { StackAdapter, ProbeResult, AdapterCommands } from '../src/adapters/adapter.js';
 import { brainFor } from '../src/brain/select.js';
 import { runVitest, runPlaywright, mergeResults, coverageVitest } from '../src/adapters/vitest-runner.js';
-import { loadConfig, validateConfig, pick } from '../src/config.js';
+import { loadConfig, validateConfig, pick } from '../src/util/config.js';
 import * as git from '../src/util/git.js';
 import {
   parseFindings,

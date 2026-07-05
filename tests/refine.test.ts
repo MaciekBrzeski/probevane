@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { flakeVerdict } from '../src/loop/runes/flake_gate.js';
 import { assertionGate } from '../src/loop/runes/assertion_gate.js';
-import { validateConfig } from '../src/config.js';
+import { validateConfig } from '../src/util/config.js';
 import { RunCtx } from '../src/loop/ctx.js';
 
 describe('flakeVerdict', () => {

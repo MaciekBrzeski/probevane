@@ -1,7 +1,7 @@
 import { resolve, join } from 'node:path';
 import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { statePath } from '../util/state.js';
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../util/config.js';
 import { runFactory } from '../factory/run.js';
 import { parseRepoList, acceptedRepos, type FactoryReport, type FactoryRepoResult } from '../factory/report.js';
 import { buildMatrix } from '../factory/matrix.js';

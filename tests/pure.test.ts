@@ -4,7 +4,7 @@ import { sampleSchema } from '../src/mock/synth.js';
 import { auditSource } from '../src/audit/core.js';
 import { jsAuditRules } from '../src/audit/rules-js.js';
 import { isSourceFile, specCandidatesFor } from '../src/git.js';
-import { pick } from '../src/config.js';
+import { pick } from '../src/util/config.js';
 import { routeModels } from '../src/loop/complexity.js';
 import { gapsDigest } from '../src/coverage/gaps.js';
 import { assessComplexity } from '../src/loop/complexity.js';

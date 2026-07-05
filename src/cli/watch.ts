@@ -2,7 +2,7 @@ import { join, relative } from 'node:path';
 import { watch } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../util/config.js';
 import { isSourceFile, specCandidatesFor } from '../git.js';
 import { flag, dirArg } from './args.js';
 

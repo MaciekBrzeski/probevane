@@ -90,7 +90,7 @@ export async function checkConfig(dir: string): Promise<DoctorReport> {
       });
       break;
     }
-    const { validateConfig } = await import('../config.js');
+    const { validateConfig } = await import('../util/config.js');
     for (const err of validateConfig(cfg)) {
       findings.push({
         check: 'config-invalid',

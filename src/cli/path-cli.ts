@@ -1,6 +1,6 @@
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { flag, dirArg } from './args.js';
-import { loadConfig, type ProbevaneConfig } from '../config.js';
+import { loadConfig, type ProbevaneConfig } from '../util/config.js';
 import { runPath } from '../loop/run-path.js';
 import type { ProfileName } from '../loop/profiles.js';
 import type { StackAdapter } from '../adapters/adapter.js';

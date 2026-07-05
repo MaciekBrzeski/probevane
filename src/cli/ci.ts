@@ -3,7 +3,7 @@ import { access, appendFile, readFile } from 'node:fs/promises';
 import { selectAdapter } from '../adapters/registry.js';
 import { isEasyTarget } from '../loop/triage.js';
 import { simulateCost } from '../cost/simulate.js';
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../util/config.js';
 import { changedFiles, isSourceFile, specCandidatesFor } from '../git.js';
 import { getDiff, reviewDiffText, findingsMarkdown, findingsTask } from '../review/diff-review.js';
 import { groundFindings, verifyFindings } from '../review/verify.js';

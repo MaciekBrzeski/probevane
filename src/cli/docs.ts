@@ -1,5 +1,5 @@
 import { basename, isAbsolute, relative } from 'node:path';
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../util/config.js';
 import { runDocs } from '../loop/run-docs.js';
 import { flag, dirArg } from './args.js';
 

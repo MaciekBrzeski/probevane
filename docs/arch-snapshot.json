@@ -4,7 +4,7 @@
       {
         "dir": "cli",
         "files": 57,
-        "fanOut": 27,
+        "fanOut": 26,
         "fanIn": 0,
         "inbound": 0,
         "imports": [
@@ -13,7 +13,6 @@
           "arch",
           "audit",
           "brain",
-          "config.ts",
           "cost",
           "distill",
           "doctor",
@@ -114,6 +113,14 @@
         ]
       },
       {
+        "dir": "util",
+        "files": 8,
+        "fanOut": 0,
+        "fanIn": 17,
+        "inbound": 64,
+        "imports": []
+      },
+      {
         "dir": "audit",
         "files": 7,
         "fanOut": 1,
@@ -132,14 +139,6 @@
         "imports": [
           "util"
         ]
-      },
-      {
-        "dir": "util",
-        "files": 7,
-        "fanOut": 0,
-        "fanIn": 17,
-        "inbound": 56,
-        "imports": []
       },
       {
         "dir": "cost",
@@ -295,14 +294,6 @@
         "imports": []
       },
       {
-        "dir": "config.ts",
-        "files": 1,
-        "fanOut": 0,
-        "fanIn": 1,
-        "inbound": 8,
-        "imports": []
-      },
-      {
         "dir": "docs",
         "files": 1,
         "fanOut": 0,
@@ -363,6 +354,11 @@
       },
       {
         "from": "cli",
+        "to": "util",
+        "count": 19
+      },
+      {
+        "from": "cli",
         "to": "loop",
         "count": 17
       },
@@ -377,11 +373,6 @@
         "count": 13
       },
       {
-        "from": "cli",
-        "to": "util",
-        "count": 11
-      },
-      {
         "from": "server",
         "to": "observe",
         "count": 11
@@ -394,11 +385,6 @@
       {
         "from": "adapters",
         "to": "library",
-        "count": 8
-      },
-      {
-        "from": "cli",
-        "to": "config.ts",
         "count": 8
       },
       {

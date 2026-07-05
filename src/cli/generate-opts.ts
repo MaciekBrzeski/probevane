@@ -1,7 +1,7 @@
 import { brainFor } from '../brain/select.js';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { generateTests } from '../loop/run-generation.js';
-import { loadConfig, pick } from '../config.js';
+import { loadConfig, pick } from '../util/config.js';
 import type { TestKind } from '../adapters/adapter.js';
 import { flag } from './args.js';
 

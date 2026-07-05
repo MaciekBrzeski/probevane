@@ -1,4 +1,4 @@
-import { loadConfig } from '../config.js';
+import { loadConfig } from '../util/config.js';
 import { formatQuality, DEFAULT_QUALITY, type QualityConfig, type QualityReport } from '../quality/analyze.js';
 import { scanProject } from '../quality/scan.js';
 import { changedFiles, isSourceFile } from '../git.js';
