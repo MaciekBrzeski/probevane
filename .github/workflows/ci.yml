@@ -39,6 +39,8 @@ jobs:
         run: npm run build
       - name: dist smoke (packaging gate — dist must RUN, not just compile)
         run: node scripts/smoke-dist.mjs
+      - name: ui perf budgets (render frame time, diff-flush ratio, bundle size)
+        run: npm run bench:ui
       - name: skill + wiki in sync (drift gate)
         run: ./bin/probevane skill --check
       - name: control-center UI in sync (drift gate — control.html is generated from src/ui/app/)

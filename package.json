@@ -25,6 +25,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke-dist.mjs",
+    "bench:ui": "tsx scripts/bench-ui.mjs",
     "prepublishOnly": "node scripts/build.mjs",
     "hooks:install": "git config core.hooksPath .githooks",
     "typecheck": "tsc --noEmit && tsc -p src/ui",
