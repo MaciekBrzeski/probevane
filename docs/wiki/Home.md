@@ -24,6 +24,7 @@ You point probevane at a project. An **adapter** detects the stack (React first)
 - [Worktree mode](Worktree.md) — isolated, reviewed (self-)improvement runs
 - [Commands](Commands.md) — full CLI reference (generated, gated)
 - [Control Center](Control-Center.md) — the daemon's LCARS console: live pipeline light show, theater replay, TSX build
+- [Drawing Engine](Drawing-Engine.md) — facet: one vector `Painter`, two backends (SVG + terminal cells); the 44-widget library both control centers share
 - [Architecture](Architecture.md) — the pieces and how they connect
 - [The Loop](The-Loop.md) — turn-by-turn control flow
 - [Runes & Gates](Runes-and-Gates.md) — what blocks the model and why

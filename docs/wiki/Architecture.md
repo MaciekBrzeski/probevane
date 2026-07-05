@@ -44,8 +44,12 @@ Everything language-specific hides behind one interface (`StackAdapter`); everyt
 | `src/brain/anthropic-sdk.ts` | LLM driver | no |
 | `src/audit/rules-js.ts` | JS/TS audit rules | yes (lives in adapter's domain) |
 | `src/library/improvement-log.ts` | append-only metrics log | no |
+| `src/tui/*` · `src/ui/app/*` | the control center (terminal + browser), both drawing through the engine | no |
+| `engine/*` | the **facet** drawing engine — one `Painter`, two backends (SVG + cells); vendored workspace packages | no |
 | `fixtures/` | test subjects | (each is a project) |
 | `eval/` | the harness's own test suite | no |
+
+The control center is rendered twice — the browser dashboard and `probevane tui` — from **one** authoring surface. The [Drawing Engine (facet)](Drawing-Engine.md) is a dual-target `Painter`: a widget is drawn once and rasterized to crisp SVG in the browser and braille/box cells in the terminal. It's vendored in-repo (`engine/*` workspace packages, bundled into `dist/`) so probevane ships as one self-contained package.
 
 ## Design invariants
 
