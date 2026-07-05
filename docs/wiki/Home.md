@@ -20,6 +20,7 @@ You point probevane at a project. An **adapter** detects the stack (React first)
 
 ## Start here
 
+- [Operations](Operations.md) — run it in a fresh / isolated / production environment (install, build, secrets, env, security)
 - [Task paths](Paths.md) — write-tests · refactor · feature · repair · fix
 - [Worktree mode](Worktree.md) — isolated, reviewed (self-)improvement runs
 - [Commands](Commands.md) — full CLI reference (generated, gated)

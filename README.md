@@ -43,6 +43,7 @@ GitHub Action: `action.yml` runs `probevane ci` on PRs and comments changed-but-
 
 ## Docs
 
+- [docs/wiki/Operations.md](docs/wiki/Operations.md) — **run it fresh** (install, build, secrets, env, isolation, security, verify)
 - [docs/wiki/Home.md](docs/wiki/Home.md) — the wiki (`npm run wiki` serves it locally)
 - [docs/probevane-guide.md](docs/probevane-guide.md) — long-form guide
 - [docs/wiki/Phase-Log.md](docs/wiki/Phase-Log.md) — build record, honest negatives included
