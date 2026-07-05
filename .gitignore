@@ -42,3 +42,4 @@ fixtures/**/.probevane-pytest.xml
 
 # generated test artifacts (probevane doctor)
 **/__pycache__/
+**/coverage/
