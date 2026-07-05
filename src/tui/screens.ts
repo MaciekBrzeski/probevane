@@ -11,6 +11,7 @@ import {
 } from './views.js';
 import { projectsPane, listPane, menuPane, textPane } from './panes.js';
 import { consoleWidgets } from './console-widgets.js';
+import { costExtras } from './cost-widgets.js';
 import { LAYOUTS, spanToBox } from '../ui/theme.js';
 import { FG } from './draw.js';
 import type { PipelineState } from '../observe/pipeline.js';
@@ -65,6 +66,7 @@ export function paintRuns(scr: Screen, w: number, h: number, s: Snapshot, sel: n
 export function paintCost(scr: Screen, w: number, h: number, s: Snapshot, a: Anim): void {
   const L = layoutFor('cost', w, h);
   costPane(scr, L.cost, s.daily);
+  costExtras(scr, L.cost, s); // daily-cost bars + acceptance donut/legend in the pane's spare rows
   alertsPane(scr, L.alerts, s.alerts);
   gaugePane(scr, L.telemetry, s.totals, a);
 }

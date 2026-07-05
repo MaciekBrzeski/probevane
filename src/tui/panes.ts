@@ -6,7 +6,7 @@
 import { putText, type Screen, type Style } from './screen.js';
 import { lcarsFrame } from './frame.js';
 import { trunc, FG } from './draw.js';
-import { paintWidget } from './facet.js';
+import { paintWidget, emptyPane } from './facet.js';
 import { card, badge, progress, menu, type Painter } from '@facet/core';
 
 export interface Project {
@@ -43,7 +43,7 @@ function projectCard(p: Painter, b: Rect, pr: Project): void {
 /** Project cards laid out in a responsive grid (facet card + badge + progress). */
 export function projectsPane(scr: Screen, r: Rect, projects: Project[]): void {
   lcarsFrame(scr, r, 'projects', FG.acc);
-  if (!projects.length) { putText(scr, r.x + 2, r.y + 1, 'no projects', DIM); return; }
+  if (!projects.length) { emptyPane(scr, r, '∅', 'no projects', 'run generate on a repo'); return; }
   paintWidget(scr, r, (p) => {
     const cols = Math.max(1, Math.floor((r.w - 2) / 34));
     const cardW = Math.floor((r.w - 4) / cols) - 1;

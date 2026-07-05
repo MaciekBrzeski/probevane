@@ -6,8 +6,9 @@
 // ships — no second hand-rolled implementation.
 
 import { CellPainter } from '@facet/render-term';
+import { emptyState, type Painter } from '@facet/core';
 import { blit, type Screen } from './screen.js';
-import type { Painter } from '@facet/core';
+import { FG } from './draw.js';
 
 interface Box { x: number; y: number; w: number; h: number }
 
@@ -17,4 +18,11 @@ export function paintWidget(scr: Screen, r: Box, draw: (p: Painter) => void): vo
   const p = new CellPainter(r.w, r.h);
   draw(p);
   blit(scr, p.flush(), r.x, r.y);
+}
+
+/** A centred facet emptyState filling a pane (the shared "nothing here" placeholder). */
+export function emptyPane(scr: Screen, r: Box, icon: string, title: string, hint?: string): void {
+  paintWidget(scr, r, (p) => {
+    emptyState(p, { rect: { x: 0, y: 0, w: r.w, h: r.h }, icon, title, hint, accent: FG.acc, dim: FG.dim });
+  });
 }
