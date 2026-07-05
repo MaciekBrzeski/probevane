@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { readFile, access } from 'node:fs/promises';
-import type { StackAdapter } from '../adapters/adapter.js';
+import type { StackAdapter } from '../../adapters/adapter.js';
 
 // doctor --full — one scorecard over the READ-ONLY graders. Aggregation, not
 // duplication: each line reuses the same pure core its dedicated command runs
@@ -47,7 +47,7 @@ async function suiteLines(dir: string, adapter: StackAdapter): Promise<FullLine[
 
 async function auditLine(dir: string, adapter: StackAdapter, specs: string[]): Promise<FullLine> {
   if (!specs.length) return { area: 'audit', summary: 'no spec files — probevane generate', ok: false };
-  const { auditFiles } = await import('../audit/core.js');
+  const { auditFiles } = await import('../../audit/core.js');
   const report = await auditFiles(specs.map((s) => join(dir, s)), adapter.auditRules());
   const errors = report.violations.filter((v) => v.severity === 'error').length;
   const warns = report.violations.length - errors;
@@ -55,7 +55,7 @@ async function auditLine(dir: string, adapter: StackAdapter, specs: string[]): P
 }
 
 async function assertionLine(dir: string, specs: string[]): Promise<FullLine> {
-  const { scoreAssertions, aggregateScore } = await import('../audit/assertion-score.js');
+  const { scoreAssertions, aggregateScore } = await import('../../audit/assertion-score.js');
   const perFile = await Promise.all(specs.map(async (s) => ({
     file: s,
     s: scoreAssertions(await readFile(join(dir, s), 'utf8').catch(() => '')),
@@ -67,7 +67,7 @@ async function assertionLine(dir: string, specs: string[]): Promise<FullLine> {
 /** Source quality — pure heuristic analyzer, same core as `probevane quality`. */
 async function qualityLine(dir: string): Promise<FullLine> {
   try {
-    const { scanProject } = await import('../quality/scan.js');
+    const { scanProject } = await import('../../quality/scan.js');
     const q = await scanProject(dir);
     return { area: 'quality', summary: `${q.score}/100 (${q.errors} error(s), ${q.warns} warn(s) over ${q.files.length} files)`, ok: q.errors === 0 };
   } catch (e) {
@@ -78,8 +78,8 @@ async function qualityLine(dir: string): Promise<FullLine> {
 /** Architecture — coupling metrics + drift vs the committed snapshot. */
 async function archLine(dir: string): Promise<FullLine> {
   try {
-    const { buildGraph } = await import('../mock/graph.js');
-    const { archMetrics, archDrift } = await import('../commands/arch/metrics.js');
+    const { buildGraph } = await import('../../mock/graph.js');
+    const { archMetrics, archDrift } = await import('../../commands/arch/metrics.js');
     const metrics = archMetrics(await buildGraph(dir));
     let driftNote = 'no snapshot (arch --snapshot to start tracking)';
     const snapPath = join(dir, 'docs', 'arch-snapshot.json');

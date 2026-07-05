@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import type { StackAdapter } from '../adapters/adapter.js';
-import { sh } from '../util/exec.js';
+import type { StackAdapter } from '../../adapters/adapter.js';
+import { sh } from '../../util/exec.js';
 import { exists, lastLine, walkSrc, type DoctorFinding, type DoctorFix, type DoctorReport } from './shared.js';
 
 // Re-exports keep the public surface stable (CLI + tests import from checks.js).

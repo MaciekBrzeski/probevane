@@ -1,4 +1,4 @@
-import { runDoctor } from '../doctor/checks.js';
+import { runDoctor } from '../commands/doctor/checks.js';
 import { selectAdapter } from '../adapters/registry.js';
 import { dirArg } from './args.js';
 
@@ -9,7 +9,7 @@ import { dirArg } from './args.js';
 // spots + stale reports, git-tracked test artifacts, package-manifest lies,
 // invalid config, missing credentials, CI steps that swallow failures, stale
 // replay cassettes, eval-case bijection. Each check exists because it bit for
-// real — see src/doctor/checks.ts for provenance. --full appends a one-screen
+// real — see src/commands/doctor/checks.ts for provenance. --full appends a one-screen
 // scorecard from the read-only graders (audit / assertions / coverage /
 // quality / arch). Exit 1 when unfixed errors remain.
 async function main() {
@@ -20,7 +20,7 @@ async function main() {
 
   const adapter = await selectAdapter(dir);
   const report = await runDoctor(dir, adapter ?? undefined);
-  const fullLines = full ? await (await import('../doctor/full.js')).fullReport(dir, adapter ?? undefined) : null;
+  const fullLines = full ? await (await import('../commands/doctor/full.js')).fullReport(dir, adapter ?? undefined) : null;
 
   if (args.includes('--json')) {
     const out = { findings: report.findings, fixable: report.fixes.length, full: fullLines ?? undefined };

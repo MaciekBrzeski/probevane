@@ -20,7 +20,7 @@ import {
 } from '../src/cost/estimate.js';
 import { spentSince, overCap } from '../src/cost/budget.js';
 import { stripFences, basePrompt, baseValue, cpuGenerate } from '../src/distill/bases.js';
-import { parseDirective, htmlToText } from '../src/integrations/ado.js';
+import { parseDirective, htmlToText } from '../src/commands/ado/ado.js';
 import { costOf } from '../src/cost/pricing.js';
 
 // ---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ describe('distill/bases cpuGenerate (stubbed fetch)', () => {
 });
 
 // ===========================================================================
-// src/integrations/ado.ts  (PURE parsers only; adoClient fetch glue skipped)
+// src/commands/ado/ado.ts  (PURE parsers only; adoClient fetch glue skipped)
 // ===========================================================================
 describe('integrations/ado htmlToText', () => {
   it('strips tags and turns block boundaries into newlines', () => {

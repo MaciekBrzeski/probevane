@@ -4,7 +4,7 @@
       {
         "dir": "cli",
         "files": 57,
-        "fanOut": 20,
+        "fanOut": 18,
         "fanIn": 0,
         "inbound": 0,
         "imports": [
@@ -14,9 +14,7 @@
           "commands",
           "cost",
           "distill",
-          "doctor",
           "factory",
-          "integrations",
           "library",
           "loop",
           "mfe",
@@ -74,6 +72,17 @@
         ]
       },
       {
+        "dir": "commands",
+        "files": 15,
+        "fanOut": 2,
+        "fanIn": 3,
+        "inbound": 12,
+        "imports": [
+          "mock",
+          "util"
+        ]
+      },
+      {
         "dir": "tui",
         "files": 14,
         "fanOut": 1,
@@ -91,17 +100,6 @@
         "inbound": 27,
         "imports": [
           "cost",
-          "util"
-        ]
-      },
-      {
-        "dir": "commands",
-        "files": 10,
-        "fanOut": 2,
-        "fanIn": 3,
-        "inbound": 10,
-        "imports": [
-          "mock",
           "util"
         ]
       },
@@ -130,7 +128,7 @@
         "dir": "util",
         "files": 8,
         "fanOut": 0,
-        "fanIn": 16,
+        "fanIn": 15,
         "inbound": 69,
         "imports": []
       },
@@ -193,16 +191,6 @@
         ]
       },
       {
-        "dir": "doctor",
-        "files": 4,
-        "fanOut": 1,
-        "fanIn": 1,
-        "inbound": 1,
-        "imports": [
-          "util"
-        ]
-      },
-      {
         "dir": "server",
         "files": 4,
         "fanOut": 6,
@@ -258,14 +246,6 @@
         "fanIn": 0,
         "inbound": 0,
         "imports": []
-      },
-      {
-        "dir": "integrations",
-        "files": 1,
-        "fanOut": 0,
-        "fanIn": 1,
-        "inbound": 1,
-        "imports": []
       }
     ],
     "edges": [
@@ -300,6 +280,11 @@
         "count": 11
       },
       {
+        "from": "cli",
+        "to": "commands",
+        "count": 10
+      },
+      {
         "from": "adapters",
         "to": "audit",
         "count": 8
@@ -307,11 +292,6 @@
       {
         "from": "adapters",
         "to": "library",
-        "count": 8
-      },
-      {
-        "from": "cli",
-        "to": "commands",
         "count": 8
       },
       {
@@ -405,6 +385,11 @@
         "count": 4
       },
       {
+        "from": "commands",
+        "to": "util",
+        "count": 3
+      },
+      {
         "from": "distill",
         "to": "util",
         "count": 3
@@ -436,11 +421,6 @@
       },
       {
         "from": "cost",
-        "to": "util",
-        "count": 2
-      },
-      {
-        "from": "doctor",
         "to": "util",
         "count": 2
       },
@@ -512,21 +492,6 @@
       {
         "from": "brain",
         "to": "cost",
-        "count": 1
-      },
-      {
-        "from": "cli",
-        "to": "integrations",
-        "count": 1
-      },
-      {
-        "from": "cli",
-        "to": "doctor",
-        "count": 1
-      },
-      {
-        "from": "commands",
-        "to": "util",
         "count": 1
       },
       {

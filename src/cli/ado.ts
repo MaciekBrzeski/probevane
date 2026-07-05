@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
-import { adoClient, triggerWiql, parseDirective, summarize, type AdoConfig, type AdoDirective } from '../integrations/ado.js';
+import { adoClient, triggerWiql, parseDirective, summarize, type AdoConfig, type AdoDirective } from '../commands/ado/ado.js';
 import { flag } from './args.js';
 
 type Client = ReturnType<typeof adoClient>;

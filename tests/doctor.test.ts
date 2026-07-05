@@ -12,7 +12,7 @@ import {
   checkCiSwallow,
   checkStaleCassettes,
   runDoctor,
-} from '../src/doctor/checks.js';
+} from '../src/commands/doctor/checks.js';
 import type { StackAdapter, RunResult } from '../src/adapters/adapter.js';
 
 const dirs: string[] = [];
@@ -277,8 +277,8 @@ import {
   checkCredentials,
   checkEvalBijection,
   checkStaleCoverageReport,
-} from '../src/doctor/checks.js';
-import { fullReport } from '../src/doctor/full.js';
+} from '../src/commands/doctor/checks.js';
+import { fullReport } from '../src/commands/doctor/full.js';
 import { utimesSync } from 'node:fs';
 
 describe('checkNodeModules', () => {

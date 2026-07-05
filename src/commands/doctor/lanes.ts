@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { sh } from '../util/exec.js';
+import { sh } from '../../util/exec.js';
 import { exists, lastLine, walkSrc, type DoctorFinding, type DoctorFix, type DoctorReport } from './shared.js';
 
 // Doctor checks 7-12 — setup/config/eval-consistency lane (see checks.ts for
@@ -90,7 +90,7 @@ export async function checkConfig(dir: string): Promise<DoctorReport> {
       });
       break;
     }
-    const { validateConfig } = await import('../util/config.js');
+    const { validateConfig } = await import('../../util/config.js');
     for (const err of validateConfig(cfg)) {
       findings.push({
         check: 'config-invalid',
@@ -170,7 +170,7 @@ function triangleFindings(
 
 /** Every registered adapter should own ≥1 fixture (the node-calc gap class). */
 async function adapterFixtureFindings(dir: string, fixtures: Set<string>): Promise<DoctorFinding[]> {
-  const { ADAPTERS } = await import('../adapters/registry.js');
+  const { ADAPTERS } = await import('../../adapters/registry.js');
   const ownedIds = new Set<string>();
   for (const f of fixtures) {
     const scores = await Promise.all(

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { adoClient, authHeader, witBase, fieldPatch, triggerWiql, parseDirective, summarize } from '../src/integrations/ado.js';
+import { adoClient, authHeader, witBase, fieldPatch, triggerWiql, parseDirective, summarize } from '../src/commands/ado/ado.js';
 
 describe('ado auth + urls', () => {
   it('authHeader is Basic base64(:pat)', () => {
