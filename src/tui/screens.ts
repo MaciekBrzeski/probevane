@@ -9,7 +9,7 @@ import {
   costPane, pipelinePane, jobsPane, alertsPane, gaugePane, telemetryPane, constellationPane,
   type Rect, type Snapshot,
 } from './views.js';
-import { projectsPane, listPane, textPane } from './panes.js';
+import { projectsPane, listPane, menuPane, textPane } from './panes.js';
 import { LAYOUTS, spanToBox } from '../ui/theme.js';
 import { FG } from './draw.js';
 import type { PipelineState } from '../observe/pipeline.js';
@@ -80,7 +80,7 @@ export function paintDocs(scr: Screen, w: number, h: number, s: Snapshot, ui: Ui
 
 export function paintLaunch(scr: Screen, w: number, h: number, s: Snapshot): void {
   const L = layoutFor('launch', w, h);
-  listPane(scr, L.ops, 'operations', FG.acc, s.ops, -1);
+  menuPane(scr, L.ops, 'operations', s.ops);
   textPane(scr, L.launchHint, 'launch', FG.acc, LAUNCH_HELP);
 }
 
