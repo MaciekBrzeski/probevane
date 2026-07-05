@@ -78,12 +78,13 @@ function evictOldJobs() {
   for (const id of jobsToEvict([...jobs.values()], CTX.MAX_JOBS)) jobs.delete(id);
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
+/** Buffer a request body up to `max` bytes (destroys the socket over cap). */
+export function readBody(req: IncomingMessage, max: number): Promise<string> {
   return new Promise((res) => {
     let data = '';
     req.on('data', (c) => {
       data += c;
-      if (data.length > CTX.MAX_BODY) req.destroy(); // cap
+      if (data.length > max) req.destroy(); // cap
     });
     req.on('end', () => res(data));
     req.on('error', () => res(data));
@@ -119,7 +120,7 @@ function startJobProcess(job: Job) {
 export async function launch(req: IncomingMessage, res: ServerResponse) {
   let body: unknown;
   try {
-    body = JSON.parse((await readBody(req)) || '{}');
+    body = JSON.parse((await readBody(req, CTX.MAX_BODY)) || '{}');
   } catch {
     return CTX.sendJson(res, 400, { error: 'invalid JSON body' });
   }
@@ -172,7 +173,7 @@ async function persistItem(item: QueueItem) {
 export async function enqueue(req: IncomingMessage, res: ServerResponse) {
   let body: unknown;
   try {
-    body = JSON.parse((await readBody(req)) || '{}');
+    body = JSON.parse((await readBody(req, CTX.MAX_BODY)) || '{}');
   } catch {
     return CTX.sendJson(res, 400, { error: 'invalid JSON body' });
   }

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# probevane pre-commit gate — catch the drift/regressions this repo has shipped
+# past a green local edit (control.html drift, quality regressions, type errors)
+# BEFORE they reach CI. Fast checks only (no coverage/mutation/e2e — those stay
+# in CI). Install once: `npm run hooks:install` (sets core.hooksPath=.githooks).
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "[pre-commit] typecheck…"
+npm run --silent typecheck
+
+echo "[pre-commit] control.html drift…"
+node scripts/build-ui.mjs --check
+
+echo "[pre-commit] source-quality (strict)…"
+./bin/probevane quality . --strict
+
+echo "[pre-commit] ok"

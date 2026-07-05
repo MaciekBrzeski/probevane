@@ -21,6 +21,9 @@ export default defineConfig({
         // --- stack-adapter spawn glue (npm/pytest/cargo/playwright) ---
         'src/adapters/*/run.ts', // run the suite (spawn)
         'src/adapters/*/install.ts', // install deps + write config (spawn/fs)
+        // --- control-center UI (browser DOM code; covered by the e2e-dash
+        //     Playwright suite against the real daemon, not node unit tests) ---
+        'src/ui/**',
         // --- browser / vision (Playwright + LLM image) ---
         'src/visual/capture.ts',
         'src/visual/vision.ts',

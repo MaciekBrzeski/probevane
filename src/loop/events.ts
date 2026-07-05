@@ -17,6 +17,8 @@ export interface LoopEvent {
   gateBlocks: number;
   /** Reasons for gate blocks, if any */
   gateBlockReasons?: string[];
+  /** Rune that BLOCKED at this step (drives the console's live pipeline). */
+  gate?: string;
   /** LLM tokens consumed (input) */
   tokensIn: number;
   /** LLM tokens produced (output) */

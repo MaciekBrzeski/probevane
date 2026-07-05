@@ -7,6 +7,17 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["fixtures", "node_modules", "dist", "src/e2e/checkpoint.ts", "tests", "**/*.test.ts", "src/cli/eval.ts"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "fixtures",
+    "node_modules",
+    "dist",
+    "src/e2e/checkpoint.ts",
+    "tests",
+    "**/*.test.ts",
+    "src/cli/eval.ts",
+    "src/ui"
+  ]
 }

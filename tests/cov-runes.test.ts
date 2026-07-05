@@ -21,6 +21,7 @@ vi.mock('../src/library/caveats.js', () => ({
 vi.mock('../src/library/retrieve.js', () => ({ retrieveFewShot: async () => h.examples }));
 
 import { RunCtx } from '../src/loop/ctx.js';
+import { firstBlockBefore, firstBlockStop, block, ALLOW, type Rune } from '../src/loop/rune.js';
 import { validationGate, firstFailure, countTsErrors, newSpecs } from '../src/loop/runes/validation_gate.js';
 import { acceptanceGate } from '../src/loop/runes/acceptance_gate.js';
 import { behaviorLock } from '../src/loop/runes/behavior_lock.js';
@@ -633,5 +634,31 @@ describe('pathGuard', () => {
     expect((await pathGuard.beforeToolCall!(call('write_file', { path: 'tests/b.spec.ts' }), ctx)).kind).toBe('allow');
     // read into node_modules is NOT a write → allowed by this gate
     expect((await pathGuard.beforeToolCall!(call('read_file', { path: 'node_modules/foo' }), ctx)).kind).toBe('allow');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// firstBlock* stamp the blocking rune — drives the console's live pipeline.
+// ---------------------------------------------------------------------------
+describe('rune-stamped block decisions', () => {
+  it('firstBlockStop returns the name of the rune that blocked', async () => {
+    const runes = [
+      { name: 'quiet' },
+      { name: 'gatekeeper', shouldStop: async () => block('nope') },
+    ] as Rune[];
+    const d = await firstBlockStop(runes, ctxWith({} as never));
+    expect(d.kind).toBe('block');
+    if (d.kind === 'block') expect(d.rune).toBe('gatekeeper');
+  });
+
+  it('firstBlockBefore stamps too, first block wins', async () => {
+    const runes = [
+      { name: 'a', beforeToolCall: async () => ALLOW },
+      { name: 'b', beforeToolCall: async () => block('stop right there') },
+      { name: 'c', beforeToolCall: async () => block('never reached') },
+    ] as Rune[];
+    const d = await firstBlockBefore(runes, { id: 'x', name: 'write_file', input: {} }, ctxWith({} as never));
+    if (d.kind === 'block') expect(d.rune).toBe('b');
+    expect(d.kind).toBe('block');
   });
 });

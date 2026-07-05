@@ -13,6 +13,7 @@ import { parseEvents } from '../loop/events.js';
 import { parseTranscript } from '../loop/transcript.js';
 import { scanProject } from '../quality/scan.js';
 import { jobs, getQueue, isPaused, snapshot, launch, cancelJob, enqueue, streamEvents, streamFiles } from './daemon-control.js';
+import { handleTerm } from './terminal-routes.js';
 
 // A runId / wiki filename is safe to interpolate into a path only if it has no
 // separators or traversal — defense in depth atop the 127.0.0.1 binding.
@@ -35,7 +36,9 @@ export interface RouteCtx {
   QUEUE_ON: boolean;
   JOBS_RETURN: number;
   AUDIT_RETURN: number;
-  DASHBOARD: () => string; // getter — re-reads control.html each call under PROBEVANE_UI_DEV (design loop)
+  // Getter — under PROBEVANE_UI_DEV recompiles the TSX sources per request
+  // (runtime compiler; the design loop sees its edits live), else cached html.
+  DASHBOARD: () => string | Promise<string>;
   WIKI_DIR: string;
   alertOpts: Parameters<typeof computeAlerts>[1];
   log: (level: string, event: string, data?: Record<string, unknown>) => Promise<void>;
@@ -142,6 +145,49 @@ async function handleData(
     return true;
   }
   if (url.startsWith('/wiki/raw/')) return handleWikiRaw(url, res);
+  return handleConsoleData(url, query, res);
+}
+
+/** Console-tab data: rune pipeline + module constellation. Returns true if handled. */
+async function handleConsoleData(url: string, query: URLSearchParams, res: ServerResponse): Promise<boolean> {
+  if (url === '/pipeline') {
+    // Rune pipeline for the console's live node graph — always derived from
+    // the real profiles (describePipeline), never a stale committed model.
+    const { describePipeline } = await import('../loop/describe.js');
+    const profile = (query.get('profile') ?? 'write_tests') as Parameters<typeof describePipeline>[0];
+    try {
+      CTX.sendJson(res, 200, describePipeline(profile, { kind: 'unit' }));
+    } catch {
+      CTX.sendJson(res, 400, { error: `unknown profile ${String(profile)}` });
+    }
+    return true;
+  }
+  if (url === '/events') {
+    // Theater replay: a run's durable event stream from the state root
+    // (survives workdir deletion — the whole point).
+    const runId = query.get('runId');
+    if (!runId || !SAFE_ID.test(runId)) { CTX.sendJson(res, 400, { error: 'valid runId required' }); return true; }
+    const { statePath } = await import('../util/state.js');
+    const txt =
+      (await readFile(statePath('events', `${runId}.jsonl`), 'utf8').catch(() => null)) ??
+      (await readFile(join(CTX.ROOT, 'events', `${runId}.jsonl`), 'utf8').catch(() => null));
+    if (txt === null) { CTX.sendJson(res, 404, { error: 'no captured events for this run' }); return true; }
+    CTX.sendJson(res, 200, { runId, events: parseEvents(txt) });
+    return true;
+  }
+  if (url === '/graph') {
+    // Module constellation: dependency graph + fan-in per node.
+    const dir = query.get('dir') ?? process.env.PROBEVANE_ROOT ?? '.';
+    const { buildGraph } = await import('../mock/graph.js');
+    const g = await buildGraph(resolve(dir));
+    const fanIn = new Map<string, number>();
+    for (const n of g.nodes.values()) for (const dep of n.imports) fanIn.set(dep, (fanIn.get(dep) ?? 0) + 1);
+    CTX.sendJson(res, 200, {
+      nodes: [...g.nodes.values()].map((n) => ({ ...n, fanIn: fanIn.get(n.path) ?? 0 })),
+      order: g.order,
+    });
+    return true;
+  }
   return false;
 }
 
@@ -223,7 +269,7 @@ async function handleGet(
   if (await handleData(url, query, req, res)) return;
   if (url === '/' || url === '/index') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(CTX.DASHBOARD());
+    res.end(await CTX.DASHBOARD());
     return;
   }
   return handleMetrics(url, res);
@@ -234,6 +280,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = full.split('?')[0];
   const query = new URLSearchParams(full.split('?')[1] ?? '');
   try {
+    if (url.startsWith('/term/')) { await handleTerm(url, query, req, res); return; }
     if (req.method === 'POST') {
       const posted = await handlePost(url, query, req, res);
       if (posted) return;

@@ -7,7 +7,7 @@ import type { ToolCall, ToolResult } from './types.js';
 
 export type RuneDecision =
   | { kind: 'allow' }
-  | { kind: 'block'; reason: string; inject?: string };
+  | { kind: 'block'; reason: string; inject?: string; rune?: string };
 
 export const ALLOW: RuneDecision = { kind: 'allow' };
 export function block(reason: string, inject?: string): RuneDecision {
@@ -46,7 +46,7 @@ export async function firstBlockBefore(
   for (const r of runes) {
     if (!r.beforeToolCall) continue;
     const d = await r.beforeToolCall(call, ctx);
-    if (d.kind === 'block') return d;
+    if (d.kind === 'block') return { ...d, rune: d.rune ?? r.name };
   }
   return ALLOW;
 }
@@ -55,7 +55,7 @@ export async function firstBlockStop(runes: Rune[], ctx: RunCtx): Promise<RuneDe
   for (const r of runes) {
     if (!r.shouldStop) continue;
     const d = await r.shouldStop(ctx);
-    if (d.kind === 'block') return d;
+    if (d.kind === 'block') return { ...d, rune: d.rune ?? r.name };
   }
   return ALLOW;
 }

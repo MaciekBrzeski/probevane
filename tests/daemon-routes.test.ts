@@ -358,3 +358,60 @@ describe('error handling', () => {
     }
   });
 });
+
+describe('console data routes', () => {
+  it('GET /pipeline returns the write_tests rune chain (derived, not stale)', async () => {
+    const res = fakeRes();
+    await handle(fakeReq('/pipeline', 'GET'), res as never);
+    const body = JSON.parse(res.body);
+    expect(body.profile).toBe('write_tests');
+    expect(body.runes.length).toBeGreaterThan(5);
+    expect(body.runes.map((r: { name: string }) => r.name)).toContain('plan_first');
+  });
+
+  it('GET /pipeline with an unknown profile → 400', async () => {
+    const res = fakeRes();
+    await handle(fakeReq('/pipeline?profile=nope', 'GET'), res as never);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('GET /graph returns nodes with fan-in over the requested dir', async () => {
+    const res = fakeRes();
+    await handle(fakeReq(`/graph?dir=${encodeURIComponent(process.cwd())}`, 'GET'), res as never);
+    const body = JSON.parse(res.body);
+    expect(body.nodes.length).toBeGreaterThan(10);
+    const withFanIn = body.nodes.filter((n: { fanIn: number }) => n.fanIn > 0);
+    expect(withFanIn.length).toBeGreaterThan(0);
+  }, 30_000);
+});
+
+describe('GET /events — theater replay source', () => {
+  it('404 when no captured events exist for the run', async () => {
+    const res = fakeRes();
+    await handle(fakeReq('/events?runId=run-nope', 'GET'), res as never);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('400 on an unsafe runId', async () => {
+    const res = fakeRes();
+    await handle(fakeReq('/events?runId=..%2Fetc', 'GET'), res as never);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('serves the durable state-root event stream, parsed', async () => {
+    const { mkdirSync: mk, writeFileSync: wf } = await import('node:fs');
+    const { join: jn } = await import('node:path');
+    mk(jn(STATE_DIR, 'events'), { recursive: true });
+    wf(
+      jn(STATE_DIR, 'events', 'run-theater1.jsonl'),
+      JSON.stringify({ ts: '2026-07-03T10:00:00Z', runId: 'run-theater1', step: 2, gate: 'no_regression', toolCalls: 1, gateBlocks: 1, tokensIn: 0, tokensOut: 0 }) + '\n' +
+      JSON.stringify({ ts: '2026-07-03T10:00:05Z', runId: 'run-theater1', step: 3, accepted: true, stopReason: 'accepted', toolCalls: 2, gateBlocks: 1, tokensIn: 0, tokensOut: 0 }) + '\n',
+    );
+    const res = fakeRes();
+    await handle(fakeReq('/events?runId=run-theater1', 'GET'), res as never);
+    const body = JSON.parse(res.body);
+    expect(body.events).toHaveLength(2);
+    expect(body.events[0].gate).toBe('no_regression');
+    expect(body.events[1].accepted).toBe(true);
+  });
+});

@@ -10,9 +10,12 @@ import { extractFence } from './improve.js';
 // turns "screenshot every page" + "improve the design" into a single gated loop,
 // and leaves the spec behind as a permanent visual-regression test.
 //
-// The rewrite is scoped to the <style> block ONLY — design lives in CSS (contrast,
-// spacing, hierarchy, alignment), and leaving markup/JS untouched keeps behaviour
-// (and the XSS/asset guarantees) intact.
+// The rewrite is scoped to CSS ONLY — design lives in CSS (contrast, spacing,
+// hierarchy, alignment), and leaving markup/JS untouched keeps behaviour (and
+// the XSS/asset guarantees) intact. Targets: an html file's first <style>
+// block, or a raw .css file (the control center's TSX build — under
+// PROBEVANE_UI_DEV the daemon recompiles per request, so each rewrite is live
+// on the next screenshot without any rebuild step).
 
 export interface DesignPage {
   name: string;
@@ -47,6 +50,25 @@ const REWRITE_SYSTEM =
   'block and a list of findings. Return ONLY the complete revised CSS inside a single fenced code block — ' +
   'no <style> tags, no prose. Keep every existing selector/class name (markup and JS depend on them); ' +
   'you may adjust their properties and add new rules. Make focused, tasteful changes — do not restyle wholesale.';
+
+/**
+ * The selector heads of a stylesheet (crude but stable: text before each `{`,
+ * split on commas). Used as the rewrite CONTRACT: markup/JS depend on these,
+ * so a rewrite that loses selectors gets reverted — the vision model is asked
+ * to keep them, but small local models don't reliably honor instructions
+ * (the LoRA lesson: convention learned, contracts not bound). Gate, don't trust.
+ */
+export function cssSelectors(css: string): Set<string> {
+  const out = new Set<string>();
+  const noAt = css.replace(/@media[^{]*\{|@keyframes[^{]*\{[\s\S]*?\}\s*\}/g, '');
+  for (const m of noAt.matchAll(/(^|\})\s*([^{}@/]+)\{/g)) {
+    for (const sel of m[2].split(',')) {
+      const s = sel.trim();
+      if (s) out.add(s);
+    }
+  }
+  return out;
+}
 
 /** The <style>…</style> body of an html file (first block), or null. */
 export function extractStyle(html: string): { css: string; start: number; end: number } | null {
@@ -138,17 +160,27 @@ export async function designLoop(opts: DesignOpts): Promise<{ rounds: DesignRoun
     const actionable = findings.filter((f) => !/^OK\b/i.test(f.text));
     if (!actionable.length) { history.push({ round: r, findings, edited: false }); log(`[design] r${r}: all pages OK — stopping`); break; }
 
-    const html = await readFile(opts.targetFile, 'utf8');
-    const style = extractStyle(html);
+    const isCss = opts.targetFile.endsWith('.css');
+    const source = await readFile(opts.targetFile, 'utf8');
+    const style = isCss ? { css: source } : extractStyle(source);
     if (!style) { log('[design] no <style> block in target — cannot rewrite'); history.push({ round: r, findings, edited: false }); break; }
     const findingText = actionable.map((f) => `## ${f.name}\n${f.text}`).join('\n\n');
     const worst = shots.find((s) => s.name === actionable[0].name)!.path;
     const reply = await ask(worst, REWRITE_SYSTEM, `FINDINGS:\n${findingText}\n\nCURRENT CSS:\n${style.css}`);
     const nextCss = extractFence(reply);
     if (!nextCss) { log(`[design] r${r}: no CSS returned — stopping`); history.push({ round: r, findings, edited: false }); break; }
-    await writeFile(opts.targetFile, spliceStyle(html, nextCss));
+    // Selector-preservation gate: the rewrite must keep every selector the
+    // markup/JS depend on. A rewrite that drops any is discarded, not applied.
+    const kept = cssSelectors(nextCss);
+    const lost = [...cssSelectors(style.css)].filter((s) => !kept.has(s));
+    if (lost.length) {
+      log(`[design] r${r}: rewrite DROPPED ${lost.length} selector(s) (${lost.slice(0, 3).join(', ')}${lost.length > 3 ? ', …' : ''}) — reverted, not applied`);
+      history.push({ round: r, findings, edited: false });
+      continue;
+    }
+    await writeFile(opts.targetFile, isCss ? nextCss.trim() + '\n' : spliceStyle(source, nextCss));
     history.push({ round: r, findings, edited: true });
-    log(`[design] r${r}: rewrote <style> in ${opts.targetFile} (${actionable.length} page(s) with findings)`);
+    log(`[design] r${r}: rewrote ${isCss ? 'the stylesheet' : '<style>'} in ${opts.targetFile} (${actionable.length} page(s) with findings)`);
   }
   return { rounds: history, shots: allShots };
 }

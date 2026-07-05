@@ -209,6 +209,8 @@ export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
   const { dir, kind, adapter } = opts;
   const log = opts.log ?? (() => {});
 
+  // Toolchain bootstrap before probing/gating (idempotent) — see runPath.
+  await adapter.install(dir).catch((e) => log(`[generate] install: ${e}`));
   const { probes, probedTargets } = await probeTargets(opts, log);
   const { brain, takeoverBrain } = await resolveBrains(opts, probedTargets, log);
 

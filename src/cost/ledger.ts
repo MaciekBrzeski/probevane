@@ -13,6 +13,8 @@ export interface RunRecord {
   ts: string;
   runId: string;
   label: string; // path + target, e.g. "generate:fixtures/x"
+  /** Full workdir (label only carries the basename) — run drawer + theater use it. */
+  dir?: string;
   model: string;
   tokensIn: number;
   tokensOut: number;

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { extractStyle, spliceStyle, specSource, designLoop, type DesignPage } from '../src/visual/design.js';
+import { extractStyle, spliceStyle, specSource, designLoop, cssSelectors, type DesignPage, type DesignOpts } from '../src/visual/design.js';
 import { usesOpenAiVision } from '../src/visual/vision.js';
 
 describe('design.extractStyle / spliceStyle', () => {
@@ -138,5 +138,40 @@ describe('vision.usesOpenAiVision', () => {
     expect(usesOpenAiVision('minimax-m3', undefined)).toBe(true);
     expect(usesOpenAiVision('claude-sonnet-4-6', 'https://ollama.com/v1')).toBe(true); // base forces it
     expect(usesOpenAiVision('claude-sonnet-4-6', undefined)).toBe(false);
+  });
+});
+
+describe('cssSelectors + the selector-preservation gate', () => {
+  it('extracts selector heads, splitting comma groups, skipping keyframe frames', () => {
+    const css = `.a { color:red } .b:hover, #c { x:1 }\n@keyframes spin { 0% {opacity:0} 100% {opacity:1} }\n@media (max-width:600px) { .d { y:2 } }`;
+    const s = cssSelectors(css);
+    expect(s.has('.a')).toBe(true);
+    expect(s.has('.b:hover')).toBe(true);
+    expect(s.has('#c')).toBe(true);
+    expect(s.has('.d')).toBe(true); // media inner selectors ARE contract
+    expect(s.has('0%')).toBe(false); // keyframe frames are not
+  });
+
+  it('reverts a rewrite that drops selectors; applies one that keeps them all', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pv-design-gate-'));
+    const target = join(dir, 'style.css');
+    writeFileSync(target, '.keep { a:1 }\n.also { b:2 }\n');
+    const logs: string[] = [];
+    const mkOpts = (reply: string): DesignOpts => ({
+      url: 'http://x', targetFile: target, outDir: join(dir, 'shots'), goal: 'g',
+      pages: [{ name: 'p' }], rounds: 1, log: (l) => logs.push(l),
+      capture: async (_u, pages, out, round) => pages.map((p) => ({ name: p.name, path: join(out, `r${round}-${p.name}.png`) })),
+      ask: async (_i, system) => (system.includes('senior product designer') ? '- finding' : reply),
+    });
+
+    // Dropping .also → reverted.
+    await designLoop(mkOpts('```css\n.keep { a:9 }\n```'));
+    expect(readFileSync(target, 'utf8')).toContain('.also'); // untouched
+    expect(logs.join('\n')).toContain('DROPPED 1 selector(s)');
+
+    // Keeping both (new props + new rule) → applied.
+    await designLoop(mkOpts('```css\n.keep { a:9 }\n.also { b:3 }\n.new { c:1 }\n```'));
+    expect(readFileSync(target, 'utf8')).toContain('.new');
+    rmSync(dir, { recursive: true, force: true });
   });
 });

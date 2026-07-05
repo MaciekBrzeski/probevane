@@ -69,6 +69,11 @@ async function applyFocus(
 
 export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
   const log = opts.log ?? (() => {});
+  // Bootstrap the stack's toolchain before any gate runs (idempotent; e.g. a
+  // python .venv on PEP-668 hosts). Without this a daemon/CLI-launched path hit
+  // bare system python and validation_gate went red on the environment, not
+  // the code. Best-effort: a failure surfaces in the gates with real output.
+  await opts.adapter.install(opts.dir).catch((e) => log(`[path] install: ${e}`));
   const { brain, takeoverBrain } = await resolveBrains(opts, log);
   const task = await applyFocus(opts, opts.task, log);
 
