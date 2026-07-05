@@ -6,6 +6,12 @@
   "engines": {
     "node": ">=22"
   },
+  "workspaces": [
+    "engine/core",
+    "engine/render-term",
+    "engine/render-dom",
+    "engine/gallery"
+  ],
   "bin": {
     "probevane": "./bin/probevane"
   },
@@ -27,7 +33,11 @@
     "eval": "tsx src/cli/eval.ts",
     "wiki": "node scripts/wiki.mjs",
     "test:e2e": "playwright test",
-    "build:ui": "node scripts/build-ui.mjs"
+    "build:ui": "node scripts/build-ui.mjs",
+    "engine:lint": "node engine/lint.mjs",
+    "engine:typecheck": "npm run --workspaces --if-present typecheck",
+    "engine:test": "npm run --workspaces --if-present test",
+    "engine:gate": "npm run engine:lint && npm run engine:typecheck && npm run engine:test"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
@@ -44,9 +54,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
-    "@facet/core": "file:../facet/packages/core",
-    "@facet/render-dom": "file:../facet/packages/render-dom",
-    "@facet/render-term": "file:../facet/packages/render-term",
+    "@facet/core": "*",
+    "@facet/render-dom": "*",
+    "@facet/render-term": "*",
     "ts-morph": "^28.0.0"
   }
 }

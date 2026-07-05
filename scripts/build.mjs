@@ -2,11 +2,13 @@
 // (src/ui/loop.html, read by `serve`). Imports already use .js extensions, so the
 // emitted ESM runs on node directly — no tsx needed at install/runtime.
 //
-// The one exception is the @facet/* drawing engine: it's a `file:` dep whose
-// package `main` points at TypeScript source with extensionless imports (fine for
-// tsx/bundlers, unrunnable by plain node). So we esbuild-bundle each facet package
-// to standalone JS under dist/node_modules/@facet/* — node resolves THAT (closer
-// to dist/cli/*.js than the repo's node_modules) and the compiled dist runs clean.
+// The one exception is the @facet/* drawing engine: it's an in-repo workspace
+// (engine/*) whose package `main` points at TypeScript source with extensionless
+// imports (fine for tsx/bundlers, unrunnable by plain node). So we esbuild-bundle
+// each facet package to standalone JS under dist/node_modules/@facet/* — node
+// resolves THAT (closer to dist/cli/*.js than the repo's node_modules) and the
+// compiled dist runs clean. This is why probevane ships as one self-contained
+// package: the engine is vendored + bundled, no external dependency.
 import { execSync } from 'node:child_process';
 import { cpSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';

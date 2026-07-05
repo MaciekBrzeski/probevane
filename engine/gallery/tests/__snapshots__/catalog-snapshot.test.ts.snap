@@ -1,0 +1,435 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`catalog snapshot: cells + svg per widget > accordion cells 1`] = `
+"▾ gates
+  validation · audit · hermetic
+▸ harvest
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > accordion svg 1`] = `"<svg viewBox="0 0 30 3" width="30" height="3"><text x="0" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">▾ gates</text><text x="2" y="1" fill="#7d93ad" text-anchor="start" font-weight="400">validation · audit · hermetic</text><text x="0" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">▸ harvest</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > alert cells 1`] = `
+" ──────────────────────────────────────╮
+  ✓ accepted                           │
+  22 tests · 100% cov · 0 flake        │
+ ──────────────────────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > alert svg 1`] = `"<svg viewBox="0 0 40 4" width="40" height="4"><rect x="0" y="0" width="40" height="4" fill="none" stroke="#2fe6a8" stroke-width="1" stroke-linecap="round"/><rect x="0" y="0" width="1" height="4" fill="#2fe6a8" stroke="#2fe6a8" stroke-width="1" stroke-linecap="round"/><text x="2" y="1" fill="#2fe6a8" text-anchor="start" font-weight="700">✓ accepted</text><text x="2" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">22 tests · 100% cov · 0 flake</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > avatar cells 1`] = `
+"╭──╮
+│MB│
+╰──╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > avatar svg 1`] = `"<svg viewBox="0 0 5 3" width="5" height="3"><rect x="0" y="0" width="4" height="3" fill="#c792ea" stroke="#c792ea" stroke-width="1" stroke-linecap="round"/><text x="2" y="1" fill="#04070f" text-anchor="middle" font-weight="700">MB</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > badge cells 1`] = `
+"
+ 12
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > badge svg 1`] = `"<svg viewBox="0 0 6 2" width="6" height="2"><rect x="0" y="0.5" width="4" height="1.4" fill="#ff5d6c" stroke="#ff5d6c" stroke-width="1" stroke-linecap="round"/><text x="2" y="1" fill="#cfe3f5" text-anchor="middle" font-weight="700">12</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > banner cells 1`] = `
+"╭──────────────────────────────────────╮
+│         mutation gate: strict        │
+╰──────────────────────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > banner svg 1`] = `"<svg viewBox="0 0 40 3" width="40" height="3"><rect x="0" y="0" width="40" height="3" fill="#ffb454" stroke="#ffb454" stroke-width="1" stroke-linecap="round"/><text x="20" y="1" fill="#04070f" text-anchor="middle" font-weight="700">mutation gate: strict</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > barChart cells 1`] = `
+"
+
+
+
+
+
+
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > barChart svg 1`] = `"<svg viewBox="0 0 26 8" width="26" height="8"><rect x="0" y="0" width="2" height="8" fill="#1b2a44"/><rect x="0" y="5" width="2" height="3" fill="#4fd6ff"/><rect x="3" y="0" width="2" height="8" fill="#1b2a44"/><rect x="3" y="3" width="2" height="5" fill="#4fd6ff"/><rect x="6" y="0" width="2" height="8" fill="#1b2a44"/><rect x="6" y="6" width="2" height="2" fill="#4fd6ff"/><rect x="9" y="0" width="2" height="8" fill="#1b2a44"/><rect x="9" y="2" width="2" height="6" fill="#4fd6ff"/><rect x="12" y="0" width="2" height="8" fill="#1b2a44"/><rect x="12" y="4" width="2" height="4" fill="#4fd6ff"/><rect x="15" y="0" width="2" height="8" fill="#1b2a44"/><rect x="15" y="1" width="2" height="7" fill="#4fd6ff"/><rect x="18" y="0" width="2" height="8" fill="#1b2a44"/><rect x="18" y="3" width="2" height="5" fill="#4fd6ff"/><rect x="21" y="0" width="2" height="8" fill="#1b2a44"/><rect x="21" y="0" width="2" height="8" fill="#4fd6ff"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > breadcrumb cells 1`] = `
+"runs › react-todo › gates
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > breadcrumb svg 1`] = `"<svg viewBox="0 0 30 1" width="30" height="1"><text x="0" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">runs</text><text x="5" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">›</text><text x="7" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">react-todo</text><text x="18" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">›</text><text x="20" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">gates</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > button cells 1`] = `
+"╭──────────╮
+│          │
+╰────RUN───╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > button svg 1`] = `"<svg viewBox="0 0 14 3" width="14" height="3"><rect x="0" y="0" width="12" height="3" fill="#4fd6ff" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="6" y="1.5" fill="#04070f" text-anchor="middle" font-weight="700">RUN</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > buttonGroup cells 1`] = `
+"  day week   month
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > buttonGroup svg 1`] = `"<svg viewBox="0 0 22 1" width="22" height="1"><text x="2.5" y="0" fill="#7d93ad" text-anchor="middle" font-weight="400">day</text><rect x="5" y="0" width="6" height="1" fill="#4fd6ff"/><text x="8" y="0" fill="#04070f" text-anchor="middle" font-weight="700">week</text><text x="14.5" y="0" fill="#7d93ad" text-anchor="middle" font-weight="400">month</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > card cells 1`] = `
+"╭────────────────────────────────╮
+│ react-todo                     │
+│─────────────────────────────────
+│ adapter: react-vitest          │
+│ gates: 6 green                 │
+╰────────────────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > card svg 1`] = `"<svg viewBox="0 0 34 6" width="34" height="6"><rect x="0" y="0" width="34" height="6" fill="#0b1220" stroke="#7d93ad" stroke-width="1" stroke-linecap="round"/><text x="2" y="1" fill="#4fd6ff" text-anchor="start" font-weight="700">react-todo</text><line x1="1" y1="2" x2="33" y2="2" fill="none" stroke="#7d93ad" stroke-width="1" stroke-linecap="round"/><text x="2" y="3" fill="#cfe3f5" text-anchor="start" font-weight="400">adapter: react-vitest</text><text x="2" y="4" fill="#cfe3f5" text-anchor="start" font-weight="400">gates: 6 green</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > checkbox cells 1`] = `
+"[✓] hermetic
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > checkbox svg 1`] = `"<svg viewBox="0 0 18 1" width="18" height="1"><text x="0" y="0" fill="#2fe6a8" text-anchor="start" font-weight="700">[✓]</text><text x="4" y="0" fill="#2fe6a8" text-anchor="start" font-weight="400">hermetic</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > chip cells 1`] = `
+"   e2e
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > chip svg 1`] = `"<svg viewBox="0 0 14 1" width="14" height="1"><rect x="0" y="0" width="7" height="1" fill="#4fd6ff" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="3.5" y="0" fill="#04070f" text-anchor="middle" font-weight="400">e2e</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > dialog cells 1`] = `
+"╭──────────────────────────────────────────╮
+│ discard run?                             │
+│───────────────────────────────────────────
+│ the worktree changes will be lost.       │
+│                                          │
+│                                          │
+│                       cancel    discard  │
+╰──────────────────────────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > dialog svg 1`] = `"<svg viewBox="0 0 44 8" width="44" height="8"><rect x="0" y="0" width="44" height="8" fill="#0b1220" stroke="#ff5d6c" stroke-width="1" stroke-linecap="round"/><text x="2" y="1" fill="#ff5d6c" text-anchor="start" font-weight="700">discard run?</text><line x1="1" y1="2" x2="43" y2="2" fill="none" stroke="#7d93ad" stroke-width="1" stroke-linecap="round"/><text x="2" y="3" fill="#cfe3f5" text-anchor="start" font-weight="400">the worktree changes will be lost.</text><rect x="32" y="6" width="9" height="1" fill="#ff5d6c" stroke="#ff5d6c" stroke-width="1" stroke-linecap="round"/><text x="36.5" y="6" fill="#0b1220" text-anchor="middle" font-weight="700">discard</text><rect x="23" y="6" width="8" height="1" fill="none" stroke="#7d93ad" stroke-width="1" stroke-linecap="round"/><text x="27" y="6" fill="#cfe3f5" text-anchor="middle" font-weight="400">cancel</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > divider cells 1`] = `
+"─────────── harvest ─────────────
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > divider svg 1`] = `"<svg viewBox="0 0 34 1" width="34" height="1"><line x1="0" y1="0" x2="11" y2="0" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><text x="11" y="0" fill="#7d93ad" text-anchor="start" font-weight="400"> harvest </text><line x1="20" y1="0" x2="32" y2="0" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > donut cells 1`] = `
+"
+
+
+
+
+    ⣠⠖⠚⠉⠉⠙⠒⢦⡀
+  ⢠⠞        ⠈⢦
+  ⡎          ⠈⡆
+  ⡇    78%    ⡇
+  ⠘⡄        ⢀⡜
+   ⠈⠢⣄⡀   ⣀⡤⠊
+      ⠈⠉⠉⠉
+
+
+
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > donut svg 1`] = `"<svg viewBox="0 0 16 16" width="16" height="16"><path d="M 8.00 2.00 A 6 6 0 1 1 8.00 2.00" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><path d="M 8.00 2.00 A 6 6 0 1 1 2.11 6.88" fill="none" stroke="#2fe6a8" stroke-width="2" stroke-linecap="round"/><path d="M 2.11 6.88 A 6 6 0 0 1 5.11 2.74" fill="none" stroke="#ffb454" stroke-width="2" stroke-linecap="round"/><path d="M 5.11 2.74 A 6 6 0 0 1 8.00 2.00" fill="none" stroke="#ff5d6c" stroke-width="2" stroke-linecap="round"/><text x="8" y="8" fill="#2fe6a8" text-anchor="middle" font-weight="700">78%</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > emptyState cells 1`] = `
+"
+            ∅
+       no runs yet
+    press l to launch
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > emptyState svg 1`] = `"<svg viewBox="0 0 24 5" width="24" height="5"><text x="12" y="1" fill="#4fd6ff" text-anchor="middle" font-weight="700">∅</text><text x="12" y="2" fill="#7d93ad" text-anchor="middle" font-weight="400">no runs yet</text><text x="12" y="3" fill="#7d93ad" text-anchor="middle" font-weight="400">press l to launch</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > frame cells 1`] = `
+" ──T E L E M E T R Y─────────────────────────╮
+                                             │
+                                             │
+                                             │
+ ────────────────────────────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > frame svg 1`] = `"<svg viewBox="0 0 46 5" width="46" height="5"><rect x="0" y="0" width="46" height="5" fill="#0b1220" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><rect x="0" y="0" width="2" height="5" fill="#4fd6ff"/><text x="3" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">T E L E M E T R Y</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > gauge cells 1`] = `
+"
+
+
+
+
+    ⣠⠖⠚⠉⠉⠙⠒⢦⡀
+  ⢠⠎        ⠙⢦
+  ⡎          ⠘⡆
+  ⣇    71%    ⡇
+  ⠸⣄        ⢀⡼
+   ⠈⠲⣄⡀  ⢀⣀⡴⠊
+      ⠈⠉⠉⠉
+
+
+
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > gauge svg 1`] = `"<svg viewBox="0 0 16 16" width="16" height="16"><path d="M 8.00 2.00 A 6 6 0 1 1 8.00 2.00" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><path d="M 8.00 2.00 A 6 6 0 1 1 2.19 9.49" fill="none" stroke="#2fe6a8" stroke-width="2" stroke-linecap="round"/><text x="8" y="8" fill="#2fe6a8" text-anchor="middle" font-weight="700">71%</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > heatmap cells 1`] = `
+"
+
+
+
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > heatmap svg 1`] = `"<svg viewBox="0 0 28 5" width="28" height="5"><rect x="0" y="0" width="2" height="1" fill="#0b1220"/><rect x="2" y="0" width="2" height="1" fill="#186052"/><rect x="4" y="0" width="2" height="1" fill="#26af85"/><rect x="6" y="0" width="2" height="1" fill="#0f292f"/><rect x="8" y="0" width="2" height="1" fill="#1c7861"/><rect x="10" y="0" width="2" height="1" fill="#2ac694"/><rect x="12" y="0" width="2" height="1" fill="#13413e"/><rect x="14" y="0" width="2" height="1" fill="#208f70"/><rect x="16" y="0" width="2" height="1" fill="#2edea3"/><rect x="18" y="0" width="2" height="1" fill="#17584d"/><rect x="20" y="0" width="2" height="1" fill="#24a67f"/><rect x="22" y="0" width="2" height="1" fill="#0e212a"/><rect x="24" y="0" width="2" height="1" fill="#1b6f5c"/><rect x="26" y="0" width="2" height="1" fill="#28be8e"/><rect x="0" y="1" width="2" height="1" fill="#113838"/><rect x="2" y="1" width="2" height="1" fill="#1f876b"/><rect x="4" y="1" width="2" height="1" fill="#2cd59d"/><rect x="6" y="1" width="2" height="1" fill="#154f47"/><rect x="8" y="1" width="2" height="1" fill="#239e7a"/><rect x="10" y="1" width="2" height="1" fill="#0c1824"/><rect x="12" y="1" width="2" height="1" fill="#196756"/><rect x="14" y="1" width="2" height="1" fill="#27b589"/><rect x="16" y="1" width="2" height="1" fill="#103033"/><rect x="18" y="1" width="2" height="1" fill="#1d7e65"/><rect x="20" y="1" width="2" height="1" fill="#2bcd98"/><rect x="22" y="1" width="2" height="1" fill="#144742"/><rect x="24" y="1" width="2" height="1" fill="#219574"/><rect x="26" y="1" width="2" height="1" fill="#2fe4a7"/><rect x="0" y="2" width="2" height="1" fill="#185e51"/><rect x="2" y="2" width="2" height="1" fill="#25ad83"/><rect x="4" y="2" width="2" height="1" fill="#0f272e"/><rect x="6" y="2" width="2" height="1" fill="#1c7660"/><rect x="8" y="2" width="2" height="1" fill="#29c492"/><rect x="10" y="2" width="2" height="1" fill="#133f3d"/><rect x="12" y="2" width="2" height="1" fill="#208d6f"/><rect x="14" y="2" width="2" height="1" fill="#2ddba1"/><rect x="16" y="2" width="2" height="1" fill="#17564c"/><rect x="18" y="2" width="2" height="1" fill="#24a47e"/><rect x="20" y="2" width="2" height="1" fill="#0d1f28"/><rect x="22" y="2" width="2" height="1" fill="#1a6d5a"/><rect x="24" y="2" width="2" height="1" fill="#28bc8d"/><rect x="26" y="2" width="2" height="1" fill="#113637"/><rect x="0" y="3" width="2" height="1" fill="#1e8469"/><rect x="2" y="3" width="2" height="1" fill="#2cd39c"/><rect x="4" y="3" width="2" height="1" fill="#154d46"/><rect x="6" y="3" width="2" height="1" fill="#229c78"/><rect x="8" y="3" width="2" height="1" fill="#0c1623"/><rect x="10" y="3" width="2" height="1" fill="#196555"/><rect x="12" y="3" width="2" height="1" fill="#26b387"/><rect x="14" y="3" width="2" height="1" fill="#102e32"/><rect x="16" y="3" width="2" height="1" fill="#1d7c64"/><rect x="18" y="3" width="2" height="1" fill="#2aca96"/><rect x="20" y="3" width="2" height="1" fill="#144541"/><rect x="22" y="3" width="2" height="1" fill="#219373"/><rect x="24" y="3" width="2" height="1" fill="#2ee2a5"/><rect x="26" y="3" width="2" height="1" fill="#185c50"/><rect x="0" y="4" width="2" height="1" fill="#25ab82"/><rect x="2" y="4" width="2" height="1" fill="#0e252c"/><rect x="4" y="4" width="2" height="1" fill="#1c745f"/><rect x="6" y="4" width="2" height="1" fill="#29c291"/><rect x="8" y="4" width="2" height="1" fill="#123c3b"/><rect x="10" y="4" width="2" height="1" fill="#208b6e"/><rect x="12" y="4" width="2" height="1" fill="#2dd9a0"/><rect x="14" y="4" width="2" height="1" fill="#16544a"/><rect x="16" y="4" width="2" height="1" fill="#23a27c"/><rect x="18" y="4" width="2" height="1" fill="#0d1d27"/><rect x="20" y="4" width="2" height="1" fill="#1a6b59"/><rect x="22" y="4" width="2" height="1" fill="#27b98b"/><rect x="24" y="4" width="2" height="1" fill="#113436"/><rect x="26" y="4" width="2" height="1" fill="#1e8268"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > keyValue cells 1`] = `
+"cost     $10.80
+accept   71%
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > keyValue svg 1`] = `"<svg viewBox="0 0 20 2" width="20" height="2"><text x="0" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">cost</text><text x="9" y="0" fill="#2fe6a8" text-anchor="start" font-weight="700">$10.80</text><text x="0" y="1" fill="#7d93ad" text-anchor="start" font-weight="400">accept</text><text x="9" y="1" fill="#2fe6a8" text-anchor="start" font-weight="700">71%</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > legend cells 1`] = `
+"  accepted
+  stalled
+  error
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > legend svg 1`] = `"<svg viewBox="0 0 16 3" width="16" height="3"><rect x="0" y="0" width="1" height="1" fill="#2fe6a8"/><text x="2" y="0" fill="#cfe3f5" text-anchor="start" font-weight="400">accepted</text><rect x="0" y="1" width="1" height="1" fill="#ffb454"/><text x="2" y="1" fill="#cfe3f5" text-anchor="start" font-weight="400">stalled</text><rect x="0" y="2" width="1" height="1" fill="#ff5d6c"/><text x="2" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">error</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > list cells 1`] = `
+"  alpha
+▸ beta
+  gamma
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > list svg 1`] = `"<svg viewBox="0 0 16 3" width="16" height="3"><text x="0" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">  alpha</text><text x="0" y="1" fill="#4fd6ff" text-anchor="start" font-weight="700">▸ beta</text><text x="0" y="2" fill="#7d93ad" text-anchor="start" font-weight="400">  gamma</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > menu cells 1`] = `
+"╭──────────────────────╮
+│ run                ⏎ │
+│ refactor           r │
+│ review             v │
+╰──────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > menu svg 1`] = `"<svg viewBox="0 0 24 5" width="24" height="5"><rect x="0" y="0" width="24" height="5" fill="#0b1220" stroke="#7d93ad" stroke-width="1" stroke-linecap="round"/><rect x="1" y="1" width="22" height="1" fill="#4fd6ff"/><text x="2" y="1" fill="#0b1220" text-anchor="start" font-weight="700">run</text><text x="21" y="1" fill="#0b1220" text-anchor="start" font-weight="400">⏎</text><text x="2" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">refactor</text><text x="21" y="2" fill="#7d93ad" text-anchor="start" font-weight="400">r</text><text x="2" y="3" fill="#cfe3f5" text-anchor="start" font-weight="400">review</text><text x="21" y="3" fill="#7d93ad" text-anchor="start" font-weight="400">v</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > meter cells 1`] = `
+"
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > meter svg 1`] = `"<svg viewBox="0 0 26 1" width="26" height="1"><rect x="0" y="0" width="26" height="1" fill="#1b2a44"/><rect x="0" y="0" width="16.12" height="1" fill="#2fe6a8"/><rect x="16.12" y="0" width="6.24" height="1" fill="#4fd6ff"/><rect x="22.36" y="0" width="3.6400000000000006" height="1" fill="#ffb454"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > nodeGraph cells 1`] = `
+"
+
+                               ⣀⠄
+( git )       ──────────────────( args )
+                       ⢀⡠⠔⠊⠁
+                    ⣀⠤⠒⠁
+                ⢀⡠⠔⠉
+              ⠔⠊⠁
+( valid )     ──────────────────( exec )
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > nodeGraph svg 1`] = `"<svg viewBox="0 0 46 10" width="46" height="10"><line x1="14" y1="2.5" x2="32" y2="2.5" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><line x1="14" y1="7.5" x2="32" y2="2.5" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><line x1="14" y1="7.5" x2="32" y2="7.5" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><rect x="32" y="0.75" width="14" height="3.5" fill="none" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="39" y="2.5" fill="#4fd6ff" text-anchor="middle" font-weight="400">args</text><rect x="32" y="5.75" width="14" height="3.5" fill="none" stroke="#ff5d6c" stroke-width="1" stroke-linecap="round"/><text x="39" y="7.5" fill="#ff5d6c" text-anchor="middle" font-weight="400">exec</text><rect x="0" y="0.75" width="14" height="3.5" fill="none" stroke="#7d93ad" stroke-width="1" stroke-linecap="round"/><text x="7" y="2.5" fill="#7d93ad" text-anchor="middle" font-weight="400">git</text><rect x="0" y="5.75" width="14" height="3.5" fill="none" stroke="#2fe6a8" stroke-width="1" stroke-linecap="round"/><text x="7" y="7.5" fill="#2fe6a8" text-anchor="middle" font-weight="400">valid</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > pagination cells 1`] = `
+"‹  1  2 [3] 4  5 ›
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > pagination svg 1`] = `"<svg viewBox="0 0 24 1" width="24" height="1"><text x="0" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">‹</text><text x="2" y="0" fill="#7d93ad" text-anchor="start" font-weight="400"> 1 </text><text x="5" y="0" fill="#7d93ad" text-anchor="start" font-weight="400"> 2 </text><text x="8" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">[3]</text><text x="11" y="0" fill="#7d93ad" text-anchor="start" font-weight="400"> 4 </text><text x="14" y="0" fill="#7d93ad" text-anchor="start" font-weight="400"> 5 </text><text x="17" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">›</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > progress cells 1`] = `
+"
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > progress svg 1`] = `"<svg viewBox="0 0 24 1" width="24" height="1"><rect x="0" y="0" width="24" height="1" fill="#1b2a44"/><rect x="0" y="0" width="14.399999999999999" height="1" fill="#2fe6a8"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > radio cells 1`] = `
+"(•) strict
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > radio svg 1`] = `"<svg viewBox="0 0 18 1" width="18" height="1"><text x="0" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">(•)</text><text x="4" y="0" fill="#4fd6ff" text-anchor="start" font-weight="400">strict</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > rating cells 1`] = `
+"★★★★☆
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > rating svg 1`] = `"<svg viewBox="0 0 6 1" width="6" height="1"><text x="0" y="0" fill="#ffb454" text-anchor="start" font-weight="700">★★★★</text><text x="4" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">☆</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > scrollbar cells 1`] = `
+"
+
+
+
+
+
+
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > scrollbar svg 1`] = `"<svg viewBox="0 0 2 8" width="2" height="8"><rect x="0" y="0" width="1" height="8" fill="#1b2a44"/><rect x="0" y="2" width="1" height="2" fill="#4fd6ff"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > select cells 1`] = `
+"╭────────────────────╮
+│ vitest            ▾│
+╰────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > select svg 1`] = `"<svg viewBox="0 0 24 3" width="24" height="3"><rect x="0" y="0" width="22" height="3" fill="none" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="2" y="1" fill="#cfe3f5" text-anchor="start" font-weight="400">vitest</text><text x="20" y="1" fill="#4fd6ff" text-anchor="start" font-weight="400">▾</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > skeleton cells 1`] = `
+"
+
+
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > skeleton svg 1`] = `"<svg viewBox="0 0 24 4" width="24" height="4"><rect x="0" y="0" width="20" height="1" fill="#1b2a44"/><rect x="0" y="1" width="14" height="1" fill="#1b2a44"/><rect x="0" y="2" width="20" height="1" fill="#1b2a44"/><rect x="0" y="3" width="14" height="1" fill="#1b2a44"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > slider cells 1`] = `
+"────────────●────────
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > slider svg 1`] = `"<svg viewBox="0 0 22 1" width="22" height="1"><line x1="0" y1="0" x2="20" y2="0" fill="none" stroke="#1b2a44" stroke-width="1" stroke-linecap="round"/><line x1="0" y1="0" x2="12" y2="0" fill="none" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="12" y="0" fill="#4fd6ff" text-anchor="middle" font-weight="400">●</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > sparkline cells 1`] = `
+"                        ⢀    ⢀⠔⠁
+                ⢀⠔⢄    ⡠⠃⠑⠢⡀⡠⠃
+         ⢀⠔⠉⠒⠒⠤⠊⠁  ⠣⡀⢀⠜    ⠈
+   ⡠⠔⠢⠤⣀⠔⠁          ⠈⠊
+ ⠔⠊
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > sparkline svg 1`] = `"<svg viewBox="0 0 32 6" width="32" height="6"><defs><linearGradient id="fg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4fd6ff" stop-opacity="0.35"/><stop offset="1" stop-color="#4fd6ff" stop-opacity="0"/></linearGradient></defs><polygon points="1,5 1,4.375 4.333333333333333,3.125 7.666666666666666,3.75 11,1.875 14.333333333333332,2.5 17.666666666666668,1.25 21,3.125 24.333333333333332,0.625 27.666666666666664,1.875 31,0 31,5" fill="url(#fg0)"/><polyline points="1,4.375 4.333333333333333,3.125 7.666666666666666,3.75 11,1.875 14.333333333333332,2.5 17.666666666666668,1.25 21,3.125 24.333333333333332,0.625 27.666666666666664,1.875 31,0" fill="none" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > spinner cells 1`] = `
+"⠸
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > spinner svg 1`] = `"<svg viewBox="0 0 3 1" width="3" height="1"><text x="0" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">⠸</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > stat cells 1`] = `
+"coverage
+100% ▲4
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > stat svg 1`] = `"<svg viewBox="0 0 18 2" width="18" height="2"><text x="0" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">coverage</text><text x="0" y="1" fill="#cfe3f5" text-anchor="start" font-weight="700">100%</text><text x="5" y="1" fill="#2fe6a8" text-anchor="start" font-weight="400">▲4</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > stepper cells 1`] = `
+"   ①───────②───────③
+ probe    gen    gate
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > stepper svg 1`] = `"<svg viewBox="0 0 30 2" width="30" height="2"><text x="3" y="0" fill="#4fd6ff" text-anchor="start" font-weight="400">①</text><text x="3" y="1" fill="#7d93ad" text-anchor="middle" font-weight="400">probe</text><line x1="4" y1="0" x2="10" y2="0" fill="none" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="11" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">②</text><text x="11" y="1" fill="#cfe3f5" text-anchor="middle" font-weight="400">gen</text><line x1="12" y1="0" x2="18" y2="0" fill="none" stroke="#7d93ad" stroke-width="1" stroke-linecap="round"/><text x="19" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">③</text><text x="19" y="1" fill="#7d93ad" text-anchor="middle" font-weight="400">gate</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > table cells 1`] = `
+"name     val
+exec     3
+rune     5
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > table svg 1`] = `"<svg viewBox="0 0 28 3" width="28" height="3"><text x="0" y="0" fill="#7d93ad" text-anchor="start" font-weight="700">name</text><text x="9" y="0" fill="#7d93ad" text-anchor="start" font-weight="700">val</text><text x="0" y="1" fill="#4fd6ff" text-anchor="start" font-weight="400">exec</text><text x="9" y="1" fill="#cfe3f5" text-anchor="start" font-weight="400">3</text><text x="0" y="2" fill="#4fd6ff" text-anchor="start" font-weight="400">rune</text><text x="9" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">5</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > tabs cells 1`] = `
+"» runs «   cost     docs
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > tabs svg 1`] = `"<svg viewBox="0 0 30 1" width="30" height="1"><text x="0" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">» runs «</text><text x="9" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">  cost  </text><text x="18" y="0" fill="#7d93ad" text-anchor="start" font-weight="400">  docs  </text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > textField cells 1`] = `
+"name
+╭────────────────────╮
+│ react-todo▏        │
+╰────────────────────╯
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > textField svg 1`] = `"<svg viewBox="0 0 24 4" width="24" height="4"><text x="0" y="0" fill="#4fd6ff" text-anchor="start" font-weight="400">name</text><rect x="0" y="1" width="22" height="3" fill="none" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="2" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">react-todo▏</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > timeline cells 1`] = `
+"● probe
+│
+● generate
+│
+○ accept
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > timeline svg 1`] = `"<svg viewBox="0 0 22 5" width="22" height="5"><text x="0" y="0" fill="#2fe6a8" text-anchor="start" font-weight="400">●</text><text x="2" y="0" fill="#cfe3f5" text-anchor="start" font-weight="400">probe</text><text x="0" y="1" fill="#7d93ad" text-anchor="start" font-weight="400">│</text><text x="0" y="2" fill="#2fe6a8" text-anchor="start" font-weight="400">●</text><text x="2" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">generate</text><text x="0" y="3" fill="#7d93ad" text-anchor="start" font-weight="400">│</text><text x="0" y="4" fill="#7d93ad" text-anchor="start" font-weight="400">○</text><text x="2" y="4" fill="#7d93ad" text-anchor="start" font-weight="400">accept</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > toggle cells 1`] = `
+"
+    ●
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > toggle svg 1`] = `"<svg viewBox="0 0 6 2" width="6" height="2"><rect x="0" y="0.6" width="5" height="1.4" fill="#2fe6a8" stroke="#2fe6a8" stroke-width="1" stroke-linecap="round"/><text x="3.5" y="1" fill="#04070f" text-anchor="middle" font-weight="400">●</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > tooltip cells 1`] = `
+"╭──────────────────╮
+│ surviving mutant │
+╰──────────────────╯
+          ▾
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > tooltip svg 1`] = `"<svg viewBox="0 0 20 4" width="20" height="4"><rect x="0" y="0" width="20" height="3" fill="#4fd6ff" stroke="#4fd6ff" stroke-width="1" stroke-linecap="round"/><text x="2" y="1" fill="#04070f" text-anchor="start" font-weight="700">surviving mutant</text><text x="10" y="3" fill="#4fd6ff" text-anchor="middle" font-weight="400">▾</text></svg>"`;
+
+exports[`catalog snapshot: cells + svg per widget > tree cells 1`] = `
+"src
+├─ loop
+└─ runes
+
+"
+`;
+
+exports[`catalog snapshot: cells + svg per widget > tree svg 1`] = `"<svg viewBox="0 0 22 4" width="22" height="4"><text x="0" y="0" fill="#7d93ad" text-anchor="start" font-weight="400"></text><text x="0" y="0" fill="#4fd6ff" text-anchor="start" font-weight="700">src</text><text x="0" y="1" fill="#7d93ad" text-anchor="start" font-weight="400">├─ </text><text x="3" y="1" fill="#cfe3f5" text-anchor="start" font-weight="400">loop</text><text x="0" y="2" fill="#7d93ad" text-anchor="start" font-weight="400">└─ </text><text x="3" y="2" fill="#cfe3f5" text-anchor="start" font-weight="400">runes</text></svg>"`;

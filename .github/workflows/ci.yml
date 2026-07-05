@@ -29,6 +29,8 @@ jobs:
         # react-todo) execute the fixture suite, which needs its node_modules.
         run: |
           for f in fixtures/*/; do if [ -f "$f/package.json" ]; then (cd "$f" && npm install --no-fund --no-audit --legacy-peer-deps); fi; done
+      - name: engine gate (facet library — lint + typecheck + parity/snapshot)
+        run: npm run engine:gate
       - name: typecheck
         run: npm run typecheck
       - name: probevane self-tests + coverage floor

@@ -292,17 +292,17 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("header", null, /* @__PURE__ */ h("h1", null, "probevane ", /* @__PURE__ */ h("span", { class: "muted" }, "control center")), /* @__PURE__ */ h("span", { class: "stat" }, /* @__PURE__ */ h("span", { id: "healthDot", class: "dot", style: "background:var(--dim)" }), /* @__PURE__ */ h("span", { id: "health", class: "connecting" }, "connecting\u2026")), /* @__PURE__ */ h("span", { class: "stat" }, "cost ", /* @__PURE__ */ h("b", { id: "cost" }, "\u2013"), " \xB7 accept ", /* @__PURE__ */ h("b", { id: "accept" }, "\u2013"), " \xB7 alerts ", /* @__PURE__ */ h("b", { id: "alertN" }, "\u2013")), /* @__PURE__ */ h("span", { class: "spacer" }), /* @__PURE__ */ h("a", { href: "/demo/pipeline", target: "_blank" }, "pipeline \u2197"));
   }
 
-  // ../facet/packages/core/src/style.ts
+  // engine/core/src/style.ts
   var hex = (c) => "#" + (c & 16777215).toString(16).padStart(6, "0");
 
-  // ../facet/packages/core/src/geom.ts
+  // engine/core/src/geom.ts
   function spanToCss(span) {
     const [x0, y0, x1, y1] = span;
     const pc = (v) => `${(v * 100).toFixed(2)}%`;
     return `left:${pc(x0)};top:${pc(y0)};width:${pc(x1 - x0)};height:${pc(y1 - y0)}`;
   }
 
-  // ../facet/packages/core/src/layout.ts
+  // engine/core/src/layout.ts
   function computeLayers(input, ids) {
     const layer = /* @__PURE__ */ new Map();
     for (const n of input) layer.set(n.id, 0);
@@ -362,7 +362,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return { nodes, edges, width, height };
   }
 
-  // ../facet/packages/core/src/widgets/gauge.ts
+  // engine/core/src/widgets/gauge.ts
   var TOP = -Math.PI / 2;
   function gauge(p, m) {
     const v = m.value < 0 ? 0 : m.value > 1 ? 1 : m.value;
@@ -378,7 +378,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     p.text(m.cx, m.cy, `${Math.round(v * 100)}%`, { fill: m.accent, align: "c", bold: true });
   }
 
-  // ../facet/packages/core/src/widgets/sparkline.ts
+  // engine/core/src/widgets/sparkline.ts
   function sparkline(p, m) {
     const pts = m.points;
     if (pts.length < 2) return;
@@ -393,7 +393,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     p.polyline(line, st);
   }
 
-  // ../facet/packages/core/src/widgets/charts.ts
+  // engine/core/src/widgets/charts.ts
   var TOP2 = -Math.PI / 2;
 
   // src/ui/theme.ts
@@ -602,7 +602,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "nodegraph-wrap" }, svg);
   }
 
-  // ../facet/packages/render-dom/src/svg-painter.ts
+  // engine/render-dom/src/svg-painter.ts
   var esc2 = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
   var SvgPainter = class {
     constructor(w, h2) {
