@@ -18,7 +18,9 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
+    "smoke": "node scripts/smoke-dist.mjs",
     "prepublishOnly": "node scripts/build.mjs",
+    "hooks:install": "git config core.hooksPath .githooks",
     "typecheck": "tsc --noEmit && tsc -p src/ui",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
