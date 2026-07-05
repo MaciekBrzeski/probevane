@@ -3,7 +3,7 @@ import { astExtract } from '../src/adapters/ast-probe.js';
 import { sampleSchema } from '../src/mock/synth.js';
 import { auditSource } from '../src/audit/core.js';
 import { jsAuditRules } from '../src/audit/rules-js.js';
-import { isSourceFile, specCandidatesFor } from '../src/git.js';
+import { isSourceFile, specCandidatesFor } from '../src/util/git.js';
 import { pick } from '../src/util/config.js';
 import { routeModels } from '../src/loop/complexity.js';
 import { gapsDigest } from '../src/coverage/gaps.js';

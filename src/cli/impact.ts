@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { changedFiles, isSourceFile } from '../git.js';
+import { changedFiles, isSourceFile } from '../util/git.js';
 import { buildGraph, resolveLocalImports } from '../mock/graph.js';
 import { impactedSpecs } from '../loop/impact.js';
 import { flag, dirArg } from './args.js';

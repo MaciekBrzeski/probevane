@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { changedFiles, isSourceFile, specCandidatesFor } from '../src/git.js';
+import { changedFiles, isSourceFile, specCandidatesFor } from '../src/util/git.js';
 
 // ===========================================================================
 // isSourceFile — pure classifier, table-tested

@@ -1,7 +1,7 @@
 import { loadConfig } from '../util/config.js';
 import { formatQuality, DEFAULT_QUALITY, type QualityConfig, type QualityReport } from '../quality/analyze.js';
 import { scanProject } from '../quality/scan.js';
-import { changedFiles, isSourceFile } from '../git.js';
+import { changedFiles, isSourceFile } from '../util/git.js';
 import { writeBaseline, applyBaseline } from '../quality/baseline.js';
 import { toSarif } from '../quality/sarif.js';
 import { flag, dirArg } from './args.js';

@@ -4,7 +4,7 @@
       {
         "dir": "cli",
         "files": 57,
-        "fanOut": 26,
+        "fanOut": 25,
         "fanIn": 0,
         "inbound": 0,
         "imports": [
@@ -17,7 +17,6 @@
           "distill",
           "doctor",
           "factory",
-          "git.ts",
           "integrations",
           "library",
           "loop",
@@ -116,8 +115,8 @@
         "dir": "util",
         "files": 8,
         "fanOut": 0,
-        "fanIn": 17,
-        "inbound": 64,
+        "fanIn": 16,
+        "inbound": 69,
         "imports": []
       },
       {
@@ -310,16 +309,6 @@
         "imports": []
       },
       {
-        "dir": "git.ts",
-        "files": 1,
-        "fanOut": 1,
-        "fanIn": 1,
-        "inbound": 6,
-        "imports": [
-          "util"
-        ]
-      },
-      {
         "dir": "integrations",
         "files": 1,
         "fanOut": 0,
@@ -349,13 +338,13 @@
     "edges": [
       {
         "from": "cli",
-        "to": "adapters",
-        "count": 23
+        "to": "util",
+        "count": 25
       },
       {
         "from": "cli",
-        "to": "util",
-        "count": 19
+        "to": "adapters",
+        "count": 23
       },
       {
         "from": "cli",
@@ -401,11 +390,6 @@
         "from": "loop",
         "to": "library",
         "count": 7
-      },
-      {
-        "from": "cli",
-        "to": "git.ts",
-        "count": 6
       },
       {
         "from": "cli",
@@ -650,11 +634,6 @@
       {
         "from": "factory",
         "to": "ship",
-        "count": 1
-      },
-      {
-        "from": "git.ts",
-        "to": "util",
         "count": 1
       },
       {

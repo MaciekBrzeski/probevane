@@ -7,7 +7,7 @@ import { readTraces } from '../distill/collect.js';
 import { buildExamples, splitExamples, statsByStack } from '../distill/dataset.js';
 import { cpuGenerate, stripFences, baseValue, type BaseResult } from '../distill/bases.js';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { specCandidatesFor } from '../git.js';
+import { specCandidatesFor } from '../util/git.js';
 import { scoreSuite } from '../loop/passk.js';
 
 // probevane distill <build|stats|train>
