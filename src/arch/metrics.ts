@@ -17,6 +17,7 @@ export interface DirCoupling {
   files: number;
   fanOut: number; // distinct other dirs this dir imports FROM
   fanIn: number; // distinct other dirs that import this dir
+  inbound: number; // weighted count of import STATEMENTS from other dirs — ≈ the churn to relocate this dir (every one is a `../dir/x.js` that rewrites)
   imports: string[]; // dirs it depends on
 }
 
@@ -49,12 +50,14 @@ export function archMetrics(graph: ModuleGraph): ArchMetrics {
   const { files, edgeCount } = tallyDirs(graph);
   const efferent = new Map<string, Set<string>>();
   const afferent = new Map<string, Set<string>>();
+  const inbound = new Map<string, number>(); // weighted incoming import statements per dir
   const edges: { from: string; to: string; count: number }[] = [];
   for (const [key, count] of edgeCount) {
     const [from, to] = key.split('|');
     edges.push({ from, to, count });
     (efferent.get(from) ?? efferent.set(from, new Set()).get(from)!).add(to);
     (afferent.get(to) ?? afferent.set(to, new Set()).get(to)!).add(from);
+    inbound.set(to, (inbound.get(to) ?? 0) + count);
   }
   const dirs: DirCoupling[] = [...files.entries()]
     .map(([dir, f]) => ({
@@ -62,6 +65,7 @@ export function archMetrics(graph: ModuleGraph): ArchMetrics {
       files: f,
       fanOut: efferent.get(dir)?.size ?? 0,
       fanIn: afferent.get(dir)?.size ?? 0,
+      inbound: inbound.get(dir) ?? 0,
       imports: [...(efferent.get(dir) ?? [])].sort(),
     }))
     .sort((a, b) => b.files - a.files || a.dir.localeCompare(b.dir));
@@ -125,8 +129,11 @@ function cycleDrift(prev: ArchMetrics, next: ArchMetrics): string[] {
 
 /** A compact text digest of the metrics for an LLM prompt. */
 export function archDigest(m: ArchMetrics): string {
-  const lines: string[] = ['## Directory coupling (files · fanOut→ · fanIn←)'];
-  for (const d of m.dirs) lines.push(`- ${d.dir}/  ${d.files} files · out ${d.fanOut} · in ${d.fanIn}${d.imports.length ? `  → ${d.imports.join(', ')}` : ''}`);
+  const lines: string[] = [
+    '## Directory coupling (files · fanOut→ · fanIn← · move-cost)',
+    '_move-cost ≈ import statements from other dirs that rewrite if this dir is relocated — weigh every suggested move against it._',
+  ];
+  for (const d of m.dirs) lines.push(`- ${d.dir}/  ${d.files} files · out ${d.fanOut} · in ${d.fanIn} · ~${d.inbound} to move${d.imports.length ? `  → ${d.imports.join(', ')}` : ''}`);
   lines.push('', '## Heaviest cross-dir edges');
   for (const e of m.edges.slice(0, 15)) lines.push(`- ${e.from} → ${e.to}  (${e.count})`);
   lines.push('', `## Directory cycles: ${m.cycles.length ? m.cycles.map(([a, b]) => `${a}↔${b}`).join(', ') : 'none'}`);

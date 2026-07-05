@@ -48,6 +48,12 @@ describe('arch.archMetrics', () => {
     expect(util.fanIn).toBe(2); // cli, loop import it
     expect(util.fanOut).toBe(0);
   });
+  it('inbound = weighted import statements to rewrite on a move (the migration cost)', () => {
+    const util = m.dirs.find((d) => d.dir === 'util')!;
+    expect(util.inbound).toBe(2); // cli/run.ts + loop/engine.ts each import util/exec.ts
+    const cli = m.dirs.find((d) => d.dir === 'cli')!;
+    expect(cli.inbound).toBe(0); // nothing imports cli → cheap by this metric alone
+  });
   it('weights cross-dir edges + ignores intra-dir', () => {
     expect(m.edges.find((e) => e.from === 'cli' && e.to === 'util')!.count).toBe(1);
     expect(m.edges.some((e) => e.from === e.to)).toBe(false);
@@ -59,9 +65,11 @@ describe('arch.archMetrics', () => {
     ]);
     expect(archMetrics(cyc).cycles).toEqual([['a', 'b']]);
   });
-  it('digest lists coupling, edges, and cycles', () => {
+  it('digest lists coupling, edges, cycles, and per-dir move-cost', () => {
     const d = archDigest(m);
     expect(d).toContain('Directory coupling');
+    expect(d).toContain('to move'); // migration-cost legend + per-dir figure
+    expect(d).toContain('util/  1 files · out 0 · in 2 · ~2 to move');
     expect(d).toContain('Directory cycles: none');
   });
 });
@@ -83,7 +91,7 @@ describe('arch.archPrompt', () => {
 import { archDrift, type ArchMetrics } from '../src/arch/metrics.js';
 
 const M = (over: Partial<ArchMetrics> = {}): ArchMetrics => ({
-  dirs: [{ dir: 'loop', files: 10, fanOut: 2, fanIn: 3, imports: ['brain', 'util'] }],
+  dirs: [{ dir: 'loop', files: 10, fanOut: 2, fanIn: 3, inbound: 4, imports: ['brain', 'util'] }],
   edges: [{ from: 'loop', to: 'brain', count: 5 }],
   cycles: [],
   ...over,
@@ -96,8 +104,8 @@ describe('archDrift', () => {
 
   it('reports added/removed dirs and file-count changes', () => {
     const next = M({ dirs: [
-      { dir: 'loop', files: 12, fanOut: 2, fanIn: 3, imports: [] },
-      { dir: 'server', files: 2, fanOut: 1, fanIn: 0, imports: [] },
+      { dir: 'loop', files: 12, fanOut: 2, fanIn: 3, inbound: 4, imports: [] },
+      { dir: 'server', files: 2, fanOut: 1, fanIn: 0, inbound: 0, imports: [] },
     ] });
     const d = archDrift(M(), next);
     expect(d).toContain('~ loop/ files 10 → 12');

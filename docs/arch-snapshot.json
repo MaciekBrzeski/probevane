@@ -6,6 +6,7 @@
         "files": 57,
         "fanOut": 27,
         "fanIn": 0,
+        "inbound": 0,
         "imports": [
           "a11y",
           "adapters",
@@ -41,6 +42,7 @@
         "files": 56,
         "fanOut": 13,
         "fanIn": 2,
+        "inbound": 21,
         "imports": [
           "adapters",
           "audit",
@@ -62,6 +64,7 @@
         "files": 25,
         "fanOut": 3,
         "fanIn": 3,
+        "inbound": 26,
         "imports": [
           "audit",
           "library",
@@ -73,6 +76,7 @@
         "files": 23,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 5,
         "imports": [
           "observe"
         ]
@@ -82,6 +86,7 @@
         "files": 14,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 5,
         "imports": [
           "ui"
         ]
@@ -91,6 +96,7 @@
         "files": 13,
         "fanOut": 2,
         "fanIn": 4,
+        "inbound": 27,
         "imports": [
           "cost",
           "util"
@@ -101,6 +107,7 @@
         "files": 8,
         "fanOut": 2,
         "fanIn": 2,
+        "inbound": 9,
         "imports": [
           "cost",
           "util"
@@ -111,6 +118,7 @@
         "files": 7,
         "fanOut": 1,
         "fanIn": 3,
+        "inbound": 18,
         "imports": [
           "quality"
         ]
@@ -120,6 +128,7 @@
         "files": 7,
         "fanOut": 1,
         "fanIn": 3,
+        "inbound": 10,
         "imports": [
           "util"
         ]
@@ -129,6 +138,7 @@
         "files": 7,
         "fanOut": 0,
         "fanIn": 17,
+        "inbound": 56,
         "imports": []
       },
       {
@@ -136,6 +146,7 @@
         "files": 6,
         "fanOut": 1,
         "fanIn": 6,
+        "inbound": 14,
         "imports": [
           "util"
         ]
@@ -145,6 +156,7 @@
         "files": 6,
         "fanOut": 1,
         "fanIn": 3,
+        "inbound": 17,
         "imports": [
           "util"
         ]
@@ -154,6 +166,7 @@
         "files": 6,
         "fanOut": 1,
         "fanIn": 5,
+        "inbound": 14,
         "imports": [
           "util"
         ]
@@ -163,6 +176,7 @@
         "files": 6,
         "fanOut": 0,
         "fanIn": 4,
+        "inbound": 9,
         "imports": []
       },
       {
@@ -170,6 +184,7 @@
         "files": 4,
         "fanOut": 1,
         "fanIn": 2,
+        "inbound": 6,
         "imports": [
           "util"
         ]
@@ -179,6 +194,7 @@
         "files": 4,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 1,
         "imports": [
           "util"
         ]
@@ -188,6 +204,7 @@
         "files": 4,
         "fanOut": 6,
         "fanIn": 1,
+        "inbound": 4,
         "imports": [
           "cost",
           "loop",
@@ -202,6 +219,7 @@
         "files": 4,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 2,
         "imports": [
           "util"
         ]
@@ -211,6 +229,7 @@
         "files": 3,
         "fanOut": 5,
         "fanIn": 1,
+        "inbound": 6,
         "imports": [
           "adapters",
           "cost",
@@ -224,6 +243,7 @@
         "files": 2,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 1,
         "imports": [
           "mock"
         ]
@@ -233,6 +253,7 @@
         "files": 2,
         "fanOut": 1,
         "fanIn": 2,
+        "inbound": 4,
         "imports": [
           "util"
         ]
@@ -242,6 +263,7 @@
         "files": 2,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 2,
         "imports": [
           "mock"
         ]
@@ -251,6 +273,7 @@
         "files": 2,
         "fanOut": 1,
         "fanIn": 2,
+        "inbound": 2,
         "imports": [
           "util"
         ]
@@ -260,6 +283,7 @@
         "files": 2,
         "fanOut": 0,
         "fanIn": 1,
+        "inbound": 3,
         "imports": []
       },
       {
@@ -267,6 +291,7 @@
         "files": 1,
         "fanOut": 0,
         "fanIn": 1,
+        "inbound": 1,
         "imports": []
       },
       {
@@ -274,6 +299,7 @@
         "files": 1,
         "fanOut": 0,
         "fanIn": 1,
+        "inbound": 8,
         "imports": []
       },
       {
@@ -281,6 +307,7 @@
         "files": 1,
         "fanOut": 0,
         "fanIn": 1,
+        "inbound": 1,
         "imports": []
       },
       {
@@ -288,6 +315,7 @@
         "files": 1,
         "fanOut": 0,
         "fanIn": 0,
+        "inbound": 0,
         "imports": []
       },
       {
@@ -295,6 +323,7 @@
         "files": 1,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 6,
         "imports": [
           "util"
         ]
@@ -304,6 +333,7 @@
         "files": 1,
         "fanOut": 0,
         "fanIn": 1,
+        "inbound": 1,
         "imports": []
       },
       {
@@ -311,6 +341,7 @@
         "files": 1,
         "fanOut": 0,
         "fanIn": 1,
+        "inbound": 1,
         "imports": []
       },
       {
@@ -318,6 +349,7 @@
         "files": 1,
         "fanOut": 1,
         "fanIn": 1,
+        "inbound": 1,
         "imports": [
           "mock"
         ]

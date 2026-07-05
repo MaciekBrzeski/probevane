@@ -34,6 +34,10 @@ const SYSTEM =
   'Identify the 5-8 most impactful, CONCRETE structural improvements: modules that live in the ' +
   'wrong directory (coupled elsewhere), directories that should be split or merged, over-coupled ' +
   'dir pairs, layering violations, and cycles. For each: what + why + a specific suggested move. ' +
+  'Each dir carries a "~N to move" figure = the number of import statements from other dirs that ' +
+  'would have to be rewritten to relocate it (its migration cost). WEIGH impact against this cost: ' +
+  'state the rough cost of each suggested move, and rank high-impact / low-cost moves first. A move ' +
+  'with cost 0-5 is cheap; a shared hub with a large ~N is expensive and needs a strong reason. ' +
   'Be terse and specific. Do NOT praise; only surface what to improve. If the structure is sound, say so.';
 
 async function llmCritique(prompt: string): Promise<string> {
