@@ -51,6 +51,22 @@ Everything language-specific hides behind one interface (`StackAdapter`); everyt
 
 The control center is rendered twice — the browser dashboard and `probevane tui` — from **one** authoring surface. The [Drawing Engine (facet)](Drawing-Engine.md) is a dual-target `Painter`: a widget is drawn once and rasterized to crisp SVG in the browser and braille/box cells in the terminal. It's vendored in-repo (`engine/*` workspace packages, bundled into `dist/`) so probevane ships as one self-contained package.
 
+## Domain map
+
+`src/` is deliberately **flat** — 33 top-level entries (31 dirs + `config.ts`, `git.ts`). This is a *logical* map over that tree, not a folder layout; the groups are the import-edge clusters the [`arch`](Commands.md) report computes (fan-in/out in `src/arch/metrics.ts`), written down where a reader looks first.
+
+| Domain | Dirs | What it does |
+|---|---|---|
+| **The loop** | `loop` · `brain` · `adapters` · `mock` · `plan` | The gated agentic engine: drive the model, gate each turn, synthesize the mock boundary, build the deterministic action plan. |
+| **Gates & analysis** | `audit` · `quality` · `arch` · `review` · `a11y` · `mfe` · `visual` · `coverage` · `e2e` | Grade and critique code + artifacts — test-quality audit, source-quality analyzer, structural critique, diff review, a11y rules, MFE contracts, visual checkpoint, coverage gaps. |
+| **Presentation** | `ui` (browser) · `tui` (terminal) | The control center in two media over one shared theme SSOT — both draw through the [Drawing Engine](Drawing-Engine.md). |
+| **Ops & fleet** | `server` · `observe` · `factory` · `doctor` · `ship` · `integrations` | The daemon + HTTP surface, cross-repo observe/aggregate, fleet matrix, health checks, PR construction, ADO. |
+| **Knowledge & docs** | `library` · `distill` · `spec` · `docs` · `skill` · `search` | Learn and describe — the caveat/example library, trace→dataset distillation, SPEC generation, the docs digest, the command catalog → SKILL.md, the search index. |
+| **Composition root** | `cli` | The command entrypoints; imports ~every domain. Stays at `src/` root — `bin/probevane` dispatches to `dist/cli/$name.js` (dist mirrors `src`). |
+| **Shared leaves** | `util` · `cost` · `config.ts` · `git.ts` | Cross every domain — exec/pool primitives, the cost ledger/budget, config loader, git helpers. |
+
+**Why a map, not folders.** Physical regrouping was weighed and declined: imports are 735 hand-written relative `.js` paths with no alias layer (`moduleResolution: Bundler`, no tsconfig `paths`), so a move rewrites every `../dir/` prefix + every importer and ~40 hardcoded `src/<dir>` refs (vitest excludes, build/smoke/bench scripts, tsconfigs, the `dist`-mirror `bin` dispatch). And `util`/`cost`/`adapters` are shared leaves that straddle any boundary. The tree is already gated + cycle-free, so the churn/risk buys only tidiness — this map captures the navigability without it.
+
 ## Design invariants
 
 1. **The loop never imports a vendor SDK.** It talks to `Brain` and `StackAdapter` only. Swapping the model or the stack touches one file/folder.
