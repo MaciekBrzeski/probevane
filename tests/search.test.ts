@@ -2,8 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cosine, embedText } from '../src/search/embed.js';
-import { buildSearchIndex, rankBySimilarity, similarPairs, type Indexed } from '../src/search/index.js';
+import { cosine, embedText } from '../src/commands/search/embed.js';
+import { buildSearchIndex, rankBySimilarity, similarPairs, type Indexed } from '../src/commands/search/index.js';
 import type { StackAdapter } from '../src/adapters/adapter.js';
 
 describe('search/embed cosine', () => {

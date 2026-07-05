@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { openPr } from '../src/ship/pr.js';
+import { openPr } from '../src/commands/ship/pr.js';
 
 // openPr shells out to `gh` via node:child_process directly (not util/exec.js),
 // so this lives in its own file where mocking child_process cannot collide with

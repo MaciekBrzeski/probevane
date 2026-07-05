@@ -1,9 +1,9 @@
 import { basename } from 'node:path';
-import type { StackAdapter } from '../adapters/adapter.js';
-import type { Brain } from '../brain/brain.js';
-import { buildGraph } from '../mock/graph.js';
-import { buildMockPlan } from '../mock/index.js';
-import { toMermaid, toAscii, graphSummary } from '../mock/render.js';
+import type { StackAdapter } from '../../adapters/adapter.js';
+import type { Brain } from '../../brain/brain.js';
+import { buildGraph } from '../../mock/graph.js';
+import { buildMockPlan } from '../../mock/index.js';
+import { toMermaid, toAscii, graphSummary } from '../../mock/render.js';
 
 // Project specification generator. Distils the structure probevane already
 // discovers — the module graph, each module's exports/probe facts, the network

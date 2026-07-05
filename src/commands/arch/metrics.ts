@@ -1,4 +1,4 @@
-import type { ModuleGraph } from '../mock/graph.js';
+import type { ModuleGraph } from '../../mock/graph.js';
 
 // Architecture signals derived from the module dependency graph — the raw
 // material the `arch` critique feeds an LLM (plus the two rendered trees). All

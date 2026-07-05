@@ -2,7 +2,7 @@ import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { parseGaps } from '../coverage/gaps.js';
 import { scanProject } from '../quality/scan.js';
 import { scanMfe } from '../mfe/scan.js';
-import { buildPlan, untestedTargets, formatPlan } from '../plan/build.js';
+import { buildPlan, untestedTargets, formatPlan } from '../commands/plan/build.js';
 import type { TestKind } from '../adapters/adapter.js';
 import { flag, dirArg } from './args.js';
 

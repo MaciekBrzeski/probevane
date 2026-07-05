@@ -15,7 +15,7 @@ vi.mock('../src/util/exec.js', () => ({
 }));
 
 import { sh } from '../src/util/exec.js';
-import { buildSpec, type SpecOptions } from '../src/spec/build.js';
+import { buildSpec, type SpecOptions } from '../src/commands/spec/build.js';
 import type { StackAdapter, ProbeResult, AdapterCommands } from '../src/adapters/adapter.js';
 import { brainFor } from '../src/brain/select.js';
 import { runVitest, runPlaywright, mergeResults, coverageVitest } from '../src/adapters/vitest-runner.js';

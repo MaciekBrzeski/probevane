@@ -1,4 +1,4 @@
-import { COMMANDS } from '../skill/catalog.js';
+import { COMMANDS } from '../commands/skill/catalog.js';
 
 // probevane help [<command>]  ·  probevane <command> --help
 //

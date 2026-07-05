@@ -1,6 +1,6 @@
 import { resolve, join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
-import { archCritique } from '../arch/critique.js';
+import { archCritique } from '../commands/arch/critique.js';
 import { dirArg } from './args.js';
 
 // probevane arch <dir> [--no-llm] [--folder-only] [--snapshot [--out <file>]]
@@ -36,7 +36,7 @@ async function main() {
 
 async function snapshot(dir: string, args: string[]) {
   const { buildGraph } = await import('../mock/graph.js');
-  const { archMetrics, archDrift } = await import('../arch/metrics.js');
+  const { archMetrics, archDrift } = await import('../commands/arch/metrics.js');
   const i = args.indexOf('--out');
   const out = resolve(i >= 0 && args[i + 1] ? args[i + 1] : join(dir, 'docs', 'arch-snapshot.json'));
   const metrics = archMetrics(await buildGraph(dir));

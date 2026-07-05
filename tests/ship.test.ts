@@ -3,8 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdtemp, writeFile } from 'node:fs/promises';
-import { branchName, prTitle, prBody, type ShipInfo } from '../src/ship/pr.js';
-import { shipRun } from '../src/ship/ship.js';
+import { branchName, prTitle, prBody, type ShipInfo } from '../src/commands/ship/pr.js';
+import { shipRun } from '../src/commands/ship/ship.js';
 
 const info = (over: Partial<ShipInfo> = {}): ShipInfo => ({
   op: 'generate',

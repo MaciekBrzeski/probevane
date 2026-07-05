@@ -2,7 +2,7 @@ import { resolve, join, basename } from 'node:path';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { brainFor } from '../brain/select.js';
-import { buildSpec } from '../spec/build.js';
+import { buildSpec } from '../commands/spec/build.js';
 import { flag, dirArg } from './args.js';
 
 // probevane spec <dir> [--narrate] [--model <id>] [--out <file>] [--wiki]

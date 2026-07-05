@@ -10,7 +10,7 @@ import { reduceJobs, jobsToEvict, itemFromPlan, type PersistedJob } from '../obs
 import { reduceQueue, nextReady, mark, type QueueItem } from '../observe/queue.js';
 import { validateLaunch } from '../observe/launch.js';
 import { overCap } from '../cost/budget.js';
-import { shipRun, latestDiary } from '../ship/ship.js';
+import { shipRun, latestDiary } from '../commands/ship/ship.js';
 import { tailFrom, sseFrame } from '../loop/observe.js';
 
 // Control center for the daemon (Pillar B): launch + track loop runs, plus the

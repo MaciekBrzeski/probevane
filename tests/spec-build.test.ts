@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
-import { buildSpec } from '../src/spec/build.js';
+import { buildSpec } from '../src/commands/spec/build.js';
 import type { StackAdapter, TestTarget } from '../src/adapters/adapter.js';
 import type { Brain } from '../src/brain/brain.js';
 

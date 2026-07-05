@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPlan, untestedTargets, formatPlan } from '../src/plan/build.js';
+import { buildPlan, untestedTargets, formatPlan } from '../src/commands/plan/build.js';
 
 describe('untestedTargets', () => {
   it('flags sources whose basename appears in no spec', () => {

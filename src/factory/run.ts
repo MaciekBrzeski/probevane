@@ -4,7 +4,7 @@ import { readFile, readdir, stat, mkdir } from 'node:fs/promises';
 import { readRuns, summarize, type RunRecord } from '../cost/ledger.js';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { isGitRepo, headSha, revertEdits } from '../util/git.js';
-import { shipRun } from '../ship/ship.js';
+import { shipRun } from '../commands/ship/ship.js';
 import { runPool } from '../util/concurrent.js';
 import { aggregate, slug, type FactoryReport, type FactoryRepoResult } from './report.js';
 import { collectRepoShared } from '../mfe/scan.js';

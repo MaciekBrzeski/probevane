@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toFolderTree } from '../src/mock/render.js';
-import { archMetrics, archDigest, topDir } from '../src/arch/metrics.js';
-import { archPrompt } from '../src/arch/critique.js';
+import { archMetrics, archDigest, topDir } from '../src/commands/arch/metrics.js';
+import { archPrompt } from '../src/commands/arch/critique.js';
 import type { ModuleGraph, ModuleNode } from '../src/mock/graph.js';
 
 function graph(nodes: (Pick<ModuleNode, 'path' | 'kind'> & Partial<ModuleNode>)[]): ModuleGraph {
@@ -88,7 +88,7 @@ describe('arch.archPrompt', () => {
 // ---------------------------------------------------------------------------
 // archDrift — snapshot diffing
 // ---------------------------------------------------------------------------
-import { archDrift, type ArchMetrics } from '../src/arch/metrics.js';
+import { archDrift, type ArchMetrics } from '../src/commands/arch/metrics.js';
 
 const M = (over: Partial<ArchMetrics> = {}): ArchMetrics => ({
   dirs: [{ dir: 'loop', files: 10, fanOut: 2, fanIn: 3, inbound: 4, imports: ['brain', 'util'] }],

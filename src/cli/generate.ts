@@ -179,7 +179,7 @@ async function maybeReport(
 // Autonomous delivery: on accept, branch + commit + open a PR for this run.
 async function maybeShip(args: string[], dir: string, outcome: Outcome): Promise<void> {
   if (!(args.includes('--ship') && outcome.accepted)) return;
-  const { shipRun, latestDiary } = await import('../ship/ship.js');
+  const { shipRun, latestDiary } = await import('../commands/ship/ship.js');
   const diary = await latestDiary(dir);
   if (!diary) return;
   const r = await shipRun(
@@ -194,7 +194,7 @@ async function maybeShip(args: string[], dir: string, outcome: Outcome): Promise
 // Produce/refresh the project spec as part of the run.
 async function maybeSpec(args: string[], dir: string, adapter: Adapter): Promise<void> {
   if (!args.includes('--spec')) return;
-  const { buildSpec } = await import('../spec/build.js');
+  const { buildSpec } = await import('../commands/spec/build.js');
   const { writeFile } = await import('node:fs/promises');
   const { join } = await import('node:path');
   const md = await buildSpec({

@@ -1,8 +1,8 @@
 import { resolve } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { buildSearchIndex, rankBySimilarity, similarPairs } from '../search/index.js';
-import { embedText, embedModel } from '../search/embed.js';
+import { buildSearchIndex, rankBySimilarity, similarPairs } from '../commands/search/index.js';
+import { embedText, embedModel } from '../commands/search/embed.js';
 import { flag } from './args.js';
 
 // probevane search <dir> "<concept>"     — modules most similar to a concept

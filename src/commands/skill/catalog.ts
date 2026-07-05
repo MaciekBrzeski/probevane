@@ -74,7 +74,7 @@ export const UNDOCUMENTED = new Set(['version', '-v', '--version', 'help', '-h',
 
 /** Parse the command names the bin dispatcher accepts (the `a|b|c)` case line). */
 export async function binCommands(): Promise<string[]> {
-  const bin = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'probevane');
+  const bin = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'bin', 'probevane');
   const src = await readFile(bin, 'utf8');
   const m = src.match(/^\s*(init\|[a-z0-9|-]+)\)/m);
   return m ? m[1].split('|') : [];

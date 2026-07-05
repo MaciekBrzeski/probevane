@@ -4,15 +4,15 @@
       {
         "dir": "cli",
         "files": 57,
-        "fanOut": 25,
+        "fanOut": 21,
         "fanIn": 0,
         "inbound": 0,
         "imports": [
           "a11y",
           "adapters",
-          "arch",
           "audit",
           "brain",
+          "commands",
           "cost",
           "distill",
           "doctor",
@@ -23,13 +23,9 @@
           "mfe",
           "mock",
           "observe",
-          "plan",
           "quality",
           "review",
-          "search",
           "server",
-          "skill",
-          "spec",
           "tui",
           "util",
           "visual"
@@ -101,6 +97,17 @@
         ]
       },
       {
+        "dir": "commands",
+        "files": 10,
+        "fanOut": 2,
+        "fanIn": 3,
+        "inbound": 10,
+        "imports": [
+          "mock",
+          "util"
+        ]
+      },
+      {
         "dir": "brain",
         "files": 8,
         "fanOut": 2,
@@ -163,7 +170,7 @@
         "dir": "mock",
         "files": 6,
         "fanOut": 1,
-        "fanIn": 5,
+        "fanIn": 3,
         "inbound": 14,
         "imports": [
           "util"
@@ -204,11 +211,11 @@
         "fanIn": 1,
         "inbound": 4,
         "imports": [
+          "commands",
           "cost",
           "loop",
           "observe",
           "quality",
-          "ship",
           "util"
         ]
       },
@@ -230,20 +237,10 @@
         "inbound": 6,
         "imports": [
           "adapters",
+          "commands",
           "cost",
           "mfe",
-          "ship",
           "util"
-        ]
-      },
-      {
-        "dir": "arch",
-        "files": 2,
-        "fanOut": 1,
-        "fanIn": 1,
-        "inbound": 1,
-        "imports": [
-          "mock"
         ]
       },
       {
@@ -255,34 +252,6 @@
         "imports": [
           "util"
         ]
-      },
-      {
-        "dir": "search",
-        "files": 2,
-        "fanOut": 1,
-        "fanIn": 1,
-        "inbound": 2,
-        "imports": [
-          "mock"
-        ]
-      },
-      {
-        "dir": "ship",
-        "files": 2,
-        "fanOut": 1,
-        "fanIn": 2,
-        "inbound": 2,
-        "imports": [
-          "util"
-        ]
-      },
-      {
-        "dir": "skill",
-        "files": 2,
-        "fanOut": 0,
-        "fanIn": 1,
-        "inbound": 3,
-        "imports": []
       },
       {
         "dir": "a11y",
@@ -315,24 +284,6 @@
         "fanIn": 1,
         "inbound": 1,
         "imports": []
-      },
-      {
-        "dir": "plan",
-        "files": 1,
-        "fanOut": 0,
-        "fanIn": 1,
-        "inbound": 1,
-        "imports": []
-      },
-      {
-        "dir": "spec",
-        "files": 1,
-        "fanOut": 1,
-        "fanIn": 1,
-        "inbound": 1,
-        "imports": [
-          "mock"
-        ]
       }
     ],
     "edges": [
@@ -377,6 +328,11 @@
         "count": 8
       },
       {
+        "from": "cli",
+        "to": "commands",
+        "count": 8
+      },
+      {
         "from": "loop",
         "to": "util",
         "count": 8
@@ -399,6 +355,11 @@
       {
         "from": "cli",
         "to": "mfe",
+        "count": 6
+      },
+      {
+        "from": "commands",
+        "to": "mock",
         "count": 6
       },
       {
@@ -462,11 +423,6 @@
         "count": 4
       },
       {
-        "from": "cli",
-        "to": "skill",
-        "count": 3
-      },
-      {
         "from": "distill",
         "to": "util",
         "count": 3
@@ -475,16 +431,6 @@
         "from": "review",
         "to": "util",
         "count": 3
-      },
-      {
-        "from": "spec",
-        "to": "mock",
-        "count": 3
-      },
-      {
-        "from": "arch",
-        "to": "mock",
-        "count": 2
       },
       {
         "from": "brain",
@@ -504,11 +450,6 @@
       {
         "from": "cli",
         "to": "library",
-        "count": 2
-      },
-      {
-        "from": "cli",
-        "to": "search",
         "count": 2
       },
       {
@@ -603,22 +544,12 @@
       },
       {
         "from": "cli",
-        "to": "arch",
-        "count": 1
-      },
-      {
-        "from": "cli",
         "to": "doctor",
         "count": 1
       },
       {
-        "from": "cli",
-        "to": "plan",
-        "count": 1
-      },
-      {
-        "from": "cli",
-        "to": "spec",
+        "from": "commands",
+        "to": "util",
         "count": 1
       },
       {
@@ -633,7 +564,7 @@
       },
       {
         "from": "factory",
-        "to": "ship",
+        "to": "commands",
         "count": 1
       },
       {
@@ -657,11 +588,6 @@
         "count": 1
       },
       {
-        "from": "search",
-        "to": "mock",
-        "count": 1
-      },
-      {
         "from": "server",
         "to": "util",
         "count": 1
@@ -673,17 +599,12 @@
       },
       {
         "from": "server",
-        "to": "ship",
+        "to": "commands",
         "count": 1
       },
       {
         "from": "server",
         "to": "quality",
-        "count": 1
-      },
-      {
-        "from": "ship",
-        "to": "util",
         "count": 1
       },
       {

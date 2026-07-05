@@ -41,7 +41,7 @@ export default defineConfig({
         'src/mfe/scan.ts', // fs walk/read glue; pure parser+rules in federation.ts/standards.ts are tested
         'src/mfe/contract-scan.ts', // fs glue; pure templating in contract.ts is tested
         'src/mfe/driver.ts', // process/fs orchestration; pure rollup in report.ts is tested
-        'src/ship/ship.ts', // git/fs orchestration; pure builders in pr.ts are tested
+        'src/commands/ship/ship.ts', // git/fs orchestration; pure builders in pr.ts are tested
         'src/distill/collect.ts', // trace fs read/write
       ],
       // Floors set just below current (stmts/lines ~92, branch ~91, funcs ~86) so

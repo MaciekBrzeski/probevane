@@ -1,6 +1,6 @@
 import { resolve, join } from 'node:path';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { isGitRepo, createBranch, commitFiles, push, hasRemote } from '../util/git.js';
+import { isGitRepo, createBranch, commitFiles, push, hasRemote } from '../../util/git.js';
 import { branchName, prTitle, prBody, openPr, type ShipInfo } from './pr.js';
 
 // Autonomous delivery (Pillar A): take an accepted run's diary record and ship it

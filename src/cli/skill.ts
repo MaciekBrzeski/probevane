@@ -1,8 +1,8 @@
 import { writeFile, readFile, mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSkill, buildWikiCommands, SKILL_PATH, WIKI_COMMANDS_PATH } from '../skill/build.js';
-import { COMMANDS, UNDOCUMENTED, binCommands } from '../skill/catalog.js';
+import { buildSkill, buildWikiCommands, SKILL_PATH, WIKI_COMMANDS_PATH } from '../commands/skill/build.js';
+import { COMMANDS, UNDOCUMENTED, binCommands } from '../commands/skill/catalog.js';
 
 // probevane skill [--check]
 //   (default) regenerate the control skill at .claude/skills/probevane/SKILL.md

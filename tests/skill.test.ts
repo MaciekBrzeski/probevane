@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { COMMANDS, UNDOCUMENTED, binCommands } from '../src/skill/catalog.js';
-import { buildSkill, buildWikiCommands, SKILL_PATH, WIKI_COMMANDS_PATH } from '../src/skill/build.js';
+import { COMMANDS, UNDOCUMENTED, binCommands } from '../src/commands/skill/catalog.js';
+import { buildSkill, buildWikiCommands, SKILL_PATH, WIKI_COMMANDS_PATH } from '../src/commands/skill/build.js';
 
 describe('control skill ↔ bin bijection', () => {
   it('every documented command is dispatchable by bin', async () => {
