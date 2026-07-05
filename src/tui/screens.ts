@@ -10,6 +10,7 @@ import {
   type Rect, type Snapshot,
 } from './views.js';
 import { projectsPane, listPane, menuPane, textPane } from './panes.js';
+import { consoleWidgets } from './console-widgets.js';
 import { LAYOUTS, spanToBox } from '../ui/theme.js';
 import { FG } from './draw.js';
 import type { PipelineState } from '../observe/pipeline.js';
@@ -48,6 +49,7 @@ export function layoutFor(tab: string, w: number, h: number): Record<string, Rec
 export function paintConsole(scr: Screen, w: number, h: number, s: Snapshot, pipe: PipelineState, a: Anim, focus = 0): void {
   const L = layoutFor('console', w, h);
   pipelinePane(scr, L.pipeline, s.runes, pipe, a.t);
+  consoleWidgets(scr, L.pipeline, s, pipe); // stat + stepper + timeline in the hero's lower half
   telemetryPane(scr, L.telemetry, s.totals, s.daily, a);
   constellationPane(scr, L.constellation, s.hubs, a.t, focus);
 }
