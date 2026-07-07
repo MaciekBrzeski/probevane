@@ -44,7 +44,9 @@ export function buildGenOpts(
   kind: TestKind,
   model: string,
 ): (d: string) => GenOpts {
-  const { strict, maxSteps, maxTargets, minTests, minCoverage, mutation, mock, targetGaps, flakeGuard, a11y, visual, budget } =
+  const {
+    strict, maxSteps, maxTargets, minTests, minCoverage, mutation, mock, targetGaps, flakeGuard, a11y, visual, budget,
+  } =
     resolveGenFlags(args, cfg, kind);
   const takeoverOverride = flag(args, '--takeover');
   return (d: string) => ({

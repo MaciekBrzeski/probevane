@@ -47,7 +47,8 @@ export async function checkToolchain(dir: string, adapter: StackAdapter): Promis
   // runner-level error, which install() can usually repair (venv, deps).
   const specs = await adapter.specFiles(dir).catch(() => []);
   if (!specs.length) return { findings, fixes }; // nothing to run — generate's job, not doctor's
-  const r = await adapter.run(dir, 'unit', specs.slice(0, 1)).catch((e) => ({ green: false, passed: 0, failed: 0, skipped: 0, raw: String(e) }));
+  const r = await adapter.run(dir, 'unit', specs.slice(0, 1))
+    .catch((e) => ({ green: false, passed: 0, failed: 0, skipped: 0, raw: String(e) }));
   if (!r.green && r.passed === 0) {
     const f: DoctorFinding = {
       check: 'toolchain',

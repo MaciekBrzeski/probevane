@@ -45,7 +45,9 @@ async function handleSession(
   if (url === '/term/stream') return handleStream(s, req, res);
   if (url === '/term/input' && req.method === 'POST') return handleInput(s, req, res);
   if (url === '/term/resize' && req.method === 'POST') return handleResize(s, req, res);
-  if (url === '/term/kill' && req.method === 'POST') { killSession(s); CTX.sendJson(res, 200, { id: s.id, killed: true }); return true; }
+  if (url === '/term/kill' && req.method === 'POST') {
+    killSession(s); CTX.sendJson(res, 200, { id: s.id, killed: true }); return true;
+  }
   CTX.sendJson(res, 404, { error: `no route ${url}` });
   return true;
 }

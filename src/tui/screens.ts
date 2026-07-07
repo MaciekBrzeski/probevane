@@ -47,7 +47,9 @@ export function layoutFor(tab: string, w: number, h: number): Record<string, Rec
   return out;
 }
 
-export function paintConsole(scr: Screen, w: number, h: number, s: Snapshot, pipe: PipelineState, a: Anim, focus = 0): void {
+export function paintConsole(
+  scr: Screen, w: number, h: number, s: Snapshot, pipe: PipelineState, a: Anim, focus = 0,
+): void {
   const L = layoutFor('console', w, h);
   pipelinePane(scr, L.pipeline, s.runes, pipe, a.t);
   consoleWidgets(scr, L.pipeline, s, pipe); // stat + stepper + timeline in the hero's lower half
