@@ -31,25 +31,36 @@ const pill = (n: ConstellationNode, w: number): string => `( ${trunc(n.label, w)
  * components largest-first up to `budget` — filling the pane with real clusters,
  * never a lone pill.
  */
-/** Undirected connected components of the hub graph with ≥2 nodes, largest first. */
-function components(hubs: ConstellationNode[]): string[][] {
+/** Undirected adjacency map over the hub set; deps pointing outside the set are ignored. */
+function hubAdjacency(hubs: ConstellationNode[]): Map<string, Set<string>> {
   const ids = new Set(hubs.map((h) => h.id));
   const adj = new Map<string, Set<string>>();
   const link = (a: string, b: string): void => { (adj.get(a) ?? adj.set(a, new Set()).get(a)!).add(b); };
   for (const h of hubs) for (const d of h.deps) if (ids.has(d)) { link(h.id, d); link(d, h.id); }
+  return adj;
+}
 
+/** BFS from `start` over `adj`, marking `seen`; returns the reached component (incl. start). */
+function reachFrom(start: string, adj: Map<string, Set<string>>, seen: Set<string>): string[] {
+  const comp: string[] = [];
+  const q = [start];
+  seen.add(start);
+  while (q.length) {
+    const x = q.pop()!;
+    comp.push(x);
+    for (const y of adj.get(x) ?? []) if (!seen.has(y)) { seen.add(y); q.push(y); }
+  }
+  return comp;
+}
+
+/** Undirected connected components of the hub graph with ≥2 nodes, largest first. */
+function components(hubs: ConstellationNode[]): string[][] {
+  const adj = hubAdjacency(hubs);
   const seen = new Set<string>();
   const comps: string[][] = [];
   for (const h of hubs) {
     if (seen.has(h.id)) continue;
-    const comp: string[] = [];
-    const q = [h.id];
-    seen.add(h.id);
-    while (q.length) {
-      const x = q.pop()!;
-      comp.push(x);
-      for (const y of adj.get(x) ?? []) if (!seen.has(y)) { seen.add(y); q.push(y); }
-    }
+    const comp = reachFrom(h.id, adj, seen);
     if (comp.length >= 2) comps.push(comp);
   }
   return comps.sort((a, b) => b.length - a.length);
@@ -80,7 +91,9 @@ const JUNCTION: Record<number, string> = {
  */
 function bundle(scr: Screen, f: Anchor, neighbors: Anchor[], toRight: boolean, st: Style): void {
   const spineX = toRight ? f.rx + 2 : f.lx - 2;
-  const hseg = (y: number, x0: number, x1: number): void => { for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) wire(scr, x, y, '─', st); };
+  const hseg = (y: number, x0: number, x1: number): void => {
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) wire(scr, x, y, '─', st);
+  };
   const rowsLeft = new Set<number>(), rowsRight = new Set<number>();
   (toRight ? rowsLeft : rowsRight).add(f.cy); // the branch back to the focused node
   for (const o of neighbors) (toRight ? rowsRight : rowsLeft).add(o.cy);
@@ -131,6 +144,34 @@ function pillStyle(nn: ConstellationNode, isFocus: boolean, isNbr: boolean, t: n
   return { fg: mix(accentOf(nn), FG.bg, 0.55) };
 }
 
+interface Edge { from: string; to: string; a: Anchor; b: Anchor }
+
+/** Edges with both endpoints anchored and on-screen, sorted for stable spine routing. */
+function visibleEdges(lay: Layout, anchor: Map<string, Anchor>, bottom: number): Edge[] {
+  return lay.edges
+    .map((e) => ({ from: e.from, to: e.to, a: anchor.get(e.from), b: anchor.get(e.to) }))
+    .filter((e): e is Edge => !!e.a && !!e.b && e.a.cy < bottom && e.b.cy < bottom)
+    .sort((p, q) => p.b.cy - q.b.cy || p.a.cy - q.a.cy);
+}
+
+/** Ids of nodes on an edge that touches the focused node (both endpoints highlight). */
+function neighborIds(edges: Edge[], focusId: string): Set<string> {
+  const nbr = new Set<string>();
+  for (const e of edges) if (e.from === focusId || e.to === focusId) { nbr.add(e.from); nbr.add(e.to); }
+  return nbr;
+}
+
+/** Draw every on-screen node's pill, styled by focus / neighbour / faded-back. */
+function drawPills(scr: Screen, placed: Placed, focusId: string, nbr: Set<string>, bottom: number, t: number): void {
+  const { lay, anchor, byId, nodeW } = placed;
+  for (const n of lay.nodes) {
+    const a = anchor.get(n.id)!;
+    if (a.cy >= bottom) continue;
+    const nn = byId.get(n.id)!;
+    putText(scr, a.lx, a.cy, pill(nn, nodeW - 4), pillStyle(nn, n.id === focusId, nbr.has(n.id), t));
+  }
+}
+
 /**
  * Focus-mode node graph: all nodes drawn, but only the FOCUSED node's edges light
  * up (the rest fade to a faint mesh) — the readable way to show a dense graph in
@@ -141,16 +182,13 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
   if (iw < 2 || ih < 2) return;
   const nodes = connectedCore(hubs, Math.min(24, Math.max(6, ih))); // ~2 rows/node, cap 24
   if (!nodes.length) return;
-  const { lay, anchor, byId, nodeW } = placeGraph(nodes, r, iw, ih);
+  const placed = placeGraph(nodes, r, iw, ih);
+  const { lay, anchor } = placed;
   const bottom = r.y + r.h - 1;
   const focusId = nodes[((focus % nodes.length) + nodes.length) % nodes.length]!.id;
 
-  const edges = lay.edges
-    .map((e) => ({ from: e.from, to: e.to, a: anchor.get(e.from), b: anchor.get(e.to) }))
-    .filter((e): e is { from: string; to: string; a: Anchor; b: Anchor } => !!e.a && !!e.b && e.a.cy < bottom && e.b.cy < bottom)
-    .sort((p, q) => p.b.cy - q.b.cy || p.a.cy - q.a.cy);
-  const nbr = new Set<string>();
-  for (const e of edges) if (e.from === focusId || e.to === focusId) { nbr.add(e.from); nbr.add(e.to); }
+  const edges = visibleEdges(lay, anchor, bottom);
+  const nbr = neighborIds(edges, focusId);
   const focused = (e: { from: string; to: string }): boolean => e.from === focusId || e.to === focusId;
 
   // Only the focused node's edges are drawn — as ONE clean spine tree. No mesh of
@@ -159,10 +197,5 @@ export function renderGraph(scr: Screen, r: Rect, hubs: ConstellationNode[], t =
   const f = anchor.get(focusId);
   const neighborAnchors = edges.filter(focused).map((e) => (e.from === focusId ? e.b : e.a));
   if (f && neighborAnchors.length) bundle(scr, f, neighborAnchors, f.layer === 0, brightSt);
-  for (const n of lay.nodes) {
-    const a = anchor.get(n.id)!;
-    if (a.cy >= bottom) continue;
-    const nn = byId.get(n.id)!;
-    putText(scr, a.lx, a.cy, pill(nn, nodeW - 4), pillStyle(nn, n.id === focusId, nbr.has(n.id), t));
-  }
+  drawPills(scr, placed, focusId, nbr, bottom, t);
 }
