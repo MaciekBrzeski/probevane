@@ -770,16 +770,18 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   }
 
   // src/observe/pipeline.ts
+  function promote(state, from, to) {
+    for (const k of Object.keys(state)) if (state[k] === from) state[k] = to;
+  }
+  function setAll(state, runes, value) {
+    for (const r of runes) state[r] = value;
+  }
   function pipelineReducer(state, ev, runeNames) {
     const next = { ...state };
     if (ev.gate) next[ev.gate] = "err";
-    else if (ev.tool) {
-      for (const k of Object.keys(next)) if (next[k] === "err") next[k] = "active";
-    }
-    if (ev.accepted) for (const r of runeNames) next[r] = "ok";
-    else if (ev.stopReason && ev.stopReason !== "accepted") {
-      for (const k of Object.keys(next)) if (next[k] === "active") next[k] = "err";
-    }
+    else if (ev.tool) promote(next, "err", "active");
+    if (ev.accepted) setAll(next, runeNames, "ok");
+    else if (ev.stopReason && ev.stopReason !== "accepted") promote(next, "active", "err");
     return next;
   }
   function replayDelayMs(prevTs, ts) {

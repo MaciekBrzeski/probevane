@@ -14,6 +14,16 @@ export interface PipelineEvent {
   stopReason?: string;
 }
 
+/** In place: flip every lamp currently in `from` to `to` (err→active cool, active→err demote). */
+function promote(state: PipelineState, from: LampState, to: LampState): void {
+  for (const k of Object.keys(state)) if (state[k] === from) state[k] = to;
+}
+
+/** In place: force every named rune to `value` (the accept cascade). */
+function setAll(state: PipelineState, runes: string[], value: LampState): void {
+  for (const r of runes) state[r] = value;
+}
+
 /** Fold one event into the lamp map; returns a NEW map (never mutates input). */
 export function pipelineReducer(
   state: PipelineState,
@@ -22,13 +32,9 @@ export function pipelineReducer(
 ): PipelineState {
   const next: PipelineState = { ...state };
   if (ev.gate) next[ev.gate] = 'err';
-  else if (ev.tool) {
-    for (const k of Object.keys(next)) if (next[k] === 'err') next[k] = 'active';
-  }
-  if (ev.accepted) for (const r of runeNames) next[r] = 'ok';
-  else if (ev.stopReason && ev.stopReason !== 'accepted') {
-    for (const k of Object.keys(next)) if (next[k] === 'active') next[k] = 'err';
-  }
+  else if (ev.tool) promote(next, 'err', 'active');
+  if (ev.accepted) setAll(next, runeNames, 'ok');
+  else if (ev.stopReason && ev.stopReason !== 'accepted') promote(next, 'active', 'err');
   return next;
 }
 
