@@ -23,6 +23,11 @@ import { walkFiles } from '../walk.js';
 // the framework adapters so a React/Vue/Svelte app still picks its own.
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
+/** True when a vitest config lives in `dir` — the definitive marker of a vitest
+ *  project even when the vitest dep is hoisted to a workspace root. */
+const hasVitestConfig = (dir: string) =>
+  Promise.all(['ts', 'mts', 'js', 'mjs'].map((e) => exists(join(dir, `vitest.config.${e}`)))).then((r) => r.some(Boolean));
+
 export const nodeAdapter: StackAdapter = {
   id: 'node-vitest',
 
@@ -32,13 +37,19 @@ export const nodeAdapter: StackAdapter = {
     let score = 0;
     if (deps.vitest) score += 0.4;
     if (deps.typescript) score += 0.1;
+    // A workspace sub-package hoists vitest/typescript to the root package.json, so
+    // its own deps look empty — but a vitest.config here still marks a vitest project.
+    if (score === 0 && (await hasVitestConfig(dir))) score = 0.35;
     return Math.min(score, 0.5);
   },
 
   async install(dir: string): Promise<void> {
     const pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
     const all = { ...pkg.dependencies, ...pkg.devDependencies };
-    if (!all.vitest) {
+    // A workspace sub-package resolves vitest from the hoisted root — a local
+    // vitest.config is proof it's already a configured project. Installing here
+    // would add a redundant (and possibly version-mismatched) dep, so skip it.
+    if (!all.vitest && !(await hasVitestConfig(dir))) {
       const r = await sh('npm install -D --legacy-peer-deps vitest@^2.1.0 @vitest/coverage-v8@^2.1.0', dir, 300_000);
       if (!r.ok) throw new Error(`probevane: dep install failed\n${r.stderr.slice(-1500)}`);
     }

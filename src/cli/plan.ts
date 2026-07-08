@@ -1,8 +1,5 @@
-import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { parseGaps } from '../coverage/gaps.js';
-import { scanProject } from '../quality/scan.js';
-import { scanMfe } from '../mfe/scan.js';
-import { buildPlan, untestedTargets, formatPlan } from '../commands/plan/build.js';
+import { formatPlan } from '../commands/plan/build.js';
+import { gatherPlan } from '../spec-run/gather.js';
 import type { TestKind } from '../adapters/adapter.js';
 import { flag, dirArg } from './args.js';
 
@@ -17,30 +14,13 @@ async function main() {
   const dir = dirArg(args);
   const kind = (flag(args, '--kind') ?? 'unit') as TestKind;
 
-  const adapter = await selectAdapterOrThrow(dir);
-  const targets = await adapter.discover(dir, kind).catch(() => []);
-  const specs = await adapter.specFiles(dir).catch(() => []);
-  const untested = untestedTargets(targets, specs);
-  const gaps = await parseGaps(dir).catch(() => []);
-  const quality = await scanProject(dir).catch(() => null);
-  const mfe = await scanMfe(dir).catch(() => null);
-
-  const plan = buildPlan({
-    untested,
-    coverageGaps: gaps.map((g) => g.file).filter((f) => !untested.includes(f)),
-    qualityErrors: quality
-      ? quality.violations.filter((v) => v.severity === 'error').map((v) => ({ file: v.file, message: `[${v.rule}] ${v.message}` }))
-      : [],
-    mfeErrors: mfe
-      ? mfe.audit.violations.filter((v) => v.severity === 'error').map((v) => ({ file: v.file, message: `[${v.rule}] ${v.message}` }))
-      : [],
-  });
+  const { adapterId, plan, mfe } = await gatherPlan(dir, kind);
 
   if (args.includes('--json')) {
-    console.log(JSON.stringify({ dir, adapter: adapter.id, ...plan }, null, 2));
+    console.log(JSON.stringify({ dir, adapter: adapterId, ...plan }, null, 2));
     return;
   }
-  console.log(`[probevane] plan for ${dir} (adapter ${adapter.id}${mfe ? ', Module Federation' : ''})\n`);
+  console.log(`[probevane] plan for ${dir} (adapter ${adapterId}${mfe ? ', Module Federation' : ''})\n`);
   console.log(formatPlan(plan));
   console.log(`\n[probevane] ${plan.summary}`);
 }

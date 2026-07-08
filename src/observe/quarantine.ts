@@ -27,6 +27,15 @@ export function quarantined(stats: Record<string, number>, label: string, thresh
   return (stats[label] ?? 0) >= threshold;
 }
 
+/** A non-zero exit is a TRANSIENT failure (worth a backoff-retry) only when the
+ *  run crashed/errored; a clean max_steps / difficulty / stuck / budget give-up
+ *  won't change on an identical re-run — the supervisor should park it, not spend
+ *  QUARANTINE attempts retrying. Mirrors the factory's runWithRetry policy.
+ *  Unknown/missing reason → transient (fall back to the old exit-code behavior). */
+export function isTransientStop(stopReason: string | undefined): boolean {
+  return stopReason === undefined || stopReason === 'error';
+}
+
 /** Exponential backoff (ms) for the Nth attempt: base·2^(n-1), capped. */
 export function backoffMs(attempts: number, baseMs = 60_000, capMs = 3_600_000): number {
   if (attempts <= 0) return 0;

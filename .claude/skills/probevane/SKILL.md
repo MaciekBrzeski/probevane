@@ -34,6 +34,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `fix` | Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality. |
 | `migrate` | Codemod / framework-version migration: change source to the new API/version while every existing test stays green (behavior_lock). --quality/--mfe gates optional; run repair after if expectations legitimately change. |
 | `document` | Add documentation only — JSDoc/TSDoc on exported APIs + comments on non-obvious logic; no behavior change (tests + typecheck stay green). --only focuses one area. |
+| `visual` | The VISUAL/graphics path: edit render/shader/material/geometry source to hit a visual goal. The existing test suite stays green (behavior_lock); the acceptance oracle is render_gate, NOT a test count — a running app is screenshotted and a vision model judges whether it renders cleanly AND matches the goal (+ optional perf budget), feeding its critique back into the loop until it passes. Start the dev server first and pass its URL. $0 vision via PROBEVANE_VISION_BASE (ollama) or claude with credits. |
 | `review` | Read-only quality grade (0–100) of a suite: green, coverage, audit, flake. |
 | `a11y` | Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade. |
 | `bench` | Measure a suite: coverage, audit, and mutation score (does it catch bugs?). |
@@ -77,6 +78,8 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `ado` | Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT. |
 | `docs` | Stack-agnostic narrative documentation loop — grounds a model on a language-agnostic project digest and writes a comprehensive long-form Markdown guide, gated so it cites only real paths (anti-hallucination). Unlike `document` (JSDoc on source) and `spec` (TS-import structured dump), works on any language. |
 | `pipeline` | Describe the loop pipeline a config assembles, WITHOUT running it — profile() is a pure (config) to Rune[] function, so the runes/hooks/phases are derivable. Prints a phase-grouped listing + Mermaid; powers the wiki "Loop pipeline" interactive demo. |
+| `intake` | Turn a simple NL prompt into a frozen, machine-checkable RunSpec ($0, no LLM required): classify the task path, ask the few clarifying questions (interactive TTY) or read a policy file (--answers), and persist <state>/specs/<id>.json — the specification a dark run executes. One spec object, two fill-modes. |
+| `factory-dark` | The dark factory: prompt → RunSpec (intake) → per-file decomposition (buildPlan) → enqueue each single-file unit onto the supervisor queue. A daemon with PROBEVANE_QUEUE=1 runs them unattended, ships accepted units, and PARKS deterministic give-ups (difficulty/max_steps/stuck) with the stop reason instead of blind-retrying. --dry-run previews units; --report <batchId> rolls the ledger up per unit (accepted/parked/pending). |
 
 ## Reference
 
@@ -159,6 +162,15 @@ Add documentation only — JSDoc/TSDoc on exported APIs + comments on non-obviou
 probevane document <dir> [--only <path>] [--task "<focus>"] [--model …] [--force-stop-after N] [--worktree [--worktree-merge|--worktree-review]]
 # e.g.
 probevane document ./app --only src/api.ts
+```
+
+### visual
+The VISUAL/graphics path: edit render/shader/material/geometry source to hit a visual goal. The existing test suite stays green (behavior_lock); the acceptance oracle is render_gate, NOT a test count — a running app is screenshotted and a vision model judges whether it renders cleanly AND matches the goal (+ optional perf budget), feeding its critique back into the loop until it passes. Start the dev server first and pass its URL. $0 vision via PROBEVANE_VISION_BASE (ollama) or claude with credits.
+
+```
+probevane visual <dir> --url <running-app-url> --goal "<what to achieve>" [--reload "<cmd>"] [--perf-cmd "<cmd>"] [--selector <css>] [--vision-votes N] [--task "<hint>"] [--model …] [--only <path>] [--budget N]
+# e.g.
+probevane visual packages/render --url http://localhost:5173 --goal "creatures have visibly dense fur"
 ```
 
 ### review
@@ -546,6 +558,24 @@ Describe the loop pipeline a config assembles, WITHOUT running it — profile() 
 probevane pipeline [--profile feature] [--kind unit|e2e] [--quality --mutation --flake --a11y --visual --mfe --min-tests N --min-coverage P] [--json | --mermaid <out> | --emit-model <file>]
 # e.g.
 probevane pipeline --profile feature --quality --json
+```
+
+### intake
+Turn a simple NL prompt into a frozen, machine-checkable RunSpec ($0, no LLM required): classify the task path, ask the few clarifying questions (interactive TTY) or read a policy file (--answers), and persist <state>/specs/<id>.json — the specification a dark run executes. One spec object, two fill-modes.
+
+```
+probevane intake "<prompt>" <dir> [--answers f.json | --interactive] [--model m] [--takeover t] [--strict] [--json] [--root <state>]
+# e.g.
+probevane intake "add unit tests" ./app --answers policy.json
+```
+
+### factory-dark
+The dark factory: prompt → RunSpec (intake) → per-file decomposition (buildPlan) → enqueue each single-file unit onto the supervisor queue. A daemon with PROBEVANE_QUEUE=1 runs them unattended, ships accepted units, and PARKS deterministic give-ups (difficulty/max_steps/stuck) with the stop reason instead of blind-retrying. --dry-run previews units; --report <batchId> rolls the ledger up per unit (accepted/parked/pending).
+
+```
+probevane factory-dark "<prompt>" <dir> [--answers f.json | --interactive] [--model m] [--dry-run] [--root <state>] [--json] | probevane factory-dark --report <batchId> [--root <state>]
+# e.g.
+probevane factory-dark "add tests" ./app --answers policy.json --model ollama
 ```
 
 ## Safety + cost

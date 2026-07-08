@@ -4,15 +4,16 @@ import type { AcceptanceOpts } from './runes/acceptance_gate.js';
 import {
   contextInject, pathGuard, planFirst, noRegression, validationGate, auditGate,
   acceptanceGate, hermeticGate, mutationGate, a11yGate, visualGate, flakeGate,
-  behaviorLock, redFirst, qualityGate, mfeGate, assertionGate,
+  behaviorLock, redFirst, qualityGate, mfeGate, assertionGate, renderGate,
   sessionDiary, caveatHarvest, distillTrace, libraryPromote,
 } from './runes/index.js';
+import type { RenderGateOpts } from './runes/index.js';
 import type { QualityConfig } from '../quality/analyze.js';
 
 // Profiles — ordered Rune pipelines per task type (ported from runestone
 // profiles.rs). beforeToolCall order: plan_first → no_regression. shouldStop
 // order: validation (fast fail) → audit (static) → acceptance (count/coverage).
-export type ProfileName = 'write_tests' | 'refactor' | 'feature' | 'repair' | 'fix' | 'migrate' | 'document' | 'bare';
+export type ProfileName = 'write_tests' | 'refactor' | 'feature' | 'repair' | 'fix' | 'migrate' | 'document' | 'visual' | 'bare';
 
 export interface ProfileOpts {
   kind: TestKind;
@@ -27,6 +28,7 @@ export interface ProfileOpts {
   visual?: boolean; // opt-in visual gate (e2e specs must capture a screenshot checkpoint)
   quality?: boolean | Partial<QualityConfig>; // opt-in source-quality gate (edited files mustn't regress)
   mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
+  render?: RenderGateOpts; // the visual path's render/vision acceptance oracle
 }
 
 /** Build the opt-in quality gate (or [] when off). */
@@ -149,6 +151,19 @@ function documentSegments(opts: ProfileOpts): Segment[] {
   ];
 }
 
+function visualSegments(opts: ProfileOpts): Segment[] {
+  // Visual/graphics change: edit render/shader/material source, existing suite +
+  // typecheck stay green (behavior_lock), and the acceptance oracle is NOT a test
+  // count but render_gate — the running app must screenshot cleanly + a vision
+  // reviewer must judge it matches the goal (+ optional perf budget).
+  return [
+    seg('preamble', preamble('unit')),
+    seg('safety-net', [behaviorLock()]),
+    ...(opts.render ? [seg('green-gates', [renderGate(opts.render)])] : []),
+    seg('harvest', harvest()),
+  ];
+}
+
 /**
  * The profile's pipeline as labelled subroutine segments — the single source of
  * truth. `profile()` is just this flattened; describe.ts reads each rune's
@@ -162,6 +177,7 @@ const SEGMENT_BUILDERS: Record<ProfileName, (opts: ProfileOpts, scope: RunScope)
   refactor: refactorSegments,
   migrate: refactorSegments,
   document: documentSegments,
+  visual: visualSegments,
   bare: () => [],
 };
 

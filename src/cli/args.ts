@@ -20,3 +20,18 @@ export function num(args: string[], name: string, dflt: number): number {
 export function dirArg(args: string[]): string {
   return resolve(args.find((a) => !a.startsWith('--')) ?? '.');
 }
+
+/** Non-flag positionals, skipping the value that follows each flag in `valueFlags`
+ *  (so `intake "prompt" dir --model sonnet` yields `["prompt", "dir"]`, not sonnet). */
+export function positionals(args: string[], valueFlags: string[] = []): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith('--')) {
+      if (valueFlags.includes(a)) i++; // consume its value
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}

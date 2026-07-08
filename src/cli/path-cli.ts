@@ -1,7 +1,7 @@
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { flag, dirArg } from './args.js';
 import { loadConfig, type ProbevaneConfig } from '../util/config.js';
-import { runPath } from '../loop/run-path.js';
+import { runPath, type RunPathOpts } from '../loop/run-path.js';
 import type { ProfileName } from '../loop/profiles.js';
 import type { StackAdapter } from '../adapters/adapter.js';
 import type { RunOutcome } from '../loop/engine.js';
@@ -19,6 +19,8 @@ export interface PathCliSpec {
   cacheRead?: boolean;
   /** Parse + pass --quality/--mfe (default true; document opts out entirely). */
   quality?: boolean;
+  /** Inject extra runPath options from argv/config (e.g. the visual path's render gate). */
+  extraOpts?: (args: string[], cfg: ProbevaneConfig) => Partial<RunPathOpts>;
 }
 
 /**
@@ -92,6 +94,7 @@ export async function runPathCli(
     worktree: args.includes('--worktree'),
     worktreeMerge: args.includes('--worktree-merge'),
     worktreeReview: args.includes('--worktree-review'),
+    ...(spec.extraOpts?.(args, cfg) ?? {}),
     log: (l) => console.error(l),
   });
   printOutcome(outcome, spec.cacheRead === true);

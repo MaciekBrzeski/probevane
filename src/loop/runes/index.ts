@@ -14,6 +14,7 @@ export { a11yGate } from './a11y_gate.js';
 export { visualGate } from './visual_gate.js';
 export { flakeGate } from './flake_gate.js';
 export { behaviorLock } from './behavior_lock.js';
+export { renderGate, type RenderGateOpts } from './render_gate.js';
 export { redFirst } from './red_first.js';
 export { qualityGate } from './quality_gate.js';
 export { mfeGate } from './mfe_gate.js';

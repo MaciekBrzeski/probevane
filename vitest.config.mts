@@ -38,6 +38,7 @@ export default defineConfig({
         // --- fs/process orchestration; pure cores are tested elsewhere ---
         'src/factory/run.ts', // spawn child + revert; pure core in report.ts is tested
         'src/quality/scan.ts', // fs walk/read glue; pure analyzer in analyze.ts is tested
+        'src/spec-run/gather.ts', // adapter/scan orchestration; pure cores (runspec/classify/expand/report) tested
         'src/mfe/scan.ts', // fs walk/read glue; pure parser+rules in federation.ts/standards.ts are tested
         'src/mfe/contract-scan.ts', // fs glue; pure templating in contract.ts is tested
         'src/mfe/driver.ts', // process/fs orchestration; pure rollup in report.ts is tested

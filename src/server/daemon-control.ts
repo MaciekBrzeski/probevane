@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RunRecord } from '../cost/ledger.js';
 import { appendJsonl, readJsonl } from '../util/jsonl.js';
-import { backoffMs } from '../observe/quarantine.js';
+import { backoffMs, isTransientStop } from '../observe/quarantine.js';
 import { reduceJobs, jobsToEvict, itemFromPlan, type PersistedJob } from '../observe/jobs.js';
 import { reduceQueue, nextReady, mark, type QueueItem } from '../observe/queue.js';
 import { validateLaunch } from '../observe/launch.js';
@@ -199,7 +199,18 @@ async function shipDispatched(item: QueueItem) {
   await CTX.log('info', 'queue_ship', { id: item.id, shipped: !!r?.shipped, pr: r?.prUrl });
 }
 
-/** Dispatch one queued item: spawn the op, mark it, ship on accept. */
+/** stopReason of the newest ledger record for a dir (undefined if none). */
+async function latestStop(dir: string): Promise<string | undefined> {
+  const { records } = await CTX.scanRuns();
+  const d = resolve(dir);
+  let stop: string | undefined;
+  for (const r of records) if (r.dir && resolve(r.dir) === d) stop = r.stopReason;
+  return stop;
+}
+
+/** Dispatch one queued item, triaging a non-zero exit by *why* the run stopped:
+ *  a transient crash/error backoff-retries; a deterministic give-up parks with the
+ *  reason (retrying can't change it). Mirrors factory.runWithRetry. */
 async function dispatch(item: QueueItem) {
   await persistItem(mark(item, 'running'));
   await CTX.log('info', 'queue_run', { id: item.id, op: item.op, dir: item.dir });
@@ -210,19 +221,20 @@ async function dispatch(item: QueueItem) {
   });
   const accepted = code === 0;
   const ran = queue.find((q) => q.id === item.id)!; // has the bumped attempts
+  const stop = accepted ? 'accepted' : await latestStop(item.dir);
   if (accepted) {
     await persistItem(mark(ran, 'done', { exitCode: code, endedAt: new Date().toISOString() }));
-  } else if (ran.attempts < CTX.QUARANTINE) {
-    // Re-queue with exponential backoff (cross-run recovery).
+  } else if (isTransientStop(stop) && ran.attempts < CTX.QUARANTINE) {
+    // Transient (crash/error) under the retry budget → re-queue with backoff.
     const nextAt = Date.now() + backoffMs(ran.attempts);
     await persistItem(mark(ran, 'queued', { exitCode: code, nextAt }));
     await CTX.log('info', 'queue_retry', { id: item.id, attempts: ran.attempts, backoffMs: backoffMs(ran.attempts) });
   } else {
-    // Quarantine: stop retrying a poisoned target.
+    // Park: a deterministic give-up, or the retry budget is spent.
     await persistItem(mark(ran, 'error', { exitCode: code, endedAt: new Date().toISOString() }));
-    await CTX.log('error', 'queue_quarantine', { id: item.id, attempts: ran.attempts });
+    await CTX.log('error', 'queue_park', { id: item.id, attempts: ran.attempts, stopReason: stop });
   }
-  await CTX.log(accepted ? 'info' : 'error', 'queue_done', { id: item.id, exitCode: code });
+  await CTX.log(accepted ? 'info' : 'error', 'queue_done', { id: item.id, exitCode: code, stopReason: stop });
   if (accepted) await shipDispatched(ran);
 }
 
@@ -251,10 +263,8 @@ export async function supervise() {
   }
 }
 
-// SSE tail of a launched run's event log (<dir>/.probevane/events-*.jsonl).
 // SSE-tail every file in <dir>/.probevane matching `pattern`, rebroadcasting new
-// lines as they're appended. Shared by /stream (events-*) and
-// /transcript?follow=1 (transcript-<runId>).
+// lines as appended. Shared by /stream (events-*) and /transcript (transcript-*).
 export async function streamFiles(
   dir: string,
   pattern: RegExp,
