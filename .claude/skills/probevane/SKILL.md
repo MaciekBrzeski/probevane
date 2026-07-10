@@ -27,6 +27,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 |---|---|
 | `init` | Detect the stack and install test deps + config. |
 | `plan` | Read-only action plan ($0, no LLM) — untested targets + coverage gaps + source-quality errors + MFE standards errors → a prioritized generate/refactor/fix/mfe-fix to-do list. The map before pointing the loop at a repo. |
+| `plan-feature` | Feature planner — a LOCAL model fills in the middle: give it the CURRENT state and DESIRED state and it writes the detailed, ordered steps between them. Fill-in-the-middle (prefix=current, suffix=desired) when the model supports it, chat framing otherwise. |
 | `generate` | Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited). |
 | `refactor` | Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress). |
 | `feature` | TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality. |
@@ -99,6 +100,15 @@ Read-only action plan ($0, no LLM) — untested targets + coverage gaps + source
 probevane plan <dir> [--kind unit|e2e] [--json]
 # e.g.
 probevane plan ./app
+```
+
+### plan-feature
+Feature planner — a LOCAL model fills in the middle: give it the CURRENT state and DESIRED state and it writes the detailed, ordered steps between them. Fill-in-the-middle (prefix=current, suffix=desired) when the model supports it, chat framing otherwise.
+
+```
+probevane plan-feature --from "<current>" --to "<desired>" [--from-file f] [--to-file f] [--model local:<id>|ollama:<id>] [--mode auto|fim|chat] [--steps N] [--json] [--out file]
+# e.g.
+probevane plan-feature --from "empty repo" --to "REST API with auth"
 ```
 
 ### generate

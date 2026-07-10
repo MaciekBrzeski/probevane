@@ -109,6 +109,54 @@ export function ollamaCloudBrain(model = OLLAMA_DEFAULT_MODEL): Brain {
   return openaiWith(process.env.PROBEVANE_BASE_URL ?? OLLAMA_CLOUD, ollamaKey(), model);
 }
 
+/** Resolve (baseUrl, key) for a model string the way the brains do: `ollama[:id]`
+ *  → Ollama Cloud + auto-key; anything else → the local OpenAI-compatible server. */
+export function resolveEndpoint(model: string): { baseUrl: string; key: string; model: string } {
+  if (model === 'ollama' || model.startsWith('ollama:')) {
+    const id = model === 'ollama' ? OLLAMA_DEFAULT_MODEL : model.slice('ollama:'.length);
+    return { baseUrl: process.env.PROBEVANE_BASE_URL ?? OLLAMA_CLOUD, key: ollamaKey(), model: id };
+  }
+  const id = model.startsWith('local:') ? model.slice('local:'.length) : model;
+  return {
+    baseUrl: process.env.PROBEVANE_BASE_URL ?? 'http://localhost:11434/v1',
+    key: process.env.PROBEVANE_API_KEY ?? process.env.OPENAI_API_KEY ?? 'sk-local',
+    model: id,
+  };
+}
+
+/** Fill-in-the-middle completion via the OpenAI-compatible `/completions` endpoint
+ *  (`suffix` param) — the classic FIM shape most coder models expose. Returns the
+ *  infilled MIDDLE text. Throws if the endpoint is unavailable or returns no text
+ *  (the caller can then fall back to a chat completion). */
+export async function fimComplete(
+  model: string,
+  prefix: string,
+  suffix: string,
+  opts: { maxTokens?: number } = {},
+): Promise<string> {
+  const ep = resolveEndpoint(model);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+  const res = await fetch(`${ep.baseUrl.replace(/\/$/, '')}/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${ep.key}` },
+    body: JSON.stringify({
+      model: ep.model,
+      prompt: prefix,
+      suffix,
+      max_tokens: opts.maxTokens ?? 2048,
+      temperature: 0,
+      stream: false,
+    }),
+    signal: ctl.signal,
+  }).finally(() => clearTimeout(timer));
+  if (!res.ok) throw new Error(`fim ${res.status} ${await res.text().catch(() => '')}`);
+  const json: any = await res.json();
+  const text: string = json.choices?.[0]?.text ?? '';
+  if (!text.trim()) throw new Error('fim: empty completion');
+  return text;
+}
+
 export function toApiMessages(req: BrainRequest): any[] {
   const out: any[] = [{ role: 'system', content: req.system }];
   for (const m of req.messages) {
