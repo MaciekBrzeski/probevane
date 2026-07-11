@@ -105,10 +105,18 @@ function commentText(line: string): string {
   return m ? m[1] : '';
 }
 
-export function analyzeFile(file: string, source: string, cfg: QualityConfig): FileReport {
+export function analyzeFile(
+  file: string,
+  source: string,
+  cfg: QualityConfig,
+  functions?: FnMetric[],
+): FileReport {
   const lines = source.split('\n');
   const code = stripToCode(lines);
-  const imports = code.filter((l) => /^\s*import\b/.test(l) || /\brequire\s*\(/.test(l)).length;
+  const imports = code.filter(
+    (l) =>
+      /^\s*import\b/.test(l) || /\brequire\s*\(/.test(l) || /^\s*from\s+\S+\s+import\b/.test(l),
+  ).length;
   const longLineNos: number[] = [];
   const debtLineNos: number[] = [];
   lines.forEach((l, i) => {
@@ -128,7 +136,8 @@ export function analyzeFile(file: string, source: string, cfg: QualityConfig): F
     debt: debtLineNos.length,
     longLineNos,
     debtLineNos,
-    functions: detectFunctions(source),
+    // Pre-computed metrics (e.g. Python via py-detect) override the TS/JS detector.
+    functions: functions ?? detectFunctions(source),
   };
 }
 
@@ -208,10 +217,10 @@ export function findDuplication(
 }
 
 export function analyzeProject(
-  inputs: { file: string; source: string }[],
+  inputs: { file: string; source: string; functions?: FnMetric[] }[],
   cfg: QualityConfig = DEFAULT_QUALITY,
 ): QualityReport {
-  const files = inputs.map((x) => analyzeFile(x.file, x.source, cfg));
+  const files = inputs.map((x) => analyzeFile(x.file, x.source, cfg, x.functions));
   const violations: QViolation[] = [];
 
   let fnCount = 0;
