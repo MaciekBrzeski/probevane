@@ -16,7 +16,7 @@ function makeNode(path: string, kind: ModuleNode['kind'] = 'util'): ModuleNode {
 function makeGraph(...paths: string[]): ModuleGraph {
   const nodes = new Map<string, ModuleNode>();
   for (const p of paths) nodes.set(p, makeNode(p));
-  return { nodes, order: paths };
+  return { nodes, order: paths, testFiles: [] };
 }
 
 // -------------------------------------------------------------------------

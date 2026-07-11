@@ -18,6 +18,9 @@ export interface ModuleGraph {
   nodes: Map<string, ModuleNode>;
   /** Topological order, leaves (no local deps) first. Cyclic edges are dropped. */
   order: string[];
+  /** Source-shaped test files (project-relative), excluded from coupling but kept
+   *  so the folder-structure view doesn't read a populated test dir as empty. */
+  testFiles: string[];
 }
 
 const SKIP = new Set([
@@ -34,11 +37,14 @@ export async function buildGraph(dir: string): Promise<ModuleGraph> {
   // packages (e.g. pycad/) laid out at the repo root are still graphed.
   const hasSrc = await readdir(join(dir, 'src')).then(() => true).catch(() => false);
   const root = hasSrc ? join(dir, 'src') : dir;
-  const files = (await walk(root).catch(() => [])).filter(
-    (f) =>
-      (/\.(tsx|ts|jsx|js)$/.test(f) && !/\.(test|spec|d)\.[tj]sx?$/.test(f) && !/main\.[tj]sx?$/.test(f)) ||
-      (IS_PY.test(f) && !PY_TEST.test(f)),
-  );
+  const all = await walk(root).catch(() => []);
+  const isSource = (f: string) =>
+    (/\.(tsx|ts|jsx|js)$/.test(f) && !/main\.[tj]sx?$/.test(f)) || IS_PY.test(f);
+  const isTest = (f: string) => /\.(test|spec|d)\.[tj]sx?$/.test(f) || PY_TEST.test(f);
+  const files = all.filter((f) => isSource(f) && !isTest(f));
+  // Test files are graphed for the FOLDER view only (so a populated tests/ dir
+  // isn't mis-read as empty), never for coupling — kept out of `nodes`.
+  const testFiles = all.filter((f) => isSource(f) && isTest(f)).map((f) => relative(dir, f));
 
   const nodes = new Map<string, ModuleNode>();
   for (const abs of files) {
@@ -50,7 +56,7 @@ export async function buildGraph(dir: string): Promise<ModuleGraph> {
     nodes.set(rel, { path: rel, kind: classify(rel, src), imports, callsNetwork: NET.test(src) });
   }
 
-  return { nodes, order: topoSort(nodes) };
+  return { nodes, order: topoSort(nodes), testFiles };
 }
 
 function classify(rel: string, src: string): NodeKind {

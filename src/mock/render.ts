@@ -131,25 +131,32 @@ export function toAscii(graph: ModuleGraph, opts?: { collapseHubs?: number }): s
 /** Filesystem view: the module paths as a nested folder tree with per-dir file
  *  counts. Distinct from toAscii (which is the dependency/import tree) — this is
  *  the on-disk layout, for comparing structure against coupling. */
-type FolderDir = { files: string[]; subs: Map<string, FolderDir> };
+type FolderDir = { files: string[]; tests: string[]; subs: Map<string, FolderDir> };
 
-export function toFolderTree(paths: string[]): string {
-  const root: FolderDir = { files: [], subs: new Map() };
-  for (const p of [...paths].sort()) {
+/** Render the on-disk folder tree. `testPaths` are counted separately and shown as
+ *  a `+N test` suffix so a populated test dir (excluded from coupling) doesn't read
+ *  as empty — the count that misled the critique into "populate/remove" findings. */
+export function toFolderTree(paths: string[], testPaths: string[] = []): string {
+  const root: FolderDir = { files: [], tests: [], subs: new Map() };
+  const insert = (p: string, isTest: boolean) => {
     const parts = p.replace(/^\.\//, '').split('/');
     const file = parts.pop()!;
     let cur = root;
     for (const seg of parts) {
-      if (!cur.subs.has(seg)) cur.subs.set(seg, { files: [], subs: new Map() });
+      if (!cur.subs.has(seg)) cur.subs.set(seg, { files: [], tests: [], subs: new Map() });
       cur = cur.subs.get(seg)!;
     }
-    cur.files.push(file);
-  }
+    (isTest ? cur.tests : cur.files).push(file);
+  };
+  for (const p of [...paths].sort()) insert(p, false);
+  for (const p of [...testPaths].sort()) insert(p, true);
   const out: string[] = [];
   const walk = (dir: FolderDir, name: string, prefix: string, last: boolean, root0: boolean) => {
-    const count = countFiles(dir);
+    const src = countFiles(dir, 'files');
+    const tests = countFiles(dir, 'tests');
+    const label = tests ? (src ? `${src} +${tests} test` : `${tests} test`) : `${src}`;
     const connector = root0 ? '' : last ? '└─ ' : '├─ ';
-    out.push(`${prefix}${connector}${name}/ (${count})`);
+    out.push(`${prefix}${connector}${name}/ (${label})`);
     const childPrefix = root0 ? '' : prefix + (last ? '   ' : '│  ');
     const subs = [...dir.subs.entries()].sort(([a], [b]) => a.localeCompare(b));
     subs.forEach(([n, d], i) => walk(d, n, childPrefix, i === subs.length - 1, false));
@@ -159,10 +166,10 @@ export function toFolderTree(paths: string[]): string {
   return out.join('\n');
 }
 
-/** Total files under a directory (recursive). */
-function countFiles(dir: FolderDir): number {
-  let n = dir.files.length;
-  for (const sub of dir.subs.values()) n += countFiles(sub);
+/** Files of one kind under a directory (recursive). */
+function countFiles(dir: FolderDir, kind: 'files' | 'tests'): number {
+  let n = dir[kind].length;
+  for (const sub of dir.subs.values()) n += countFiles(sub, kind);
   return n;
 }
 

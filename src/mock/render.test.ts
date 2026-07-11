@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { toAscii, sharedModules } from './render.js';
+import { toAscii, sharedModules, toFolderTree } from './render.js';
 import type { ModuleGraph, ModuleNode } from './graph.js';
 
 function graph(nodes: (Pick<ModuleNode, 'path' | 'kind'> & Partial<Pick<ModuleNode, 'imports' | 'callsNetwork'>>)[]): ModuleGraph {
   const map = new Map(nodes.map((n) => [n.path, { ...n, imports: n.imports ?? [], callsNetwork: n.callsNetwork ?? false }]));
-  return { nodes: map, order: [...map.keys()] };
+  return { nodes: map, order: [...map.keys()], testFiles: [] };
 }
 
 describe('sharedModules', () => {
@@ -124,5 +124,23 @@ describe('toAscii', () => {
       'Shared (imported by >=2):',
       'lib/hub.ts (2)',
     ].join('\n'));
+  });
+});
+
+describe('toFolderTree – test-file annotation', () => {
+  it('shows a `+N test` suffix so a populated test dir is not read as empty', () => {
+    const tree = toFolderTree(
+      ['pycad/mesh.py', 'pycad/csg.py'],
+      ['tests/test_mesh.py', 'tests/test_csg.py', 'tests/sub/__init__.py'],
+    );
+    // source-only dir: bare count; test-only dir: `N test`; nested test dir carried up
+    expect(tree).toContain('pycad/ (2)');
+    expect(tree).toContain('tests/ (3 test)');
+    expect(tree).not.toContain('tests/ (0)');
+  });
+
+  it('mixes source + test counts in one dir as `S +T test`', () => {
+    const tree = toFolderTree(['app/main.ts'], ['app/main.test.ts']);
+    expect(tree).toContain('app/ (1 +1 test)');
   });
 });

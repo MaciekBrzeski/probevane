@@ -69,7 +69,9 @@ export interface ArchReport {
 export function archPrompt(folderTree: string, depTree: string, summary: string, digest: string): string {
   return [
     `Dependency summary: ${summary}`,
-    '', '# Folder structure (on disk)', '```', folderTree, '```',
+    '', '# Folder structure (on disk)',
+    '_`(N)` = source files; `+N test` = test files (present on disk but excluded from the coupling graph — a dir showing only `N test` is a populated test dir, not empty)._',
+    '```', folderTree, '```',
     '', '# Directory metrics', digest,
     '', '# Dependency tree (imports; ⇗ shared = hub, listed in the footer)', '```', depTree, '```',
     '', 'What could be structurally better? Give concrete, actionable findings.',
@@ -79,7 +81,7 @@ export function archPrompt(folderTree: string, depTree: string, summary: string,
 export async function archCritique(dir: string, opts: { llm?: boolean } = {}): Promise<ArchReport> {
   const graph = await buildGraph(dir);
   const paths = [...graph.nodes.keys()];
-  const folderTree = toFolderTree(paths);
+  const folderTree = toFolderTree(paths, graph.testFiles);
   const depTree = toAscii(graph, graph.nodes.size > 40 ? { collapseHubs: 8 } : undefined);
   const summary = graphSummary(graph);
   const metrics = archMetrics(graph);
