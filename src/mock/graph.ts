@@ -20,20 +20,33 @@ export interface ModuleGraph {
   order: string[];
 }
 
-const SKIP = new Set(['node_modules', 'dist', 'build', 'coverage', '.git']);
-const NET = /\b(fetch|axios|XMLHttpRequest)\s*[(.]/;
+const SKIP = new Set([
+  'node_modules', 'dist', 'build', 'coverage', '.git',
+  '.venv', 'venv', 'env', '.tox', 'site-packages', '__pycache__',
+  '.pytest_cache', '.ruff_cache', '.mypy_cache',
+]);
+const NET = /\b(fetch|axios|XMLHttpRequest|requests\.(get|post|put|delete)|urllib|httpx)\s*[(.]/;
+const IS_PY = /\.py$/;
+const PY_TEST = /(^|\/)(test_[^/]+|[^/]+_test|conftest)\.py$/;
 
 export async function buildGraph(dir: string): Promise<ModuleGraph> {
-  const root = join(dir, 'src');
+  // Prefer src/ (JS/TS convention); fall back to the whole dir so Python
+  // packages (e.g. pycad/) laid out at the repo root are still graphed.
+  const hasSrc = await readdir(join(dir, 'src')).then(() => true).catch(() => false);
+  const root = hasSrc ? join(dir, 'src') : dir;
   const files = (await walk(root).catch(() => [])).filter(
-    (f) => /\.(tsx|ts|jsx|js)$/.test(f) && !/\.(test|spec|d)\.[tj]sx?$/.test(f) && !/main\.[tj]sx?$/.test(f),
+    (f) =>
+      (/\.(tsx|ts|jsx|js)$/.test(f) && !/\.(test|spec|d)\.[tj]sx?$/.test(f) && !/main\.[tj]sx?$/.test(f)) ||
+      (IS_PY.test(f) && !PY_TEST.test(f)),
   );
 
   const nodes = new Map<string, ModuleNode>();
   for (const abs of files) {
     const rel = relative(dir, abs);
     const src = await readFile(abs, 'utf8').catch(() => '');
-    const imports = resolveLocalImports(src, abs, dir, files);
+    const imports = IS_PY.test(abs)
+      ? resolvePyImports(src, abs, dir, files)
+      : resolveLocalImports(src, abs, dir, files);
     nodes.set(rel, { path: rel, kind: classify(rel, src), imports, callsNetwork: NET.test(src) });
   }
 
@@ -62,6 +75,48 @@ export function resolveLocalImports(src: string, fromAbs: string, dir: string, f
     const base = resolve(dirname(fromAbs), spec);
     const hit = files.find((f) => f === base || f.replace(/\.[tj]sx?$/, '') === base || f.replace(/\/index\.[tj]sx?$/, '') === base);
     if (hit) out.add(relative(dir, hit));
+  }
+  return [...out];
+}
+
+/** Resolve a dotted Python module (`a.b.c`) under `baseDir` to a file in `files`
+ *  — either `a/b/c.py` or the package `a/b/c/__init__.py`. Null if neither exists. */
+function pyModuleToFile(parts: string[], baseDir: string, files: Set<string>): string | null {
+  if (!parts.length) return null;
+  const p = resolve(baseDir, ...parts);
+  for (const c of [p + '.py', join(p, '__init__.py')]) if (files.has(c)) return c;
+  return null;
+}
+
+/** Local-import resolver for Python: handles `import a.b`, `from a.b import x`,
+ *  and relative `from .mod import x` / `from . import mod`. Absolute modules
+ *  resolve from the project root; leading dots walk up from the file's package.
+ *  Each imported name is also probed as a submodule (package re-export style). */
+export function resolvePyImports(src: string, fromAbs: string, dir: string, files: string[]): string[] {
+  const set = new Set(files);
+  const out = new Set<string>();
+  const add = (hit: string | null) => { if (hit) out.add(relative(dir, hit)); };
+
+  for (const line of src.split('\n')) {
+    let m = line.match(/^\s*from\s+(\.*)([\w.]*)\s+import\s+(.+)$/);
+    if (m) {
+      const level = m[1].length;
+      const modParts = m[2] ? m[2].split('.') : [];
+      // Absolute (level 0) → project root; relative → up `level-1` dirs from this file's package.
+      let base = dir;
+      if (level > 0) { base = dirname(fromAbs); for (let i = 1; i < level; i++) base = dirname(base); }
+      add(pyModuleToFile(modParts, base, set));
+      const names = m[3].replace(/[()]/g, '').split(',').map((s) => s.trim().split(/\s+as\s+/)[0].trim());
+      for (const n of names) if (n && n !== '*') add(pyModuleToFile([...modParts, n], base, set));
+      continue;
+    }
+    m = line.match(/^\s*import\s+(.+)$/);
+    if (m) {
+      for (const chunk of m[1].split(',')) {
+        const mod = chunk.trim().split(/\s+as\s+/)[0].trim();
+        if (/^[\w.]+$/.test(mod)) add(pyModuleToFile(mod.split('.'), dir, set));
+      }
+    }
   }
   return [...out];
 }

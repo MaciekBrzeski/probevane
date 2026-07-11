@@ -200,6 +200,32 @@ describe('buildGraph – import type skipped', () => {
   });
 });
 
+describe('buildGraph – Python package (no src/)', () => {
+  it('graphs .py files at the repo root and resolves absolute/relative imports', async () => {
+    const dir = mkdtempSync(join(rootDir, 'py-'));
+    mkdirSync(join(dir, 'pycad'), { recursive: true });
+    writeFileSync(join(dir, 'pycad', '__init__.py'), '');
+    writeFileSync(join(dir, 'pycad', 'mesh.py'), 'def build():\n    return 1\n');
+    // absolute package import
+    writeFileSync(join(dir, 'pycad', 'csg.py'), 'from pycad.mesh import build\n');
+    // relative import → same package
+    writeFileSync(join(dir, 'pycad', 'sdf.py'), 'from .mesh import build\n');
+    // bench outside the package, absolute import; test file must be skipped
+    writeFileSync(join(dir, 'bench.py'), 'import pycad.csg\n');
+    writeFileSync(join(dir, 'test_mesh.py'), 'from pycad.mesh import build\n');
+
+    const graph = await buildGraph(dir);
+    const paths = [...graph.nodes.keys()];
+    expect(paths).toContain('pycad/mesh.py');
+    expect(paths).not.toContain('test_mesh.py'); // test file excluded
+
+    const imp = (p: string) => graph.nodes.get(p)!.imports;
+    expect(imp('pycad/csg.py')).toContain('pycad/mesh.py'); // absolute
+    expect(imp('pycad/sdf.py')).toContain('pycad/mesh.py'); // relative
+    expect(imp('bench.py')).toContain('pycad/csg.py'); // import a.b
+  });
+});
+
 describe('buildGraph – missing src/ directory', () => {
   it('returns an empty graph when src/ does not exist', async () => {
     const dir = mkdtempSync(join(rootDir, 'nosrc-'));
