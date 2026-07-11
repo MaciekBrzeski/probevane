@@ -94,36 +94,47 @@ function pyModuleToFile(parts: string[], baseDir: string, files: Set<string>): s
   return null;
 }
 
+const nonNull = (x: string | null): x is string => x !== null;
+
+/** `from a.b import x, y` (and relative `from .mod import x`) → resolved files.
+ *  Absolute (level 0) resolves from the project root; each leading dot walks one
+ *  dir up from the file's package. Each imported name is also probed as a
+ *  submodule (package re-export style). Non-import lines → []. */
+function pyFromLine(line: string, fromAbs: string, dir: string, files: Set<string>): string[] {
+  const m = line.match(/^\s*from\s+(\.*)([\w.]*)\s+import\s+(.+)$/);
+  if (!m) return [];
+  const level = m[1].length;
+  const modParts = m[2] ? m[2].split('.') : [];
+  let base = dir;
+  if (level > 0) { base = dirname(fromAbs); for (let i = 1; i < level; i++) base = dirname(base); }
+  const names = m[3].replace(/[()]/g, '').split(',').map((s) => s.trim().split(/\s+as\s+/)[0].trim());
+  return [
+    pyModuleToFile(modParts, base, files),
+    ...names.filter((n) => n && n !== '*').map((n) => pyModuleToFile([...modParts, n], base, files)),
+  ].filter(nonNull);
+}
+
+/** `import a.b, c.d` → resolved files (absolute modules, from the project root). */
+function pyImportLine(line: string, dir: string, files: Set<string>): string[] {
+  const m = line.match(/^\s*import\s+(.+)$/);
+  if (!m) return [];
+  return m[1]
+    .split(',')
+    .map((chunk) => chunk.trim().split(/\s+as\s+/)[0].trim())
+    .filter((mod) => /^[\w.]+$/.test(mod))
+    .map((mod) => pyModuleToFile(mod.split('.'), dir, files))
+    .filter(nonNull);
+}
+
 /** Local-import resolver for Python: handles `import a.b`, `from a.b import x`,
- *  and relative `from .mod import x` / `from . import mod`. Absolute modules
- *  resolve from the project root; leading dots walk up from the file's package.
- *  Each imported name is also probed as a submodule (package re-export style). */
+ *  and relative `from .mod import x` / `from . import mod`. Delegates the two
+ *  statement shapes to helpers; this stays a flat scan over the source lines. */
 export function resolvePyImports(src: string, fromAbs: string, dir: string, files: string[]): string[] {
   const set = new Set(files);
   const out = new Set<string>();
-  const add = (hit: string | null) => { if (hit) out.add(relative(dir, hit)); };
-
-  for (const line of src.split('\n')) {
-    let m = line.match(/^\s*from\s+(\.*)([\w.]*)\s+import\s+(.+)$/);
-    if (m) {
-      const level = m[1].length;
-      const modParts = m[2] ? m[2].split('.') : [];
-      // Absolute (level 0) → project root; relative → up `level-1` dirs from this file's package.
-      let base = dir;
-      if (level > 0) { base = dirname(fromAbs); for (let i = 1; i < level; i++) base = dirname(base); }
-      add(pyModuleToFile(modParts, base, set));
-      const names = m[3].replace(/[()]/g, '').split(',').map((s) => s.trim().split(/\s+as\s+/)[0].trim());
-      for (const n of names) if (n && n !== '*') add(pyModuleToFile([...modParts, n], base, set));
-      continue;
-    }
-    m = line.match(/^\s*import\s+(.+)$/);
-    if (m) {
-      for (const chunk of m[1].split(',')) {
-        const mod = chunk.trim().split(/\s+as\s+/)[0].trim();
-        if (/^[\w.]+$/.test(mod)) add(pyModuleToFile(mod.split('.'), dir, set));
-      }
-    }
-  }
+  for (const line of src.split('\n'))
+    for (const hit of [...pyFromLine(line, fromAbs, dir, set), ...pyImportLine(line, dir, set)])
+      out.add(relative(dir, hit));
   return [...out];
 }
 
