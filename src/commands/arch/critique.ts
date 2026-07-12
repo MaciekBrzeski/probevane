@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { buildGraph } from '../../mock/graph.js';
 import { toFolderTree, toAscii, graphSummary, sharedModules } from '../../mock/render.js';
 import { archMetrics, archDigest } from './metrics.js';
+import { crowdingReport, crowdingDigest } from './crowding.js';
 
 // Experimental architecture-critique loop: build the module graph, render the
 // FOLDER tree + DEPENDENCY tree + coupling metrics, and ask an LLM what could be
@@ -85,7 +86,8 @@ export async function archCritique(dir: string, opts: { llm?: boolean } = {}): P
   const depTree = toAscii(graph, graph.nodes.size > 40 ? { collapseHubs: 8 } : undefined);
   const summary = graphSummary(graph);
   const metrics = archMetrics(graph);
-  const digest = archDigest(metrics);
+  const crowd = crowdingDigest(crowdingReport(graph));
+  const digest = crowd ? `${archDigest(metrics)}\n\n${crowd}` : archDigest(metrics);
   const hubs = sharedModules(graph, 8);
   const findings = opts.llm === false ? '' : await llmCritique(archPrompt(folderTree, depTree, summary, digest));
   return { model: ARCH_MODEL, folderTree, depSummary: summary, digest, hubs, findings };

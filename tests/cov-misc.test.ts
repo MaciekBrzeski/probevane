@@ -327,8 +327,8 @@ describe('config loadConfig / validateConfig / pick', () => {
   it('validateConfig accepts the nested arch role block, rejects malformed ones', () => {
     expect(validateConfig({ arch: { glue: ['cli'], shared: ['util', 'cost'], feature: ['ui'] } })).toEqual([]);
     expect(validateConfig({ arch: { glue: [] } })).toEqual([]);
-    expect(validateConfig({ arch: 'cli' })).toEqual(['"arch" must be an object ({ glue?, shared?, feature? })']);
-    expect(validateConfig({ arch: ['cli'] })).toEqual(['"arch" must be an object ({ glue?, shared?, feature? })']);
+    expect(validateConfig({ arch: 'cli' })).toEqual(['"arch" must be an object ({ glue?, shared?, feature?, maxFiles? })']);
+    expect(validateConfig({ arch: ['cli'] })).toEqual(['"arch" must be an object ({ glue?, shared?, feature?, maxFiles? })']);
     expect(validateConfig({ arch: { blue: ['cli'] } })).toEqual(['unknown key "arch.blue"']);
     expect(validateConfig({ arch: { glue: 'cli' } })).toEqual(['"arch.glue" must be string[]']);
     expect(validateConfig({ arch: { shared: ['util', 7] } })).toEqual(['"arch.shared" must be string[]']);

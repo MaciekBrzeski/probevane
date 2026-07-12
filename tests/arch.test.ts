@@ -225,3 +225,78 @@ describe('pyramid.pyramidReport', () => {
     expect(pyramidDigest(clean)).toContain('none — the structure already fits the model');
   });
 });
+
+// ---------------------------------------------------------------------------
+// crowding — too many files in one folder → subfolder / move suggestions
+// ---------------------------------------------------------------------------
+import { crowdingReport, crowdingDigest } from '../src/commands/arch/crowding.js';
+
+describe('crowding.crowdingReport', () => {
+  // src/big: 5 direct files — 3 share the "run" prefix (subfolder candidate),
+  // loner.ts has zero intra-dir ties and is only imported by src/other (move
+  // candidate), core.ts is used by a sibling so it stays.
+  const g = graph([
+    { path: 'src/big/run-path.ts', kind: 'util', imports: ['src/big/core.ts'] },
+    { path: 'src/big/run-docs.ts', kind: 'util', imports: [] },
+    { path: 'src/big/run-generation.ts', kind: 'util', imports: [] },
+    { path: 'src/big/core.ts', kind: 'util', imports: [] },
+    { path: 'src/big/loner.ts', kind: 'util', imports: [] },
+    { path: 'src/other/user.ts', kind: 'util', imports: ['src/big/loner.ts', 'src/big/run-docs.ts'] },
+    { path: 'src/other/user2.ts', kind: 'util', imports: ['src/big/loner.ts'] },
+  ]);
+
+  it('flags only dirs over the threshold', () => {
+    expect(crowdingReport(g, 15)).toEqual([]);
+    const crowded = crowdingReport(g, 4);
+    expect(crowded.map((c) => c.dir)).toEqual(['src/big']);
+    expect(crowded[0].files).toBe(5);
+  });
+
+  it('proposes a subfolder for a >=3-file name-prefix cluster', () => {
+    const [big] = crowdingReport(g, 4);
+    expect(big.clusters).toEqual([
+      { prefix: 'run', files: ['run-docs.ts', 'run-generation.ts', 'run-path.ts'] },
+    ]);
+  });
+
+  it('flags a zero-cohesion file pulled by exactly one other dir', () => {
+    const [big] = crowdingReport(g, 4);
+    expect(big.misplaced).toEqual([{ file: 'loner.ts', suggest: 'src/other', pulls: 2 }]);
+    // run-docs is imported from outside too, but it belongs to the run-* cluster
+    // by prefix; core.ts has a sibling importer → neither is misplaced.
+    expect(big.misplaced.some((m) => m.file === 'core.ts')).toBe(false);
+  });
+
+  it('digest renders suggestions; empty when nothing is crowded', () => {
+    const d = crowdingDigest(crowdingReport(g, 4), 4);
+    expect(d).toContain('src/big/  5 files');
+    expect(d).toContain('subfolder candidate src/big/run/ — 3 files');
+    expect(d).toContain('loner.ts has no ties here — only src/other/ imports it (2×)');
+    expect(crowdingDigest([], 15)).toBe('');
+  });
+
+  it('never flags index.* and suppresses registry-pattern mass pulls', () => {
+    // plugins/: 4 loose files all imported once by src/host (an orchestrator) +
+    // an index barrel. None should read as "misplaced" — that's the dir's design.
+    const reg = graph([
+      { path: 'src/plugins/alpha.ts', kind: 'util', imports: [] },
+      { path: 'src/plugins/beta.ts', kind: 'util', imports: [] },
+      { path: 'src/plugins/gamma.ts', kind: 'util', imports: [] },
+      { path: 'src/plugins/index.ts', kind: 'util', imports: [] },
+      { path: 'src/host/main.ts', kind: 'util', imports: ['src/plugins/alpha.ts', 'src/plugins/beta.ts', 'src/plugins/gamma.ts', 'src/plugins/index.ts'] },
+    ]);
+    const [crowded] = crowdingReport(reg, 3);
+    expect(crowded.dir).toBe('src/plugins');
+    expect(crowded.misplaced).toEqual([]);
+  });
+
+  it('says so when a crowded dir has no mechanical split', () => {
+    const flat = graph([
+      { path: 'src/f/a.ts', kind: 'util', imports: [] },
+      { path: 'src/f/b.ts', kind: 'util', imports: ['src/f/a.ts'] },
+      { path: 'src/f/c.ts', kind: 'util', imports: ['src/f/a.ts'] },
+    ]);
+    const d = crowdingDigest(crowdingReport(flat, 2), 2);
+    expect(d).toContain('no mechanical split found — needs a judgement call');
+  });
+});

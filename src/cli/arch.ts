@@ -14,7 +14,9 @@ import { dirArg } from './args.js';
 // regressions visible over time. Still report-only, never a gate.
 // --pyramid: score the tree against the pyramid model (isolated feature
 // pyramids on a glue base, shared dirs as the common floor); roles are
-// inferred from coupling, --glue/--shared override the inference.
+// inferred from coupling, --glue/--shared/--feature override the inference.
+// Appends the folder-crowding check: dirs over --max-files (config
+// arch.maxFiles, default 15) get subfolder/move suggestions.
 async function main() {
   const args = process.argv.slice(2);
   const dir = dirArg(args);
@@ -42,6 +44,7 @@ async function main() {
 async function pyramid(dir: string, args: string[]) {
   const { buildGraph } = await import('../mock/graph.js');
   const { pyramidReport, pyramidDigest } = await import('../commands/arch/pyramid.js');
+  const { crowdingReport, crowdingDigest } = await import('../commands/arch/crowding.js');
   const { loadConfig } = await import('../util/config.js');
   const list = (flag: string) => {
     const i = args.indexOf(flag);
@@ -54,7 +57,8 @@ async function pyramid(dir: string, args: string[]) {
     shared: list('--shared') ?? cfg.shared,
     feature: list('--feature') ?? cfg.feature,
   };
-  const report = pyramidReport(await buildGraph(dir), roles);
+  const graph = await buildGraph(dir);
+  const report = pyramidReport(graph, roles);
   console.log(`# Pyramid structure report — ${dir}\n`);
   if (roles.glue || roles.shared || roles.feature) {
     const source = list('--glue') || list('--shared') || list('--feature') ? 'flags' : 'probevane.config';
@@ -62,6 +66,11 @@ async function pyramid(dir: string, args: string[]) {
     console.log(`_Declared roles (${source}) — glue: ${show(roles.glue)} · shared: ${show(roles.shared)} · feature: ${show(roles.feature)}_\n`);
   }
   console.log(pyramidDigest(report));
+  const i = args.indexOf('--max-files');
+  const flagVal = i >= 0 ? Number(args[i + 1]) : NaN;
+  const maxFiles = Number.isFinite(flagVal) ? flagVal : cfg.maxFiles ?? 15;
+  const crowdedOut = crowdingDigest(crowdingReport(graph, maxFiles), maxFiles);
+  if (crowdedOut) console.log('\n' + crowdedOut);
 }
 
 async function snapshot(dir: string, args: string[]) {
