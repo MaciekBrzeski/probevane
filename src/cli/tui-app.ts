@@ -22,13 +22,17 @@ const EMPTY: Snapshot = {
 };
 const clamp01 = (k: number): number => (k < 0 ? 0 : k > 1 ? 1 : k);
 
+/** GET JSON with a short timeout; null on any failure (daemon may be mid-start). */
 async function getJson(url: string): Promise<any> {
   return fetch(url, { signal: AbortSignal.timeout(2000) }).then((r) => r.json()).catch(() => null);
 }
+/** GET text; '' on failure — callers render an empty pane instead of crashing. */
 async function getText(url: string): Promise<string> {
   return fetch(url, { signal: AbortSignal.timeout(4000) }).then((r) => (r.ok ? r.text() : '')).catch(() => '');
 }
 
+// One snapshot: fan out to every daemon endpoint in parallel, defaulting each
+// section so a partially-up daemon never breaks a paint.
 async function poll(base: string): Promise<Snapshot> {
   const [health, agg, jobs, pipe, alerts, runs, graph, projects, wiki, ops] = await Promise.all([
     getJson(`${base}/health`), getJson(`${base}/aggregate`), getJson(`${base}/jobs`),
@@ -130,12 +134,18 @@ class TuiApp {
   private t0 = Date.now();
   private tabEnter = Date.now();
   private anim: ReturnType<typeof setInterval> | null = null;
+  // base = daemon URL; quit = the caller's terminal-restore hook.
   constructor(private base: string, private quit: () => void) {}
 
+  // Live terminal size, with sane fallbacks off-tty.
   dims() { return { w: process.stdout.columns || 80, h: process.stdout.rows || 24 }; }
+  // ms since app start — the animation clock.
   private now() { return Date.now() - this.t0; }
-  private reveal() { return clamp01((Date.now() - this.tabEnter) / 400); } // gauge sweep-in on tab enter
+  // 0→1 over 400ms after a tab switch — the gauge sweep-in.
+  private reveal() { return clamp01((Date.now() - this.tabEnter) / 400); }
 
+  // Paint one full frame for the active tab, then diff-flush — only cells that
+  // actually changed emit ANSI.
   draw() {
     const { w, h } = this.dims();
     const scr = blank(w, h);
@@ -150,6 +160,7 @@ class TuiApp {
     process.stdout.write(diff(this.prev, scr));
     this.prev = scr;
   }
+  // Re-poll the daemon and repaint.
   async refresh() { this.data = await poll(this.base); this.draw(); }
 
   /** Dispatch the active tab to its composer. */
@@ -168,6 +179,7 @@ class TuiApp {
     painters[this.tab]?.();
   }
 
+  // Switch tab (index wraps), restart the reveal sweep, kick the lazy per-tab fetches.
   setTab(i: number) {
     this.tab = TABS[((i % TABS.length) + TABS.length) % TABS.length];
     this.tabEnter = Date.now();
@@ -184,6 +196,7 @@ class TuiApp {
     }
   }
 
+  // Fetch the selected wiki page body; repaint only if the user is still on Docs.
   private async loadDocsPage() {
     const file = this.data.wikiPages[this.ui.docsSel];
     if (!file) return;
@@ -191,6 +204,7 @@ class TuiApp {
     if (this.tab === 'docs') this.draw();
   }
 
+  // Replay the selected run's rune light-show on the Console tab.
   async doReplay() {
     const run = this.data.runs[this.sel];
     if (!run) return;
@@ -198,18 +212,25 @@ class TuiApp {
     await replay(this.base, run.runId, this.data.runes.map((r) => r.name), (p) => { this.pipe = p; this.draw(); });
   }
 
+  // Tear down: stop the loop + animation tick, hand the terminal back via quit().
   private stop() { this.running = false; if (this.anim) clearInterval(this.anim); this.quit(); }
 
   // Single-key actions (number keys + arrows handled separately in onKey).
   private keys: Record<string, () => void | Promise<void>> = {
     q: () => this.stop(), '\x03': () => this.stop(),
     r: () => void this.refresh(),
-    l: () => { this.input = ''; this.draw(); },
+    l:
+      // l — open the launch prompt (typed command → daemon job or shell).
+      () => { this.input = ''; this.draw(); },
     '\t': () => this.setTab(TABS.indexOf(this.tab) + 1),
-    s: async () => { await dropToShell(); this.prev = null; await this.refresh(); },
+    s:
+      // s — drop to a shell; full repaint + fresh data on return.
+      async () => { await dropToShell(); this.prev = null; await this.refresh(); },
     '\r': () => this.doReplay(), '\n': () => this.doReplay(),
   };
 
+  // Route a keypress: digits pick tabs, arrows move the selection, the rest goes
+  // through the keys table.
   onKey(k: string): void | Promise<void> {
     if (k >= '1' && k <= '8') return this.setTab(Number(k) - 1);
     if (k === '\x1b[A') return this.moveSel(-1);
@@ -228,6 +249,7 @@ class TuiApp {
     this.draw();
   }
 
+  // Launch-input editing: Esc cancels, Enter launches, backspace edits, printable appends.
   async onInputKey(k: string) {
     if (k === '\x1b') { this.input = null; return this.draw(); } // Esc cancels
     if (k === '\r' || k === '\n') {
@@ -239,6 +261,8 @@ class TuiApp {
     if (k >= ' ') { this.input = (this.input ?? '') + k; return this.draw(); }
   }
 
+  // Mouse: wheel scrolls the run selection; left-click picks tabs, selects a run,
+  // or (clicking the already-selected run) replays it — clicks act on the Runs tab only.
   onMouse(mo: { b: number; x: number; y: number; press: boolean }) {
     if (mo.b === 64) { this.sel = Math.max(0, this.sel - 1); return this.draw(); } // wheel up
     if (mo.b === 65) { this.sel = Math.min(this.data.runs.length - 1, this.sel + 1); return this.draw(); } // wheel down
@@ -252,13 +276,18 @@ class TuiApp {
     if (idx === this.sel) void this.doReplay(); else { this.sel = idx; this.draw(); } // click selected = replay
   }
 
-  onData = (buf: Buffer): void => {
+  onData =
+    // stdin dispatch: mouse frames → onMouse; keys go to the launch input when
+    // typing, else to the app key router. Arrow property so `this` stays bound.
+    (buf: Buffer): void => {
     const k = buf.toString();
     const mo = parseMouse(k);
     if (mo) return this.onMouse(mo);
     void (this.input !== null ? this.onInputKey(k) : this.onKey(k));
   };
 
+  // Main loop: wire resize/stdin, start the 80ms animation tick, then poll the
+  // daemon every 2s until stopped (paused while the launch input is open).
   async run() {
     process.stdout.on('resize', () => { this.prev = null; this.draw(); });
     process.stdin.on('data', this.onData);
@@ -272,6 +301,7 @@ class TuiApp {
   }
 }
 
+// Public entry — build the app and run it until quit; tui.ts owns terminal setup/restore.
 export function runTui(base: string, quit: () => void): Promise<void> {
   return new TuiApp(base, quit).run();
 }

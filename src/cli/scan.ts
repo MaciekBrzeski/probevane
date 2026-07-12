@@ -17,6 +17,8 @@ async function isFile(p: string): Promise<boolean> {
   return await stat(p).then((s) => s.isFile()).catch(() => false);
 }
 
+// Entry: resolve the repo list (list-file or dirs) and append one queue item per
+// repo for a PROBEVANE_QUEUE=1 daemon to drain.
 async function main() {
   const args = process.argv.slice(2);
   const op = flag(args, '--op') ?? 'generate';

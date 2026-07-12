@@ -11,6 +11,8 @@ import { flag, dirArg } from '../util/args.js';
 // (JSDoc on source) and `spec` (TS-import structured dump).
 const DEFAULT_SECTIONS = 'Overview,Architecture,Key concepts,Project layout,Getting started,Glossary';
 
+// Entry: resolve flags > config, confine --out inside <dir>, run the docs loop,
+// exit 1 when the loop does not accept.
 async function main() {
   const args = process.argv.slice(2);
   const dir = dirArg(args);

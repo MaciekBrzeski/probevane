@@ -50,6 +50,7 @@ function classifyFlag(argv: string[], i: number, own: Own, passThrough: string[]
   return 0;
 }
 
+/** Split argv into positionals, factory-own flags (OWN table), and pass-through generate flags. */
 function parseArgs(argv: string[]): ParsedArgs {
   const positionals: string[] = [];
   const own: Own = {};
@@ -92,6 +93,7 @@ async function loadResume(own: Own, reportPath: string): Promise<{ prior: Factor
   return { prior, skip };
 }
 
+/** Human rollup: per-repo row, accept rate, total cost, failure modes, MFE alignment. */
 function printRollup(report: FactoryReport, reportPath: string): void {
   console.log('');
   for (const r of report.results) console.log('  ' + rowLine(r));
@@ -121,6 +123,8 @@ interface RunConfig {
   binPath: string;
 }
 
+// Resolve the run knobs (flag > default). State root defaults to a fresh
+// timestamped dir so concurrent factory runs never share ledgers.
 function buildRunConfig(own: Own): RunConfig {
   const kind = ((own['--kind'] as string) ?? 'unit') as TestKind;
   const concurrency = parseInt((own['--concurrency'] as string) ?? '4', 10);
@@ -134,6 +138,8 @@ function buildRunConfig(own: Own): RunConfig {
   return { kind, concurrency, stateRoot, checkpoint, retry, reportPath, binPath };
 }
 
+// Entry: parse → resolve repos → (--emit-matrix short-circuits) → run the fleet,
+// write report.json, exit 1 unless every repo accepted.
 async function main() {
   const argv = process.argv.slice(2);
   const { positionals, own, passThrough } = parseArgs(argv);
@@ -180,6 +186,7 @@ async function main() {
   if (report.accepted < report.repos) process.exit(1);
 }
 
+/** One rollup line per repo: ✓ tests/coverage/cost, or ✗ with the stop reason. */
 function rowLine(r: FactoryRepoResult): string {
   const name = r.repo.replace(/\/+$/, '').split('/').pop() || r.repo;
   if (r.accepted) {

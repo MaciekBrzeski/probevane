@@ -28,6 +28,8 @@ function report(r: MutationRun): void {
   }
 }
 
+// Entry: run the budgeted/sampled mutation pass, report (or --json), exit 1 when
+// the score falls below --min-score.
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const dir = dirArg(args);

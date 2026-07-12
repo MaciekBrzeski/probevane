@@ -14,6 +14,7 @@ const ROOT = flag(args, '--root');
 const BASE = `http://127.0.0.1:${PORT}`;
 const BIN = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'bin', 'probevane');
 
+/** Is the daemon already answering /health? */
 async function up(): Promise<boolean> {
   return fetch(`${BASE}/health`, { signal: AbortSignal.timeout(800) }).then((r) => r.ok).catch(() => false);
 }
@@ -33,6 +34,7 @@ async function ensureDaemon(): Promise<boolean> {
 
 // Terminal lifecycle — alt screen + raw + hidden cursor; restore on any exit.
 let restored = false;
+// Undo the terminal takeover — idempotent, called from every exit path.
 function restore(): void {
   if (restored) return;
   restored = true;
@@ -40,6 +42,8 @@ function restore(): void {
   process.stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l'); // mouse off, cursor on, leave alt screen
 }
 
+// Entry: ensure the daemon is up, take over the terminal (alt screen/raw/mouse),
+// run the app, and always restore on the way out.
 async function main(): Promise<void> {
   if (!(await ensureDaemon())) {
     process.stderr.write(`probevane tui: daemon did not come up on :${PORT}\n`);

@@ -13,8 +13,6 @@ type Adapter = Awaited<ReturnType<typeof selectAdapterOrThrow>>;
 type GenOpts = Parameters<typeof generateTests>[0];
 
 const num = (s?: string) => (s !== undefined ? parseInt(s, 10) : undefined);
-// Build the per-dir generate options (a closure so passk can re-target a copy).
-// Explicit --takeover overrides the escalation tier.
 // Flag > config > default resolution for the generate-loop knobs.
 function resolveGenFlags(args: string[], cfg: Cfg, kind: TestKind) {
   // --strict: turn on the CORRECTNESS floor (KB: default gates measure well-formedness,
@@ -37,6 +35,9 @@ function resolveGenFlags(args: string[], cfg: Cfg, kind: TestKind) {
   };
 }
 
+// Build the per-dir generate options, returned as a closure so pass@k can
+// re-target candidate copies with identical knobs. Explicit --takeover overrides
+// the escalation tier.
 export function buildGenOpts(
   args: string[],
   cfg: Cfg,

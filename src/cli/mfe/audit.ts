@@ -18,6 +18,7 @@ async function isFile(p: string): Promise<boolean> {
   return (await stat(p).then((s) => s.isFile()).catch(() => false));
 }
 
+/** Repo set: --repos <file> or a positional list-file → parsed list; else the positional dir ('.'). */
 async function resolveRepos(args: string[]): Promise<string[]> {
   const listFlag = flag(args, '--repos');
   const positional = args.find((a) => !a.startsWith('--'));
@@ -36,6 +37,8 @@ function printHuman(rows: { repo: string; audit: MfeAudit }[], align: MfeViolati
   if (align.length) console.log(`\n# cross-repo\n${formatMfe(align)}`);
 }
 
+// Entry: scan each repo's MFE config, report per-repo audits + cross-repo shared
+// version alignment; --strict exits 1 on any error.
 async function main() {
   const args = process.argv.slice(2);
   const json = args.includes('--json');

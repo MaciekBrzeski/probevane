@@ -17,9 +17,9 @@ const DIR = dirArg(args);
 const EVENTS = join(DIR, '.probevane');
 const PORT = Number(flag(args, '--port') ?? process.env.PROBEVANE_SERVE_PORT ?? 7655);
 
+const offsets = new Map<string, number>();
 // Byte-offset tailer: new lines appended to each events-*.jsonl since last seen.
 // The decision (which lines are new) is the pure `tailFrom`; this is just the I/O.
-const offsets = new Map<string, number>();
 async function pollNew(dir: string): Promise<string[]> {
   const out: string[] = [];
   const files = (await readdir(dir).catch(() => [])).filter((f) => /^events-.*\.jsonl$/.test(f));

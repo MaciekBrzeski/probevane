@@ -60,6 +60,7 @@ async function main() {
   await emit(md);
 }
 
+/** Print the report and mirror it to $GITHUB_STEP_SUMMARY when in Actions. */
 async function emit(md: string): Promise<void> {
   console.log(md);
   const s = process.env.GITHUB_STEP_SUMMARY;

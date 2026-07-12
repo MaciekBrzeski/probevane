@@ -13,13 +13,16 @@ import { flag } from '../util/args.js';
 
 const PROFILES = ['write_tests', 'feature', 'refactor', 'repair', 'fix', 'migrate', 'document', 'bare'];
 
+/** Boolean flag presence. */
 function has(args: string[], name: string): boolean {
   return args.includes(name);
 }
+/** Numeric flag value; undefined when the flag is absent. */
 function num(v: string | undefined): number | undefined {
   return v === undefined ? undefined : Number(v);
 }
 
+/** Map the CLI flags onto ProfileOpts — the same knobs the real loop hands to profiles.ts. */
 function buildOpts(args: string[]): ProfileOpts {
   return {
     kind: flag(args, '--kind') === 'e2e' ? 'e2e' : 'unit',
@@ -48,6 +51,8 @@ function printDefault(name: ProfileName, opts: ProfileOpts, desc: ReturnType<typ
   console.log(pipelineMermaid(desc.runes));
 }
 
+// Entry: --emit-model dumps the all-profiles client model; otherwise describe one
+// profile as JSON, a Mermaid file, or the human phase listing.
 function main() {
   const args = process.argv.slice(2);
 

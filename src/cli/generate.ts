@@ -26,6 +26,7 @@ type Outcome = Awaited<ReturnType<typeof generateTests>>;
 
 const num = (s?: string) => (s !== undefined ? parseInt(s, 10) : undefined);
 
+// Test kind precedence: --kind flag > config > unit.
 function resolveKind(args: string[], cfg: Cfg): TestKind {
   return (flag(args, '--kind') ?? cfg.kind ?? 'unit') as TestKind;
 }
@@ -67,6 +68,8 @@ interface HybridOpts {
   genOpts: (d: string) => GenOpts;
 }
 
+// --hybrid: triage targets, draft the easy band with the local model concurrently
+// ($0), then let the normal bridge/paid loop cover the rest.
 async function runHybrid(o: HybridOpts): Promise<void> {
   const { args, dir, kind, adapter, model, genOpts } = o;
   const localBrain = brainFor(flag(args, '--local-model') ?? 'local:qwen2.5-coder:7b');
@@ -130,6 +133,8 @@ interface PasskOpts {
   genOpts: (d: string) => GenOpts;
 }
 
+// --passk K: sample K candidate suites, keep the best-scoring one; exit 1 when
+// no candidate accepts.
 async function runPassk(o: PasskOpts): Promise<void> {
   const { args, dir, kind, adapter, passk, genOpts } = o;
   const { passKGenerate } = await import('../loop/passk.js');
@@ -207,6 +212,8 @@ async function maybeSpec(args: string[], dir: string, adapter: Adapter): Promise
   console.error('[probevane] wrote SPEC.md');
 }
 
+// Entry: resolve kind/adapter/model, dispatch the mode flags (--triage/--hybrid/
+// --delegate/--passk), else run the plain gated loop + the post-accept extras.
 async function main() {
   const args = process.argv.slice(2);
   const dir = dirArg(args);

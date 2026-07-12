@@ -10,6 +10,7 @@ import { latestPerRun, runStatus } from '../loop/observe.js';
 const DIR = resolve(process.argv.slice(2).find((a) => !a.startsWith('--')) ?? '.');
 const EVENTS = join(DIR, '.probevane');
 
+/** Parse every events-*.jsonl under <dir>/.probevane into one event list. */
 async function readAll(): Promise<LoopEvent[]> {
   const files = (await readdir(EVENTS).catch(() => [])).filter((f) => /^events-.*\.jsonl$/.test(f));
   const all: LoopEvent[] = [];
@@ -17,6 +18,7 @@ async function readAll(): Promise<LoopEvent[]> {
   return all;
 }
 
+/** One compact status row per run (latest event wins), under a fixed header. */
 function render(runs: Map<string, LoopEvent>): string {
   const rows = [...runs.values()].sort((a, b) => a.runId.localeCompare(b.runId)).map((e) => {
     return ` ${e.runId.padEnd(16)} ${runStatus(e).padEnd(16)} tools=${e.toolCalls} blocks=${e.gateBlocks} tok=${e.tokensIn}/${e.tokensOut}${e.tool ? ' · ' + e.tool : ''}`;
@@ -24,6 +26,7 @@ function render(runs: Map<string, LoopEvent>): string {
   return `probevane peek — ${EVENTS}\n${'─'.repeat(72)}\n${rows.join('\n') || ' (no runs yet — start one with PROBEVANE_EVENTS on)'}\n`;
 }
 
+// Entry: clear + repaint the table every 500ms — watch(1) over the event log.
 async function main() {
   // eslint-disable-next-line no-constant-condition
   while (true) {

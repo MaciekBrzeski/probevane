@@ -13,6 +13,8 @@ interface DiaryRecord {
   editedFiles?: string[];
 }
 
+// Entry: load the run's diary record and restore each edited file to the checkpoint
+// sha (created files are removed). Requires git — no repo, no undo.
 async function main() {
   const [runId, dirArg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   if (!runId) {

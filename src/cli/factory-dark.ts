@@ -49,6 +49,8 @@ async function enqueueChildren(children: RunSpec[], root?: string): Promise<stri
   return queued;
 }
 
+// Run mode: prompt → parent spec → per-file children → enqueue for the supervisor
+// (--dry-run just lists the units); prints the daemon/report follow-up commands.
 async function runMode(args: string[]) {
   const root = flag(args, '--root');
   const pos = positionals(args, VALUE_FLAGS);
@@ -84,6 +86,7 @@ async function runMode(args: string[]) {
   if (args.includes('--json')) console.log(JSON.stringify({ batch, queued }, null, 2));
 }
 
+// --report <batchId>: roll the ledger up per child spec of a batch (human or --json).
 async function reportMode(args: string[]) {
   const root = flag(args, '--root');
   const id = flag(args, '--report')!;
@@ -99,6 +102,7 @@ async function reportMode(args: string[]) {
   console.log(formatDarkReport(report));
 }
 
+// Entry: --report switches to the rollup; anything else launches a batch.
 async function main() {
   const args = process.argv.slice(2);
   if (flag(args, '--report')) return reportMode(args);

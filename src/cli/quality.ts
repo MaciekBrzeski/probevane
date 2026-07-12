@@ -28,6 +28,8 @@ function parseNum(args: string[], name: string): number | undefined {
   return n;
 }
 
+// Effective thresholds: defaults < probevane.config quality < explicit flags —
+// clean() drops unset flags so they can never shadow config values.
 function buildConfig(args: string[], cfg: any): QualityConfig {
   return {
     ...DEFAULT_QUALITY,
@@ -47,6 +49,7 @@ function buildConfig(args: string[], cfg: any): QualityConfig {
   };
 }
 
+/** Human (or --json) report: violations, counts, dup blocks, and the 0-100 grade. */
 function printReport(args: string[], report: QualityReport): void {
   if (args.includes('--json')) {
     console.log(JSON.stringify(report, null, 2));
@@ -61,6 +64,8 @@ function printReport(args: string[], report: QualityReport): void {
   if (report.duplicationCapped) console.error('[probevane] quality: duplicate-block report capped — more exist.');
 }
 
+// Entry: scan (full or --since subset), apply the baseline ratchet unless
+// --no-baseline, emit report/SARIF; --strict exits 1 on error-severity violations.
 async function main() {
   const args = process.argv.slice(2);
   const dir = dirArg(args);
@@ -99,6 +104,7 @@ async function changedSince(dir: string, args: string[]): Promise<string[] | und
   return (await changedFiles(dir, ref)).filter(isSourceFile);
 }
 
+/** Drop undefined entries so unset flags never override config/default values. */
 function clean<T extends Record<string, unknown>>(o: T): Partial<T> {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
 }

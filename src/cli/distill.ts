@@ -21,6 +21,7 @@ const OUT = join(homedir(), '.local/share/probevane/distill');
 type Traces = Awaited<ReturnType<typeof readTraces>>;
 type Adapter = Awaited<ReturnType<typeof selectAdapterOrThrow>>;
 
+// `distill stats` — trace count + per-stack breakdown (is there data to build from?).
 function runStats(traces: Traces): void {
   const by = statsByStack(traces);
   console.log(`[distill] ${traces.length} trace(s) collected`);
@@ -28,6 +29,7 @@ function runStats(traces: Traces): void {
   if (!traces.length) console.log('  (none yet — run the loop with PROBEVANE_TRACES=1 to collect)');
 }
 
+// `distill build` — traces → quality-filtered, deduped train/val JSONL under OUT.
 async function runBuild(traces: Traces): Promise<void> {
   const ex = buildExamples(traces);
   const { train, val } = splitExamples(ex);
@@ -37,6 +39,8 @@ async function runBuild(traces: Traces): Promise<void> {
   console.log(`[distill] built ${ex.length} example(s) from ${traces.length} trace(s) → ${OUT}/{train,val}.jsonl (${train.length}/${val.length})`);
 }
 
+// `distill train` — print the LoRA training plan. DRY by default because training
+// grabs the GPU; --execute is the explicit opt-in.
 async function runTrain(): Promise<void> {
   const execute = process.argv.includes('--execute');
   // Default to the 3B base — the CPU bake-off winner; lighter to train + serve.
@@ -94,6 +98,7 @@ async function bakeModel(
   }
 }
 
+/** Render the bake-off ranking table + the recommended serve command. */
 function printBases(results: BaseResult[]): void {
   console.log('\n### probevane distill bases — CPU model bake-off\n');
   console.log('| rank | model | green | tests | cov% | audit err | CPU tok/s | ms | value |');
@@ -103,6 +108,8 @@ function printBases(results: BaseResult[]): void {
   console.log(best ? `\n**Best CPU base: \`${best.model}\`** (value ${best.value}, ${best.tokPerSec} tok/s). Serve: \`probevane generate --model local:${best.model}\`.` : '\n_No candidate produced a green suite._');
 }
 
+// `distill bases` — CPU bake-off: each candidate model writes a fixture suite from
+// the same prompt; the highest-value result wins the local-model slot.
 async function runBases(): Promise<void> {
   // CPU model bake-off → best base for GPU-less machines.
   const models = (arg('--models') ?? 'qwen2.5-coder:3b,qwen2.5-coder:7b')
@@ -124,6 +131,7 @@ async function runBases(): Promise<void> {
   printBases(results);
 }
 
+// Entry: subcommand dispatch — stats is the safe read-only default.
 async function main() {
   const sub = process.argv[2] ?? 'stats';
   const traces = await readTraces();
@@ -137,6 +145,7 @@ async function main() {
   process.exit(2);
 }
 
+/** Value following `name` in argv (undefined when the flag is absent). */
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : undefined;
