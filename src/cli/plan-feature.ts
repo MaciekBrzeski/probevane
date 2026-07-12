@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { planFeature, renderMarkdown, type PlanMode } from '../planner/planner.js';
-import { flag, num } from './args.js';
+import { flag, num } from '../util/args.js';
 
 // probevane plan-feature --from "<current>" --to "<desired>" [--from-file f] [--to-file f]
 //     [--model local:<id>|ollama:<id>] [--mode auto|fim|chat] [--steps N] [--json] [--out f]

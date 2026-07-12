@@ -2,7 +2,7 @@ import { createInterface } from 'node:readline';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { flag } from '../cli/args.js';
+import { flag } from '../util/args.js';
 import { classifyPrompt, resolveSpec, type Question } from './classify.js';
 import type { RunSpec } from './runspec.js';
 

@@ -13,7 +13,7 @@ import { initControl, jobs, getQueue, isPaused, setPaused, loadJobs, loadQueue, 
 import { initRoutes, handle } from '../server/daemon-routes.js';
 import { initTerminal, reapIdle, reap, sessions } from '../server/terminal.js';
 import { initTermRoutes } from '../server/terminal-routes.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane daemon [--port N] [--root <stateDir>] [--interval SEC]
 //

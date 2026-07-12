@@ -1,5 +1,5 @@
 import { runPathCliMain } from './path-cli.js';
-import { flag, num } from './args.js';
+import { flag, num } from '../util/args.js';
 
 // probevane visual <dir> --url <running-app-url> --goal "<what to achieve>"
 //   [--task "<hint>"] [--reload "<cmd>"] [--perf-cmd "<cmd>"] [--selector <css>]

@@ -10,7 +10,7 @@ import { saveSpec, loadSpec, specToLaunchPlan, specsDir, type RunSpec } from '..
 import { expandSpec, expandSummary } from '../spec-run/expand.js';
 import { buildDarkReport, formatDarkReport } from '../spec-run/report.js';
 import { gatherPlan } from '../spec-run/gather.js';
-import { flag, positionals } from './args.js';
+import { flag, positionals } from '../util/args.js';
 
 // probevane factory-dark "<prompt>" <dir> [--answers f.json | --interactive]
 //     [--model m] [--takeover t] [--strict] [--root <state>] [--dry-run] [--json]

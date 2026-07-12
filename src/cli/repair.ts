@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { access } from 'node:fs/promises';
 import { runPathCliMain } from './path-cli.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 import { changedFiles, isSourceFile, specCandidatesFor } from '../util/git.js';
 
 // probevane repair <dir> [--since <ref>] [--model …]

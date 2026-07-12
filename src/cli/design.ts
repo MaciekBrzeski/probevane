@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { designLoop, type DesignPage } from '../visual/design.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane design --url <u> --target <file> [--tabs a,b,c] [--goal "<g>"] [--rounds N] [--spec <file>] [--out <dir>]
 //

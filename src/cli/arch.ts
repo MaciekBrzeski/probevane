@@ -1,7 +1,7 @@
 import { resolve, join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { archCritique } from '../commands/arch/critique.js';
-import { dirArg } from './args.js';
+import { dirArg } from '../util/args.js';
 
 // probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d] [--feature e,f]] [--snapshot [--out <file>]]
 //

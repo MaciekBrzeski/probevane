@@ -1,6 +1,6 @@
 import { runDoctor } from '../commands/doctor/checks.js';
 import { selectAdapter } from '../adapters/registry.js';
-import { dirArg } from './args.js';
+import { dirArg } from '../util/args.js';
 
 // probevane doctor <dir> [--fix] [--full] [--json]
 //

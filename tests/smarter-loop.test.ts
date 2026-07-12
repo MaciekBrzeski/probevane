@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isCircular, proposal, CIRCULAR_THRESHOLD } from '../src/loop/difficulty.js';
+import { isCircular, proposal, CIRCULAR_THRESHOLD } from '../src/loop/engine/difficulty.js';
 import { stableCacheIndex } from '../src/loop/engine/index.js';
 import { toApiMsg, withCacheBreakpoint } from '../src/brain/anthropic-sdk.js';
 import { tokenize, similarity, pickSimilarTrace } from '../src/library/similar.js';

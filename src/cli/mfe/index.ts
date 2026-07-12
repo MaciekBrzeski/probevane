@@ -3,7 +3,7 @@ import { readFile, writeFile, stat } from 'node:fs/promises';
 import { runMfe } from '../../mfe/driver.js';
 import { parseRepoList } from '../../factory/report.js';
 import { formatMfe } from '../../mfe/standards.js';
-import { flag } from '../args.js';
+import { flag } from '../../util/args.js';
 
 // probevane mfe <repos.txt | dir...> [--contract] [--generate] [--fix]
 //               [--model …] [--concurrency N] [--report <path>]
@@ -42,8 +42,13 @@ async function main() {
     log: (l) => console.error(l),
   });
 
-  const reportPath = resolve(flag(args, '--report') ?? join(process.cwd(), 'mfe-report.json'));
-  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  // Write the report only when there's something to report (or the caller
+  // asked for a path explicitly) — a no-op scan must not litter cwd.
+  const explicitReport = flag(args, '--report');
+  const reportPath = explicitReport || report.mfeRepos > 0
+    ? resolve(explicitReport ?? join(process.cwd(), 'mfe-report.json'))
+    : null;
+  if (reportPath) await writeFile(reportPath, JSON.stringify(report, null, 2));
 
   if (args.includes('--json')) {
     console.log(JSON.stringify(report, null, 2));
@@ -62,7 +67,8 @@ async function main() {
   if (report.versionAlign.length) console.log(`\ncross-repo:\n${formatMfe(report.versionAlign)}`);
   console.log(
     `\n[mfe] ${report.mfeRepos}/${report.repos} MFE repo(s), avg grade ${report.avgGrade}/100, ` +
-      `${report.totalErrors} error(s)${report.improved ? `, ${report.improved} improved` : ''} → ${reportPath}`,
+      `${report.totalErrors} error(s)${report.improved ? `, ${report.improved} improved` : ''}` +
+      (reportPath ? ` → ${reportPath}` : ' (no MFE repos — report skipped)'),
   );
 
   if (report.totalErrors > 0 && args.includes('--strict')) process.exit(1);

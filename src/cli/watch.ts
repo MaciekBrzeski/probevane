@@ -4,7 +4,7 @@ import { access } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { loadConfig } from '../util/config.js';
 import { isSourceFile, specCandidatesFor } from '../util/git.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane watch <dir> [--run] [--debounce 800]
 //

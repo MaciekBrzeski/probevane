@@ -4,7 +4,7 @@ import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { auditFiles } from '../audit/core.js';
 import { saveExample, LIB_ROOT } from '../library/store.js';
 import { recordAudit } from '../observe/audit.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane learn <dir> --file <spec> --category <c> [--kind unit|e2e] [--bad]
 //

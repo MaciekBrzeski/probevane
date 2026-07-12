@@ -1,5 +1,5 @@
 import { runPathCliMain } from './path-cli.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane document <dir> [--only <path>] [--task "<focus>"] [--model …] [--force-stop-after N]
 //

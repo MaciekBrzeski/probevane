@@ -1,7 +1,7 @@
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { scoreSuite } from '../loop/passk.js';
 import { mutationScore } from '../loop/mutation.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane bench <dir> [--mutants N]
 //

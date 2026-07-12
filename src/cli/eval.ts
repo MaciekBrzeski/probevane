@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { appendLog } from '../library/improvement-log.js';
 import { scoreFixture, judge, type Baseline } from '../../eval/scorer.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane eval [--live] [--flake N]
 //

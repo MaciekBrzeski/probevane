@@ -5,7 +5,7 @@ import { isEasyTarget } from '../loop/triage.js';
 import { formatReport, simulateCost, savings } from '../cost/simulate.js';
 import { readRuns } from '../cost/ledger.js';
 import { projectLedger, formatProjection } from '../cost/project.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane simcost [dir] [--easy N --hard M] [--local-hit R] [--json]
 //   With a dir: triage discovered modules → easy/hard counts → simulate.

@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { buildGraph } from '../mock/index.js';
 import { toMermaid, toAscii, graphSummary } from '../mock/render.js';
-import { dirArg } from './args.js';
+import { dirArg } from '../util/args.js';
 
 // probevane graph <dir> [--mermaid <out.md>]
 //   Show the module dependency graph (the chain the mock maker walks).

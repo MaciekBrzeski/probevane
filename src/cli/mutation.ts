@@ -1,6 +1,6 @@
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { runMutation, type MutationRun } from '../loop/mutation.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--json]
 //   Full per-site mutation test: flips operators (===/!==/>=/<=/&&/true/+) one at

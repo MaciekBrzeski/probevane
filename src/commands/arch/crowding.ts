@@ -100,7 +100,7 @@ export function crowdingDigest(crowded: DirCrowding[], maxFiles = 15): string {
     for (const cl of c.clusters)
       lines.push(`  · subfolder candidate ${c.dir}/${cl.prefix}/ — ${cl.files.length} files share the "${cl.prefix}" prefix (${cl.files.slice(0, 4).join(', ')}${cl.files.length > 4 ? ', …' : ''})`);
     for (const m of c.misplaced)
-      lines.push(`  · ${m.file} has no ties here — only ${m.suggest}/ imports it (${m.pulls}×); consider moving it there`);
+      lines.push(`  · ${m.file} has no ties here — only ${m.suggest}/ imports it (${m.pulls}×); consider moving it there (runtime imports only — grep for type-only importers before moving)`);
     if (!c.clusters.length && !c.misplaced.length)
       lines.push('  · no mechanical split found — needs a judgement call');
   }

@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { pickBetter, readModelPointer, writeModelPointer, type EvalResult } from '../distill/improve.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane improve-cycle [--promote <model>] [--compare <a.json> <b.json>] [--status]
 //

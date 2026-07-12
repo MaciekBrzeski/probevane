@@ -1,7 +1,7 @@
 import { readRuns, summarize } from '../cost/ledger.js';
 import { aggregateOverTime } from '../observe/aggregate.js';
 import { computeAlerts, shouldHalt } from '../observe/alerts.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane history [--limit N] [--json] [--trend [--days N]]
 //

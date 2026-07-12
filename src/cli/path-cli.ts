@@ -1,5 +1,5 @@
 import { selectAdapterOrThrow } from '../adapters/registry.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 import { loadConfig, type ProbevaneConfig } from '../util/config.js';
 import { runPath, type RunPathOpts } from '../loop/run/path.js';
 import type { ProfileName } from '../loop/profiles.js';

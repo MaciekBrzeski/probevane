@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sseFrame, tailFrom } from '../loop/observe.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane serve [dir] [--port N]
 //

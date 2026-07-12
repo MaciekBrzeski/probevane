@@ -3,7 +3,7 @@ import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { generateTests } from '../loop/run/generation.js';
 import { loadConfig, pick } from '../util/config.js';
 import type { TestKind } from '../adapters/adapter.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // Option assembly for `probevane generate` — flag > config > default for every
 // knob, split out of generate.ts (which keeps the orchestration).

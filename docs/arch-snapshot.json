@@ -3,10 +3,10 @@
     "dirs": [
       {
         "dir": "cli",
-        "files": 61,
+        "files": 60,
         "fanOut": 20,
-        "fanIn": 1,
-        "inbound": 1,
+        "fanIn": 0,
+        "inbound": 0,
         "imports": [
           "adapters",
           "audit",
@@ -119,10 +119,10 @@
       },
       {
         "dir": "util",
-        "files": 9,
+        "files": 10,
         "fanOut": 0,
         "fanIn": 18,
-        "inbound": 86,
+        "inbound": 132,
         "imports": []
       },
       {
@@ -197,12 +197,11 @@
       {
         "dir": "spec-run",
         "files": 6,
-        "fanOut": 7,
+        "fanOut": 6,
         "fanIn": 1,
         "inbound": 8,
         "imports": [
           "adapters",
-          "cli",
           "commands",
           "mfe",
           "observe",
@@ -292,7 +291,7 @@
       {
         "from": "cli",
         "to": "util",
-        "count": 27
+        "count": 72
       },
       {
         "from": "cli",
@@ -550,6 +549,11 @@
         "count": 2
       },
       {
+        "from": "spec-run",
+        "to": "util",
+        "count": 2
+      },
+      {
         "from": "ui",
         "to": "observe",
         "count": 2
@@ -621,11 +625,6 @@
       },
       {
         "from": "spec-run",
-        "to": "cli",
-        "count": 1
-      },
-      {
-        "from": "spec-run",
         "to": "adapters",
         "count": 1
       },
@@ -646,11 +645,6 @@
       },
       {
         "from": "spec-run",
-        "to": "util",
-        "count": 1
-      },
-      {
-        "from": "spec-run",
         "to": "observe",
         "count": 1
       },
@@ -660,11 +654,6 @@
         "count": 1
       }
     ],
-    "cycles": [
-      [
-        "cli",
-        "spec-run"
-      ]
-    ]
+    "cycles": []
   }
 }

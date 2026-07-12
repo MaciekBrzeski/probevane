@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { buildSpec } from '../spec-run/build-spec.js';
 import { saveSpec, specToArgv, validateRunSpec, isDarkRunnable } from '../spec-run/runspec.js';
-import { flag, positionals } from './args.js';
+import { flag, positionals } from '../util/args.js';
 
 // probevane intake "<prompt>" <dir> [--answers f.json | --interactive]
 //                  [--model m] [--takeover t] [--strict] [--json] [--root <state>]

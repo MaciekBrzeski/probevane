@@ -1,5 +1,5 @@
 import { runPathCliMain } from './path-cli.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane feature <dir> --task "add discount to cartTotal …" [--model …] [--max-steps N]
 //

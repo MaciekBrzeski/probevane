@@ -1,5 +1,5 @@
 import { runPathCliMain } from './path-cli.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane migrate <dir> --task "<migration>" | --to <pkg@version>
 //                   [--only <path>] [--model …] [--quality] [--mfe] [--force-stop-after N]

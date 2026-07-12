@@ -1,7 +1,7 @@
 import { formatPlan } from '../commands/plan/build.js';
 import { gatherPlan } from '../spec-run/gather.js';
 import type { TestKind } from '../adapters/adapter.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane plan <dir> [--kind unit|e2e] [--json]
 //

@@ -1,6 +1,6 @@
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import type { RunScope } from '../adapters/adapter.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane run <dir> [--scope unit|e2e|all]
 async function main() {

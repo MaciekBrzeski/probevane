@@ -4,7 +4,7 @@ import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { changedFiles, isSourceFile } from '../util/git.js';
 import { buildGraph, resolveLocalImports } from '../mock/graph.js';
 import { impactedSpecs } from '../loop/impact.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane impact <dir> [--base <ref>] [--run] [--json]
 //   Test-impact analysis: which specs are affected by the changes since <base>.

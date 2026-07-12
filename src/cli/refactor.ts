@@ -1,5 +1,5 @@
 import { runPathCliMain } from './path-cli.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane refactor <dir> --task "extract / rename / simplify …" [--model …] [--max-steps N]
 //

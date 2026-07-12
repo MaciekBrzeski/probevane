@@ -4,7 +4,7 @@ import { scanProject } from '../quality/scan.js';
 import { changedFiles, isSourceFile } from '../util/git.js';
 import { writeBaseline, applyBaseline } from '../quality/baseline.js';
 import { toSarif } from '../quality/sarif.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane quality <dir> [--json] [--strict] [--max-file N] [--max-fn N]
 //                        [--max-complexity N] [--max-cognitive N] [--max-nesting N]

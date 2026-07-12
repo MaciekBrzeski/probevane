@@ -3,7 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { scanMfe } from '../../mfe/scan.js';
 import { formatMfe, versionAlign, type MfeViolation, type RepoShared, type MfeAudit } from '../../mfe/standards.js';
 import { parseRepoList } from '../../factory/report.js';
-import { flag } from '../args.js';
+import { flag } from '../../util/args.js';
 
 // probevane mfe-audit <dir | repos.txt> [--repos <file>] [--json] [--strict]
 //                     [--design-system <pkg>]

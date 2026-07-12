@@ -1,7 +1,7 @@
 import { dirname } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { planContracts } from '../../mfe/contract-scan.js';
-import { dirArg } from '../args.js';
+import { dirArg } from '../../util/args.js';
 
 // probevane mfe-contract <dir> [--write] [--json]
 //

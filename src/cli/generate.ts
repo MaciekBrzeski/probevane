@@ -9,7 +9,7 @@ import { anthropicBrain } from '../brain/anthropic-sdk.js';
 import { generateTests } from '../loop/run/generation.js';
 import { loadConfig, pick } from '../util/config.js';
 import type { TestKind } from '../adapters/adapter.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 import { buildGenOpts } from './generate-opts.js';
 
 // probevane generate <dir> [--kind unit|e2e] [--model …] [--max-steps N] [--max-targets N]

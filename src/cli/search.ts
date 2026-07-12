@@ -3,7 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { buildSearchIndex, rankBySimilarity, similarPairs } from '../commands/search/index.js';
 import { embedText, embedModel } from '../commands/search/embed.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane search <dir> "<concept>"     — modules most similar to a concept
 // probevane search <dir> --similar       — semantically-duplicate module PAIRS

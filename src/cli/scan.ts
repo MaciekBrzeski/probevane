@@ -5,7 +5,7 @@ import { statePath } from '../util/state.js';
 import { appendJsonl } from '../util/jsonl.js';
 import { newItem } from '../observe/queue.js';
 import { parseRepoList } from '../factory/report.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane scan <repos.txt | dir...> [--op generate] [--root <stateDir>] [...op flags]
 //

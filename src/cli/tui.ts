@@ -1,6 +1,6 @@
 import { resolve, join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { flag, num } from './args.js';
+import { flag, num } from '../util/args.js';
 import { runTui } from './tui-app.js';
 
 // probevane tui [--port N] [--root <stateDir>]

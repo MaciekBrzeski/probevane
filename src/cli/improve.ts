@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { improveLoop } from '../visual/improve.js';
-import { flag } from './args.js';
+import { flag } from '../util/args.js';
 
 // probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload "<cmd>"] [--max N] [--out <dir>]
 //

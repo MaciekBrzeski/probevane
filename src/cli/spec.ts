@@ -3,7 +3,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { brainFor } from '../brain/select.js';
 import { buildSpec } from '../commands/spec/build.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane spec <dir> [--narrate] [--model <id>] [--out <file>] [--wiki]
 //   Generate a project specification (module graph, responsibilities, API

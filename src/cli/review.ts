@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { appendFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { auditFiles } from '../audit/core.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane review <dir> [--flake N] [--mutation]
 //

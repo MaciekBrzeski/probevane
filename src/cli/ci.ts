@@ -9,7 +9,7 @@ import { getDiff, reviewDiffText, findingsMarkdown, findingsTask } from '../revi
 import { groundFindings, verifyFindings } from '../review/verify.js';
 import { brainFor } from '../brain/select.js';
 import { sh } from '../util/exec.js';
-import { flag, dirArg } from './args.js';
+import { flag, dirArg } from '../util/args.js';
 
 // probevane ci <dir> [--base <ref>] [--generate]
 //
