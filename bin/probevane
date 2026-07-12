@@ -12,14 +12,25 @@ shift 2>/dev/null || true
 
 # Prefer the compiled dist (published installs ship it, no tsx needed);
 # fall back to tsx on the source for dev-from-checkout.
+# Command token → file, in order: flat `<name>`, first dash → slash
+# (`mfe-audit` → `mfe/audit` — lets a command family live in a subfolder),
+# `<name>/index` (the family's bare token). Flat wins, so dashed commands
+# with flat files (factory-dark, plan-feature, …) are untouched.
 run_cli() {
   local name="$1"
   shift
-  if [ -f "$PROBEVANE_ROOT/dist/cli/$name.js" ]; then
-    exec node "$PROBEVANE_ROOT/dist/cli/$name.js" "$@"
-  else
-    exec npx tsx "$PROBEVANE_ROOT/src/cli/$name.ts" "$@"
-  fi
+  for rel in "$name" "${name/-//}" "$name/index"; do
+    if [ -f "$PROBEVANE_ROOT/dist/cli/$rel.js" ]; then
+      exec node "$PROBEVANE_ROOT/dist/cli/$rel.js" "$@"
+    fi
+  done
+  for rel in "$name" "${name/-//}" "$name/index"; do
+    if [ -f "$PROBEVANE_ROOT/src/cli/$rel.ts" ]; then
+      exec npx tsx "$PROBEVANE_ROOT/src/cli/$rel.ts" "$@"
+    fi
+  done
+  echo "probevane: no implementation found for '$name'" >&2
+  exit 2
 }
 
 case "$cmd" in

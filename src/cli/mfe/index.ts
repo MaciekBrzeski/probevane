@@ -1,9 +1,9 @@
 import { resolve, join } from 'node:path';
 import { readFile, writeFile, stat } from 'node:fs/promises';
-import { runMfe } from '../mfe/driver.js';
-import { parseRepoList } from '../factory/report.js';
-import { formatMfe } from '../mfe/standards.js';
-import { flag } from './args.js';
+import { runMfe } from '../../mfe/driver.js';
+import { parseRepoList } from '../../factory/report.js';
+import { formatMfe } from '../../mfe/standards.js';
+import { flag } from '../args.js';
 
 // probevane mfe <repos.txt | dir...> [--contract] [--generate] [--fix]
 //               [--model …] [--concurrency N] [--report <path>]

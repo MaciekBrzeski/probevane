@@ -5,8 +5,9 @@
 // + the full TUI module graph (which pulls the facet drawing engine). Any
 // resolution/execution break fails here.
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -29,4 +30,19 @@ for (const m of MODULES) {
   catch (e) { die(`import ${m}: ${e.message}`); }
 }
 
-console.log(`[smoke] dist runnable — help CLI + ${MODULES.length} facet-touching modules loaded`);
+// 3) bin dispatch resolves subfolder command families (mfe-audit →
+//    dist/cli/mfe/audit.js via the dash→slash fallback; mfe → mfe/index.js).
+//    Run in a temp cwd (mfe writes a report into cwd); on a non-MFE dir both
+//    exit 0 with a recognizable stdout line — reaching it proves dispatch.
+const tmp = mkdtempSync(join(tmpdir(), 'probevane-smoke-'));
+for (const [cmd, marker] of [['mfe-audit', 'no Module Federation'], ['mfe', 'not an MFE']]) {
+  try {
+    const out = execFileSync(join(ROOT, 'bin/probevane'), [cmd], { stdio: 'pipe', encoding: 'utf8', cwd: tmp });
+    if (!out.includes(marker)) die(`\`probevane ${cmd}\` ran but stdout missing "${marker}"`);
+  } catch (e) {
+    die(`\`probevane ${cmd}\` dispatch failed (exit ${e.status}): ${e.stderr}`);
+  }
+}
+rmSync(tmp, { recursive: true, force: true });
+
+console.log(`[smoke] dist runnable — help CLI + ${MODULES.length} facet-touching modules + subfolder dispatch`);
