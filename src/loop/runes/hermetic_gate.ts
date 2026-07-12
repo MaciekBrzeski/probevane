@@ -16,13 +16,16 @@ const MOCK_SETUP = /\b(setupServer|server\.use|http\.(get|post|put|patch|delete)
 const REAL_TIME = /\b(Date\.now\s*\(|new Date\s*\(\s*\)|Math\.random\s*\()/;
 const TIME_CONTROL = /\b(useFakeTimers|setSystemTime|vi\.setSystemTime|seed|mockReturnValue|spyOn\s*\(\s*Math)/;
 
+/** Single shared rune instance — stateless, so one const serves every profile. */
 export const hermeticGate: Rune = {
   name: 'hermetic_gate',
 
+  /** The hermeticity rule, stated up front so specs mock network/time from the start. */
   systemPromptAddition(): string {
     return 'HERMETIC: tests must not hit a real network or real clock/random. Route all network through the provided mocks (MSW handlers / vi.mock / page.route), and control time/random with fake timers or seeds. A test that calls fetch/axios directly or uses Date.now()/Math.random() unmocked is rejected.';
   },
 
+  /** Block finishing while any spec THIS run wrote breaks a hermeticity rule. */
   async shouldStop(ctx: RunCtx): Promise<RuneDecision> {
     // Scope to the spec files THIS run wrote — not the whole suite. A pre-existing
     // unrelated test holding a URL/clock literal must not block a run (and

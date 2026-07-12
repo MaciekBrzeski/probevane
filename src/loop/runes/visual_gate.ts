@@ -11,9 +11,11 @@ import { newSpecs } from './validation_gate.js';
 // drops the checkpoint helper into the project's e2e/ so specs can import it.
 const VISUAL = /toHaveScreenshot|checkpoint\s*\(/;
 
+/** Single shared rune instance — prepare() re-copies the helper per run; no state kept. */
 export const visualGate: Rune = {
   name: 'visual_gate',
 
+  /** Drop the checkpoint helper into the project's e2e/ so generated specs can import it. */
   async prepare(ctx: RunCtx): Promise<string | undefined> {
     const dst = join(ctx.workdir, 'e2e', 'checkpoint.ts');
     const srcHelper = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'e2e', 'checkpoint.ts');
@@ -22,10 +24,12 @@ export const visualGate: Rune = {
     return undefined;
   },
 
+  /** The visual-checkpoint rule, stated up front so specs capture screenshots from the start. */
   systemPromptAddition(): string {
     return "VISUAL REGRESSION: each e2e spec MUST capture a visual checkpoint — `import { checkpoint } from './checkpoint'` then `await checkpoint(page, '<state-name>')` at each key UI state (mask dynamic regions). A spec with no screenshot assertion is rejected.";
   },
 
+  /** Block finishing while any new e2e spec (helper aside) captures no screenshot. */
   async shouldStop(ctx: RunCtx): Promise<RuneDecision> {
     for (const rel of newSpecs(ctx)) {
       if (rel.endsWith('checkpoint.ts')) continue; // the helper itself

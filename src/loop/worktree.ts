@@ -42,6 +42,9 @@ function linkNodeModules(root: string, wt: string): void {
   }
 }
 
+/** How to dispose of an ACCEPTED worktree run: auto-merge vs keep-on-branch, with an
+ *  optional self-review that can veto the merge. Filled from --worktree-merge /
+ *  --worktree-review flags. */
 export interface WorktreeOpts {
   merge?: boolean; // auto-merge the branch into the original branch on accept
   review?: (diff: string) => Promise<Finding[]>; // self-review the accepted diff before keep/merge

@@ -68,6 +68,9 @@ async function applyFocus(
   return task;
 }
 
+/** Task-path entrypoint (feature/refactor/repair/…): bootstrap the toolchain, resolve
+ *  brains, apply --only focus, then run the profile's gated loop — optionally inside
+ *  a throwaway worktree so the live tree stays untouched. */
 export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
   const log = opts.log ?? (() => {});
   // Bootstrap the stack's toolchain before any gate runs (idempotent; e.g. a

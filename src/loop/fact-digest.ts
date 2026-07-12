@@ -12,6 +12,7 @@ function nextStrState(c: string, inStr: string, esc: boolean): { inStr: string |
   return { inStr, esc: false };
 }
 
+/** Is this char a string-literal opener? (all three JS quote kinds). */
 function isQuote(c: string): boolean {
   return c === '"' || c === "'" || c === '`';
 }

@@ -22,9 +22,9 @@ export function propertyGuidance(): string {
   ].join('\n');
 }
 
+const IMPURE = /\b(fetch\s*\(|axios|readFile|writeFile|child_process|Date\.now|Math\.random|new Date)/;
 // Pure = no IO/network/clock/random + has plain function exports. Property tests
 // only make sense (and are safe) for these.
-const IMPURE = /\b(fetch\s*\(|axios|readFile|writeFile|child_process|Date\.now|Math\.random|new Date)/;
 export function looksPropertyTestable(source: string): boolean {
   return /export\s+(?:async\s+)?function\s+\w+|export\s+const\s+\w+\s*=\s*\(/.test(source) && !IMPURE.test(source);
 }

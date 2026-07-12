@@ -96,9 +96,12 @@ export interface MutantSite {
   repl: string;
   snippet: string;
 }
+/** A tried mutant site + whether the suite caught it. */
 export interface MutantOutcome extends MutantSite {
   status: 'killed' | 'survived';
 }
+/** Whole-run mutation report: score, per-file tallies, and the survivors to act on.
+ *  Built by runMutation; rendered by the mutation CLI. */
 export interface MutationRun {
   total: number;
   killed: number;
@@ -194,8 +197,11 @@ export async function runMutation(
  *  synchronously (the async try/finally handles the normal path). */
 class MutantRestorer {
   private active: { abs: string; original: string } | null = null;
+  /** Register the in-flight mutant before writing it to disk. */
   arm(abs: string, original: string): void { this.active = { abs, original }; }
+  /** Normal path finished — nothing left to restore. */
   clear(): void { this.active = null; }
+  /** Put the original source back (sync on purpose — safe inside a signal handler). */
   restore(): void {
     if (!this.active) return;
     try { writeFileSync(this.active.abs, this.active.original); } catch { /* best-effort */ }
@@ -225,6 +231,8 @@ async function runOneSite(
   }
 }
 
+/** Budget-capped mutation sampling for the gate: a few mutants over a few (preferably
+ *  just-tested) targets — a fast kill-rate estimate, not the exhaustive runMutation. */
 export async function mutationScore(
   dir: string,
   adapter: StackAdapter,

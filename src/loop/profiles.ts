@@ -15,6 +15,8 @@ import type { QualityConfig } from '../quality/analyze.js';
 // order: validation (fast fail) → audit (static) → acceptance (count/coverage).
 export type ProfileName = 'write_tests' | 'refactor' | 'feature' | 'repair' | 'fix' | 'migrate' | 'document' | 'visual' | 'bare';
 
+/** Everything a profile assembly can be tuned with — test kind + acceptance floors +
+ *  the opt-in gate toggles. Filled from CLI flags / config by the run entrypoints. */
 export interface ProfileOpts {
   kind: TestKind;
   minTests?: number;
@@ -90,6 +92,7 @@ function harvest(o: { full?: boolean } = {}): Rune[] {
   return [sessionDiary, caveatHarvest, ...(o.full ? [distillTrace, libraryPromote] : [])];
 }
 
+/** A labelled contiguous run of runes — what describe.ts buckets into subroutines. */
 export interface Segment {
   sub: SubroutineId;
   runes: Rune[];
@@ -100,6 +103,7 @@ function seg(sub: SubroutineId, runes: Rune[]): Segment {
   return { sub, runes };
 }
 
+/** write_tests: preamble + full green-gate stack with acceptance floors + the extras suite. */
 function writeTestsSegments(opts: ProfileOpts, scope: RunScope): Segment[] {
   return [
     seg('preamble', preamble(opts.kind, { noRegression: true })),
@@ -112,8 +116,8 @@ function writeTestsSegments(opts: ProfileOpts, scope: RunScope): Segment[] {
   ];
 }
 
+// TDD red-first: failing spec → implement → green, existing tests protected.
 function featureSegments(opts: ProfileOpts): Segment[] {
-  // TDD red-first: failing spec → implement → green, existing tests protected.
   return [
     seg('preamble', preamble('unit', { redFirst: true, noRegression: true })),
     seg('green-gates', greenGates('unit', { acceptance: { scope: 'unit', minTests: opts.minTests ?? 1 } })),
@@ -122,8 +126,8 @@ function featureSegments(opts: ProfileOpts): Segment[] {
   ];
 }
 
+// Get the whole suite green + clean again after a source change / review fix.
 function repairSegments(opts: ProfileOpts): Segment[] {
-  // Get the whole suite green + clean again after a source change / review fix.
   return [
     seg('preamble', preamble('unit')),
     seg('green-gates', greenGates('unit', { fullSuite: true })), // full suite must be green
@@ -132,8 +136,8 @@ function repairSegments(opts: ProfileOpts): Segment[] {
   ];
 }
 
+// Characterization-first: tests are the contract, source is what changes.
 function refactorSegments(opts: ProfileOpts): Segment[] {
-  // Characterization-first: tests are the contract, source is what changes.
   return [
     seg('preamble', preamble('unit')),
     seg('safety-net', [behaviorLock()]),
@@ -142,8 +146,8 @@ function refactorSegments(opts: ProfileOpts): Segment[] {
   ];
 }
 
+// Add docs/JSDoc only — no behavior change: tests + typecheck stay green.
 function documentSegments(opts: ProfileOpts): Segment[] {
-  // Add docs/JSDoc only — no behavior change: tests + typecheck stay green.
   return [
     seg('preamble', preamble('unit')),
     seg('safety-net', [behaviorLock()]),
@@ -151,11 +155,11 @@ function documentSegments(opts: ProfileOpts): Segment[] {
   ];
 }
 
+// Visual/graphics change: edit render/shader/material source, existing suite +
+// typecheck stay green (behavior_lock), and the acceptance oracle is NOT a test
+// count but render_gate — the running app must screenshot cleanly + a vision
+// reviewer must judge it matches the goal (+ optional perf budget).
 function visualSegments(opts: ProfileOpts): Segment[] {
-  // Visual/graphics change: edit render/shader/material source, existing suite +
-  // typecheck stay green (behavior_lock), and the acceptance oracle is NOT a test
-  // count but render_gate — the running app must screenshot cleanly + a vision
-  // reviewer must judge it matches the goal (+ optional perf budget).
   return [
     seg('preamble', preamble('unit')),
     seg('safety-net', [behaviorLock()]),
@@ -181,11 +185,13 @@ const SEGMENT_BUILDERS: Record<ProfileName, (opts: ProfileOpts, scope: RunScope)
   bare: () => [],
 };
 
+/** Assemble a profile's labelled segments — the single source of truth for its pipeline. */
 export function profileSegments(name: ProfileName, opts: ProfileOpts): Segment[] {
   const scope: RunScope = opts.kind === 'e2e' ? 'e2e' : 'unit';
   return SEGMENT_BUILDERS[name](opts, scope);
 }
 
+/** The runnable pipeline: profileSegments flattened. */
 export function profile(name: ProfileName, opts: ProfileOpts): Rune[] {
   return profileSegments(name, opts).flatMap((s) => s.runes);
 }

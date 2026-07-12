@@ -20,6 +20,7 @@ const SOURCE_EXT = new Set(Object.keys(LANG));
 
 interface FileRec { rel: string; loc: number; ext: string }
 
+/** readdirSync that returns [] on unreadable dirs — the walk never throws. */
 function readEntries(abs: string): Dirent[] {
   try {
     return readdirSync(abs, { withFileTypes: true });
@@ -28,6 +29,7 @@ function readEntries(abs: string): Dirent[] {
   }
 }
 
+/** One file's record; LOC stays 0 for binary/unreadable files (never throws). */
 function fileRec(root: string, p: string, name: string): FileRec {
   const ext = extname(name);
   let loc = 0;
@@ -35,6 +37,7 @@ function fileRec(root: string, p: string, name: string): FileRec {
   return { rel: relative(root, p), loc, ext };
 }
 
+/** Walk one entry: recurse into non-skipped dirs, record files; dotfiles (except .github) ignored. */
 function visitEntry(root: string, abs: string, depth: number, e: Dirent, out: FileRec[]): void {
   if (e.name.startsWith('.') && e.name !== '.github') return;
   const p = join(abs, e.name);
@@ -45,25 +48,28 @@ function visitEntry(root: string, abs: string, depth: number, e: Dirent, out: Fi
   }
 }
 
+/** Recurse a directory, depth-capped at 8 so a pathological tree can't blow up the digest. */
 function visitDir(root: string, abs: string, depth: number, out: FileRec[]): void {
   if (depth > 8) return;
   for (const e of readEntries(abs)) visitEntry(root, abs, depth, e, out);
 }
 
+/** All project files under root minus skip-dirs — the raw material for every digest section. */
 function walk(root: string): FileRec[] {
   const out: FileRec[] = [];
   visitDir(root, root, 0, out);
   return out;
 }
 
+/** A pruned, sorted path listing (dirs implied by paths) — capped. */
 function tree(files: FileRec[], maxEntries = 80): string {
-  // A pruned, sorted path listing (dirs implied by paths) — capped.
   const paths = files.map((f) => f.rel).sort();
   const shown = paths.slice(0, maxEntries);
   const extra = paths.length - shown.length;
   return shown.join('\n') + (extra > 0 ? `\n… (+${extra} more files)` : '');
 }
 
+/** Summarize whichever manifests exist (npm/cargo/py/go) — what the project claims to be. */
 function manifests(root: string): string[] {
   const out: string[] = [];
   const read = (name: string) => (existsSync(join(root, name)) ? readFileSync(join(root, name), 'utf8') : null);
@@ -95,6 +101,7 @@ function manifests(root: string): string[] {
   return out;
 }
 
+/** Leading chunks of README/CLAUDE/docs — so generated prose complements, not contradicts, them. */
 function existingDocs(root: string, files: FileRec[]): string[] {
   const out: string[] = [];
   const candidates = ['README.md', 'CLAUDE.md', 'RENDER_NOTES.md'];
@@ -113,6 +120,7 @@ function existingDocs(root: string, files: FileRec[]): string[] {
   return out;
 }
 
+/** Likely entry files by conventional names + bin/cli dirs — where a reader should start. */
 function entryPoints(root: string, files: FileRec[]): string[] {
   const names = new Set(['main.rs', 'lib.rs', 'main.ts', 'main.py', 'index.ts', 'index.js', 'main.go', '__main__.py', 'cli.ts', 'cli.py']);
   const eps = files
@@ -122,9 +130,9 @@ function entryPoints(root: string, files: FileRec[]): string[] {
   return eps;
 }
 
+/** The largest source files — their leading lines (doc comments / imports) reveal
+ *  responsibility. Cap to keep the digest bounded. */
 function sampleHeaders(root: string, files: FileRec[]): string[] {
-  // The largest source files — their leading lines (doc comments / imports) reveal
-  // responsibility. Cap to keep the digest bounded.
   const top = files
     .filter((f) => SOURCE_EXT.has(f.ext) && !/\.(test|spec)\./.test(f.rel))
     .sort((a, b) => b.loc - a.loc)

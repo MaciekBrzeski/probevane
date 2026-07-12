@@ -13,6 +13,7 @@ export const MUTATIONS: [RegExp, string][] = [
   [/\+/g, '-'],
 ];
 
+/** Aggregate mutation verdict (killed/total) — what mutation_gate scores and bench reports. */
 export interface MutationResult {
   total: number;
   killed: number;

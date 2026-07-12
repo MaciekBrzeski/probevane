@@ -18,13 +18,16 @@ const DENY = [
   /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/,
 ];
 
+/** Single shared rune instance — stateless, so one const serves every profile. */
 export const pathGuard: Rune = {
   name: 'path_guard',
 
+  /** The write-scope rule, stated up front so the model stays in bounds. */
   systemPromptAddition(): string {
     return 'SCOPE: only create/edit test files under the project source (e.g. src/, tests/, e2e/). Never edit node_modules, build output, lockfiles, or tooling — if a tool seems broken, report it, do not modify it.';
   },
 
+  /** Veto any write/delete into the deny-list (deps / build output / lockfiles). */
   async beforeToolCall(call: ToolCall, _ctx: RunCtx): Promise<RuneDecision> {
     if (!WRITE_TOOLS.has(call.name) && call.name !== 'delete_file') return ALLOW;
     const path = String((call.input as any).path ?? '');

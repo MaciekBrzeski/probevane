@@ -10,10 +10,13 @@ export type RuneDecision =
   | { kind: 'block'; reason: string; inject?: string; rune?: string };
 
 export const ALLOW: RuneDecision = { kind: 'allow' };
+/** Shorthand for a Block decision; `inject` is the feedback the loop hands back to the model. */
 export function block(reason: string, inject?: string): RuneDecision {
   return { kind: 'block', reason, inject };
 }
 
+/** The gate/harness contract: optional hooks the engine calls at fixed points of the
+ *  loop. Implemented by everything under runes/; profiles compose ordered lists of these. */
 export interface Rune {
   name: string;
 
@@ -51,6 +54,7 @@ export async function firstBlockBefore(
   return ALLOW;
 }
 
+/** First blocking shouldStop wins — gate order in the profile is the precedence. */
 export async function firstBlockStop(runes: Rune[], ctx: RunCtx): Promise<RuneDecision> {
   for (const r of runes) {
     if (!r.shouldStop) continue;

@@ -12,13 +12,16 @@ import { newSpecs } from './validation_gate.js';
 const RENDERS = /\b(render|mount)\s*\(/;
 const A11Y = /toHaveNoViolations|\baxe\s*\(|getByRole|getByLabelText|getByLabel\b|findByRole/;
 
+/** Single shared rune instance — stateless, so one const serves every profile. */
 export const a11yGate: Rune = {
   name: 'a11y_gate',
 
+  /** The a11y rule, stated up front so specs are written with it in mind. */
   systemPromptAddition(): string {
     return 'ACCESSIBILITY: any test that renders a component must assert accessibility — either `expect(await axe(container)).toHaveNoViolations()` (jest-axe) or query by role/label (getByRole / getByLabelText). A component test with no a11y assertion is rejected.';
   },
 
+  /** Block finishing while any new component-rendering spec lacks an a11y assertion. */
   async shouldStop(ctx: RunCtx): Promise<RuneDecision> {
     for (const rel of newSpecs(ctx)) {
       const src = await readFile(join(ctx.workdir, rel), 'utf8').catch(() => '');

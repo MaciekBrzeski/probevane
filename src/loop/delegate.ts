@@ -16,6 +16,8 @@ import { recordRun } from '../cost/ledger.js';
 const TEST_RE = /(\.(test|spec)\.[tj]sx?$)|(test_\w+\.py$)|(_test\.py$)|(_test\.go$)|(tests\/.*\.rs$)/;
 const TIMEOUT_MS = Number(process.env.PROBEVANE_CC_TIMEOUT_MS ?? 600_000);
 
+/** The delegation envelope: where to run, what test kind, and the adapter whose
+ *  gates judge the result. Filled by the delegate CLI entrypoint. */
 export interface DelegateOpts {
   dir: string;
   kind: TestKind;
@@ -26,6 +28,8 @@ export interface DelegateOpts {
   log?: (l: string) => void;
 }
 
+/** What a whole delegation run produced — final gate verdicts + rounds + cost,
+ *  returned to the CLI and the cost ledger. */
 export interface DelegateOutcome {
   accepted: boolean;
   rounds: number;
@@ -61,8 +65,7 @@ function buildPrompt(base: string, round: number, feedback: string): string {
   return round === 1 ? base : `${base}\n\nYOUR PREVIOUS ATTEMPT DID NOT PASS THE GATES:\n${feedback}\nFix it.`;
 }
 
-/** One delegation round: spawn `claude -p`, then run the suite + audit on the
- *  changed test files and derive green/auditErrors and the next-round feedback. */
+/** Everything one delegation round needs, threaded from runDelegated's retry loop. */
 interface RoundCtx {
   opts: DelegateOpts;
   dir: string;
@@ -72,6 +75,8 @@ interface RoundCtx {
   feedback: string;
 }
 
+/** One delegation round: spawn `claude -p`, then run the suite + audit on the
+ *  changed test files and derive green/auditErrors and the next-round feedback. */
 async function delegateRound(c: RoundCtx): Promise<RoundResult> {
   const { opts, dir, scope, base, round, feedback } = c;
   const { adapter } = opts;
@@ -106,6 +111,8 @@ async function delegateRound(c: RoundCtx): Promise<RoundResult> {
   return { cost, changed, green, auditErrors, feedback: nextFeedback };
 }
 
+/** Drive up to maxRounds delegation rounds, feeding each the previous round's gate
+ *  feedback; record the run in the cost ledger and report the final verdicts. */
 export async function runDelegated(opts: DelegateOpts): Promise<DelegateOutcome> {
   const { dir, kind } = opts;
   const scope: RunScope = kind === 'e2e' ? 'e2e' : 'unit';
@@ -143,6 +150,7 @@ export async function runDelegated(opts: DelegateOpts): Promise<DelegateOutcome>
   return { accepted, rounds: roundsRun, changedFiles: changed, costUsd, green, auditErrors };
 }
 
+/** Test files the delegate touched (tracked diff + untracked) — the gates judge only its work. */
 async function changedTestFiles(dir: string): Promise<string[]> {
   const tracked = await git(dir, ['diff', '--name-only']);
   const untracked = await git(dir, ['ls-files', '--others', '--exclude-standard']);
@@ -150,12 +158,14 @@ async function changedTestFiles(dir: string): Promise<string[]> {
   return [...new Set(all)].filter((f) => TEST_RE.test(f));
 }
 
+/** Run git in `dir`, resolving '' on failure — callers treat no-output as no-changes. */
 function git(dir: string, args: string[]): Promise<string> {
   return new Promise((resolve) => {
     execFile('git', ['-C', dir, ...args], { maxBuffer: 8 * 1024 * 1024 }, (_e, out) => resolve(out ?? ''));
   });
 }
 
+/** execFile with the prompt piped via stdin — argv would hit length limits on big prompts. */
 function spawn(cmd: string, args: string[], input: string, cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(

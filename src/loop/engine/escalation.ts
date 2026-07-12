@@ -129,6 +129,8 @@ export async function difficultyCheck(lr: LoopRun, started: boolean): Promise<bo
   return true;
 }
 
+/** Give up after forceStopAfter consecutive barren turns — a started run that
+ *  stopped producing edits won't recover by itself. */
 export function stuckCheck(lr: LoopRun, started: boolean): boolean {
   const { ctx, st, log } = lr;
   if (!started || ctx.barren < lr.forceStopAfter) return false;

@@ -23,6 +23,7 @@ interface ValidationState {
 const VALIDATION_SYSTEM_PROMPT =
   'FINISH RULE: You may only stop once your changes add NO new type errors AND the new tests run green (no failures, not all-skipped). If a gate reports failure, fix the FIRST reported failure (shown under "FIX THIS FIRST"), re-run, then the next — one at a time. Do not rewrite the whole file each turn.';
 
+/** Capture the pre-edit type-error baseline; a dirty project is noted, not fixed. */
 async function validationPrepare(ctx: RunCtx, state: ValidationState): Promise<string | undefined> {
   const tc = await sh(ctx.adapter.commands(ctx.workdir).typecheck, ctx.workdir);
   state.baselineTypecheckOk = tc.ok;
@@ -32,6 +33,7 @@ async function validationPrepare(ctx: RunCtx, state: ValidationState): Promise<s
     : `NOTE: the project has ${state.baselineErrors} pre-existing type error(s) on its own; that's not yours to fix — but your tests must not ADD any.`;
 }
 
+/** Block only when the error COUNT rose above the baseline — i.e. OUR edits added type errors. */
 async function validationTypecheckCheck(ctx: RunCtx, state: ValidationState): Promise<RuneDecision | undefined> {
   const cmds = ctx.adapter.commands(ctx.workdir);
   const tc = await sh(cmds.typecheck, ctx.workdir);
@@ -45,6 +47,7 @@ async function validationTypecheckCheck(ctx: RunCtx, state: ValidationState): Pr
   return undefined;
 }
 
+/** Run the suite (our specs only, unless full) and block with the first failure front-and-center. */
 async function validationRunCheck(ctx: RunCtx, scope: RunScope, full: boolean): Promise<RuneDecision> {
   // Scope to the specs we wrote — a real app's pre-existing suite may be
   // red under our config and is not ours to fix (no_regression forbids
@@ -67,6 +70,7 @@ async function validationRunCheck(ctx: RunCtx, scope: RunScope, full: boolean): 
   return ALLOW;
 }
 
+/** Gate body: something written → typecheck delta → suite green, in fail-fast order. */
 async function validationShouldStop(
   ctx: RunCtx,
   scope: RunScope,
@@ -84,6 +88,7 @@ async function validationShouldStop(
   return validationRunCheck(ctx, scope, full);
 }
 
+/** Build the validation rune for a scope; full=true validates the WHOLE suite (repair path). */
 export function validationGate(scope: RunScope = 'unit', full = false): Rune {
   const state: ValidationState = { baselineErrors: 0, baselineTypecheckOk: true };
   return {
@@ -94,16 +99,17 @@ export function validationGate(scope: RunScope = 'unit', full = false): Rune {
   };
 }
 
+/** Last n chars — enough failure output to act on without flooding the transcript. */
 function tail(s: string, n = 2500): string {
   return s.length > n ? s.slice(-n) : s;
 }
 
-// First failing test + a few lines of its assertion, across runners. Weak models
-// repair a single precise failure far better than the whole dump.
 // cross/×/✕/✗ marks via \u escapes (avoid glyph copy ambiguity).
 const FAIL_MARKER = /(^|\n)\s*(?:[×✕✗]|FAIL(?:ED)?\b)\s|(AssertionError|Error:|expected .* (?:to|but)|^E\s{2,}|assert\b)/i;
 // next test-result line: a check/cross mark or PASS/FAIL (marks via \u to avoid glyph drift).
 const NEXT_RESULT = /^\s*(?:[✓✔✗✕×]|PASS(?:ED)?|FAIL(?:ED)?)/;
+// First failing test + a few lines of its assertion, across runners. Weak models
+// repair a single precise failure far better than the whole dump.
 export function firstFailure(raw: string, lines = 12): string | undefined {
   if (!raw) return undefined;
   const ls = raw.split('\n');
@@ -125,6 +131,7 @@ export function countTsErrors(output: string): number {
 }
 
 const SPEC_RE = /(\.(test|spec)\.[tj]sx?$)|((^|\/)test_\w+\.py$)|(_test\.py$)/;
+/** The spec files THIS run wrote — the scope most gates judge. */
 export function newSpecs(ctx: RunCtx): string[] {
   return [...ctx.editedFiles].filter((f) => SPEC_RE.test(f));
 }

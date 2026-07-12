@@ -60,6 +60,8 @@ function workspacePackages(root: string): Map<string, string> {
   return out;
 }
 
+/** A package's entry source: exports["."] (string or import/default), else
+ *  module/main, else the src/index.ts convention. */
 function entryOf(pkg: Record<string, unknown>): string {
   const exp = pkg.exports as undefined | string | Record<string, unknown>;
   const dot = exp && typeof exp === 'object' ? (exp['.'] as undefined | string | Record<string, string>) : undefined;

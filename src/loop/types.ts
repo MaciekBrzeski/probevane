@@ -8,12 +8,14 @@ export interface ToolSpec {
   inputSchema: Record<string, unknown>;
 }
 
+/** One tool invocation as the brain requested it; `id` ties the result back to the call. */
 export interface ToolCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
 }
 
+/** The outcome fed back for a ToolCall; isError carries gate blocks and tool failures alike. */
 export interface ToolResult {
   id: string; // matches ToolCall.id
   content: string;
@@ -29,8 +31,10 @@ export interface Msg {
   toolResults?: ToolResult[];
 }
 
+/** Why the provider stopped generating, normalized across providers. */
 export type StopReason = 'tool_use' | 'end_turn' | 'max_tokens' | 'other';
 
+/** One completion: text and/or tool calls, plus the usage the engine folds into the cost ledger. */
 export interface BrainResponse {
   text: string;
   toolCalls: ToolCall[];

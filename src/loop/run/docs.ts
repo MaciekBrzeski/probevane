@@ -23,6 +23,8 @@ export interface DocsRunOpts {
   log?: (line: string) => void;
 }
 
+/** The narrative-docs loop: ground a docs-writer brain on the project digest and gate
+ *  the markdown on structure + reference integrity before accepting. */
 export async function runDocs(opts: DocsRunOpts): Promise<RunOutcome> {
   const log = opts.log ?? (() => {});
   const digest = buildDocsDigest(opts.dir);

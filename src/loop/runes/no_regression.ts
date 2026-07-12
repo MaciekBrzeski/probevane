@@ -36,6 +36,7 @@ export function noRegression(): Rune {
   };
 }
 
+/** Normalize a tool path for set membership (strip a leading ./). */
 function norm(p: string): string {
   return p.replace(/^\.\//, '');
 }

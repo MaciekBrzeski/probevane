@@ -31,6 +31,7 @@ export class RunCtx {
   /** RAW (non-deduped) gate-block reasons — the difficulty gate counts repeats here. */
   gateBlockHistory: string[] = [];
 
+  /** Record a gate block: raw history always (difficulty counts repeats), deduped list for harvest. */
   noteBlock(reason: string) {
     this.gateBlockHistory.push(reason);
     if (!this.gateBlockReasons.includes(reason)) this.gateBlockReasons.push(reason);
@@ -49,12 +50,14 @@ export class RunCtx {
   /** Per-run recent tool-call signatures (repetition detection, P-later). */
   recentCalls: string[] = [];
 
+  /** Wires the run identity only — every counter/flag starts at its field default. */
   constructor(workdir: string, adapter: StackAdapter, task: string) {
     this.workdir = workdir;
     this.adapter = adapter;
     this.task = task;
   }
 
+  /** Count a tool call and keep the last 8 signatures for repetition detection. */
   noteCall(call: ToolCall) {
     this.toolCalls++;
     this.recentCalls.push(`${call.name}:${JSON.stringify(call.input)}`);

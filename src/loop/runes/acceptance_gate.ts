@@ -17,6 +17,8 @@ export interface AcceptanceOpts {
   shellChecks?: string[];
 }
 
+/** State the acceptance floors up front so the model aims at them instead of
+ *  discovering them through blocks. */
 function acceptanceSystemPrompt(opts: AcceptanceOpts): string {
   const parts: string[] = [];
   if (opts.minTests) parts.push(`at least ${opts.minTests} passing tests`);
@@ -25,6 +27,8 @@ function acceptanceSystemPrompt(opts: AcceptanceOpts): string {
   return `ACCEPTANCE: the run is not done until there are ${parts.join(' and ')}.`;
 }
 
+/** Enforce the minimum passing-test count (scoped to the specs this run wrote);
+ *  also captures the count so --report needn't re-run the suite. */
 async function checkMinTests(ctx: RunCtx, opts: AcceptanceOpts): Promise<RuneDecision | undefined> {
   if (opts.minTests === undefined) return undefined;
   const ours = newSpecs(ctx);
@@ -39,6 +43,7 @@ async function checkMinTests(ctx: RunCtx, opts: AcceptanceOpts): Promise<RuneDec
   return undefined;
 }
 
+/** Enforce the statement-coverage floor; unmeasurable coverage blocks too (a silent 0 must not pass). */
 async function checkMinCoverage(ctx: RunCtx, opts: AcceptanceOpts): Promise<RuneDecision | undefined> {
   if (opts.minCoverage === undefined) return undefined;
   const cov = await ctx.adapter.coverage(ctx.workdir);
@@ -55,6 +60,7 @@ async function checkMinCoverage(ctx: RunCtx, opts: AcceptanceOpts): Promise<Rune
   return undefined;
 }
 
+/** Run each raw shell check; the first non-zero exit blocks with its output. */
 async function checkShellChecks(ctx: RunCtx, opts: AcceptanceOpts): Promise<RuneDecision | undefined> {
   for (const cmd of opts.shellChecks ?? []) {
     const r = await sh(cmd, ctx.workdir);
@@ -68,6 +74,7 @@ async function checkShellChecks(ctx: RunCtx, opts: AcceptanceOpts): Promise<Rune
   return undefined;
 }
 
+/** Checks in cost order: test count → coverage → shell; first block wins. */
 async function acceptanceShouldStop(ctx: RunCtx, opts: AcceptanceOpts): Promise<RuneDecision> {
   return (
     (await checkMinTests(ctx, opts)) ??
@@ -77,6 +84,7 @@ async function acceptanceShouldStop(ctx: RunCtx, opts: AcceptanceOpts): Promise<
   );
 }
 
+/** Build the acceptance rune over the given floors. */
 export function acceptanceGate(opts: AcceptanceOpts): Rune {
   return {
     name: 'acceptance_gate',
