@@ -26,14 +26,25 @@ export function mkViolation(s: ViolationSpec): QViolation {
   };
 }
 
-/** File-level violations (size, import fan-out, long lines, debt markers). */
+/** File-level violations (size, import fan-out, long lines, debt markers, type docs).
+ *  Size rules measure CODE lines — comment-only lines are excluded, so documenting
+ *  never pushes a file over the bar. */
 export function fileLevelViolations(f: FileReport, cfg: QualityConfig): QViolation[] {
   const v: QViolation[] = [];
-  if (f.loc > cfg.maxFileLoc) {
+  const codeLoc = f.loc - f.commentLoc;
+  if (codeLoc > cfg.maxFileLoc) {
     v.push(mkViolation({
       file: f.file, line: 1, rule: 'file-size', severity: 'error',
-      value: f.loc, threshold: cfg.maxFileLoc, what: 'file too long',
+      value: codeLoc, threshold: cfg.maxFileLoc, what: 'file too long (code lines)',
     }));
+  }
+  if (cfg.requireDocs) {
+    for (const t of f.types.filter((x) => x.exported && !x.hasDoc)) {
+      v.push(mkViolation({
+        file: f.file, line: t.line, rule: 'type-doc', severity: 'warn',
+        value: 1, threshold: 0, what: `exported ${t.name} lacks a shape comment (what is it, who fills it)`,
+      }));
+    }
   }
   if (f.imports > cfg.maxImports) {
     v.push(mkViolation({
@@ -56,13 +67,21 @@ export function fileLevelViolations(f: FileReport, cfg: QualityConfig): QViolati
   return v;
 }
 
-/** Per-function violations (size, cyclomatic, cognitive, nesting, params). */
+/** Per-function violations (size, cyclomatic, cognitive, nesting, params, docs). */
 export function fnLevelViolations(file: string, fn: FnMetric, cfg: QualityConfig): QViolation[] {
   const v: QViolation[] = [];
-  if (fn.loc > cfg.maxFnLoc) {
+  const codeLoc = fn.loc - (fn.commentLoc ?? 0);
+  if (codeLoc > cfg.maxFnLoc) {
     v.push(mkViolation({
       file, line: fn.startLine, rule: 'fn-size', severity: 'error',
-      value: fn.loc, threshold: cfg.maxFnLoc, what: `function ${fn.name} too long`,
+      value: codeLoc, threshold: cfg.maxFnLoc, what: `function ${fn.name} too long (code lines)`,
+    }));
+  }
+  // hasDoc undefined = the detector for this language can't tell — rule skipped.
+  if (cfg.requireDocs && fn.hasDoc === false) {
+    v.push(mkViolation({
+      file, line: fn.startLine, rule: 'doc-comment', severity: 'warn',
+      value: 1, threshold: 0, what: `function ${fn.name} lacks a doc comment (say what it does and why)`,
     }));
   }
   if (fn.complexity > cfg.maxComplexity) {

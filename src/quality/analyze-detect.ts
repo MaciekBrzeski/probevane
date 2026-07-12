@@ -253,6 +253,17 @@ function isReportable(n: Node): boolean {
   return (k === SyntaxKind.ArrowFunction || k === SyntaxKind.FunctionExpression) && fnName(n) !== '(anonymous)';
 }
 
+/** Does a doc comment precede this node? Arrows/fn-exprs sit inside a variable
+ *  statement — the comment belongs to that statement, so judge from the outermost
+ *  declaration statement, not the function node itself. */
+function hasLeadingDoc(n: Node): boolean {
+  const stmt =
+    n.getFirstAncestorByKind(SyntaxKind.VariableStatement) ??
+    n.getFirstAncestorByKind(SyntaxKind.ExportAssignment) ??
+    n;
+  return stmt.getLeadingCommentRanges().length > 0;
+}
+
 /** Per-function size/complexity metrics via AST. Each function is measured on its
  *  own body; nested functions are separate nodes, never folded into the parent. */
 export function detectFunctions(source: string): FnMetric[] {
@@ -274,7 +285,35 @@ export function detectFunctions(source: string): FnMetric[] {
       complexity: m.branches + 1,
       cognitive: m.cognitive,
       nesting: m.nesting,
+      // Doc gate input: nested functions inherit-exempt (their parent's doc covers
+      // the cluster) — only top-level-ish functions are judged, so mark nested ones
+      // as documented.
+      hasDoc: node.getAncestors().some(isFnLike) ? true : hasLeadingDoc(node),
     });
   });
+  return out;
+}
+
+export interface TypeDecl {
+  name: string;
+  line: number;
+  exported: boolean;
+  hasDoc: boolean;
+}
+
+/** Exported interface/type-alias declarations + whether a shape comment precedes
+ *  them — input for the type-doc rule (an exported contract should say what its
+ *  usual shape/lifecycle is, not just list fields). */
+export function detectTypeDecls(source: string): TypeDecl[] {
+  const sf = detectProject.createSourceFile('__detect__.tsx', source, { overwrite: true });
+  const out: TypeDecl[] = [];
+  for (const node of [...sf.getInterfaces(), ...sf.getTypeAliases()]) {
+    out.push({
+      name: node.getName(),
+      line: node.getStartLineNumber(),
+      exported: node.isExported(),
+      hasDoc: node.getLeadingCommentRanges().length > 0,
+    });
+  }
   return out;
 }

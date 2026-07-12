@@ -9,12 +9,14 @@ function mkFile(partial: Partial<FileReport> = {}): FileReport {
   return {
     file: 'src/foo.ts',
     loc: 10,
+    commentLoc: 0,
     imports: 0,
     longLines: 0,
     debt: 0,
     longLineNos: [],
     debtLineNos: [],
     functions: [],
+    types: [],
     ...partial,
   };
 }
@@ -80,7 +82,7 @@ describe('fileLevelViolations', () => {
     expect(v[0].line).toBe(1);
     expect(v[0].value).toBe(cfg.maxFileLoc + 5);
     expect(v[0].threshold).toBe(cfg.maxFileLoc);
-    expect(v[0].message).toBe(`file too long (${cfg.maxFileLoc + 5} > ${cfg.maxFileLoc})`);
+    expect(v[0].message).toBe(`file too long (code lines) (${cfg.maxFileLoc + 5} > ${cfg.maxFileLoc})`);
   });
 
   it('flags import-fanout as warn at line 1 when imports exceed the ceiling', () => {

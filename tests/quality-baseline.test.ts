@@ -8,7 +8,7 @@ import { selectInputPaths } from '../src/quality/scan.js';
 import { toSarif } from '../src/quality/sarif.js';
 
 const CFG = { ...DEFAULT_QUALITY, maxFnLoc: 2, maxParams: 2 };
-const SRC = ['function foo(a, b, c) {', '  const x = 1;', '  return a + b + c + x;', '}'].join('\n');
+const SRC = ['/** docs */', 'function foo(a, b, c) {', '  const x = 1;', '  return a + b + c + x;', '}'].join('\n');
 
 function reportFor(source: string): QualityReport {
   return analyzeProject([{ file: 'a.ts', source }], CFG);
@@ -26,7 +26,7 @@ describe('quality baseline (ratchet)', () => {
 
   it('violationKey strips the changing "(N > M)" tail (line-shift robust)', () => {
     const fnSize = reportFor(SRC).violations.find((v) => v.rule === 'fn-size')!;
-    expect(violationKey(fnSize)).toBe('a.ts::fn-size::function foo too long');
+    expect(violationKey(fnSize)).toBe('a.ts::fn-size::function foo too long (code lines)');
   });
 
   it('applyBaseline suppresses every baselined violation and recomputes counts', () => {

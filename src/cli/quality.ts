@@ -43,6 +43,7 @@ function buildConfig(args: string[], cfg: any): QualityConfig {
       maxImports: parseNum(args, '--max-imports'),
     }),
     debt: !args.includes('--no-debt'),
+    requireDocs: !args.includes('--no-docs'),
   };
 }
 

@@ -16,6 +16,7 @@ export interface QualityConfig {
   maxImports: number; // import/require statements per file
   dupMinLines: number; // window size for duplicate-block detection
   debt: boolean; // flag TODO/FIXME/HACK/XXX markers
+  requireDocs: boolean; // flag undocumented functions + exported interfaces/type aliases
 }
 
 export const DEFAULT_QUALITY: QualityConfig = {
@@ -29,6 +30,7 @@ export const DEFAULT_QUALITY: QualityConfig = {
   maxImports: 20,
   dupMinLines: 6,
   debt: true,
+  requireDocs: true,
 };
 
 export interface QViolation {
@@ -50,17 +52,21 @@ export interface FnMetric {
   complexity: number; // cyclomatic-ish (branch count + 1)
   cognitive: number; // nesting-weighted (each branch costs 1 + its nesting depth)
   nesting: number;
+  hasDoc?: boolean; // doc comment precedes the fn; undefined = detector can't tell (skip the rule)
+  commentLoc?: number; // comment-only lines inside the span — excluded from the size rule
 }
 
 export interface FileReport {
   file: string;
   loc: number;
+  commentLoc: number; // comment-only lines — excluded from the file-size rule
   imports: number;
   longLines: number;
   debt: number;
   longLineNos: number[]; // 1-based lines exceeding maxLineWidth
   debtLineNos: number[]; // 1-based lines with a debt marker (in a comment)
   functions: FnMetric[];
+  types: TypeDecl[]; // exported interface/type-alias decls (doc-rule input)
 }
 
 export interface Dup {
@@ -83,8 +89,8 @@ export interface QualityReport {
 // String/comment stripping + heuristic function detection live in a sibling file
 // to keep each function/file under the analyzer's own quality bar; re-exported
 // here so the public API (stripToCode, detectFunctions) is unchanged.
-import { stripToCode, detectFunctions } from './analyze-detect.js';
-export { stripToCode, detectFunctions };
+import { stripToCode, detectFunctions, detectTypeDecls, type TypeDecl } from './analyze-detect.js';
+export { stripToCode, detectFunctions, detectTypeDecls, type TypeDecl };
 import { mkViolation, fileLevelViolations, fnLevelViolations } from './analyze-violations.js';
 
 // A real debt annotation leads its comment (the marker is the first word) or is
@@ -104,6 +110,24 @@ function commentText(line: string): string {
   const m = line.match(/\/\*(.*?)(\*\/|$)/);
   return m ? m[1] : '';
 }
+
+/** 1-based line numbers that hold ONLY comment text (raw non-blank, code empty).
+ *  Python comments (`# …`) aren't stripped by the JS stripper — matched directly. */
+function commentOnlyLines(file: string, lines: string[], code: string[]): Set<number> {
+  const py = /\.py$/.test(file);
+  const out = new Set<number>();
+  lines.forEach((raw, i) => {
+    if (raw.trim() === '') return;
+    if (code[i].trim() === '' || (py && /^\s*#/.test(raw))) out.add(i + 1);
+  });
+  return out;
+}
+
+const countIn = (set: Set<number>, from: number, to: number): number => {
+  let n = 0;
+  for (let i = from; i <= to; i++) if (set.has(i)) n++;
+  return n;
+};
 
 export function analyzeFile(
   file: string,
@@ -128,16 +152,26 @@ export function analyzeFile(
     // Debt only counts inside a COMMENT — not in a string literal or identifier.
     if (cfg.debt && isDebt(commentText(l))) debtLineNos.push(i + 1);
   });
+  // Comment-only lines never count toward size rules — documenting code must not
+  // push a file/function over the length bar (that would gate AGAINST comments).
+  const comments = commentOnlyLines(file, lines, code);
+  const py = /\.py$/.test(file);
+  const fns = (functions ?? detectFunctions(source)).map((fn) => ({
+    ...fn,
+    commentLoc: fn.commentLoc ?? countIn(comments, fn.startLine, fn.endLine),
+  }));
   return {
     file,
     loc: lines.length,
+    commentLoc: comments.size,
     imports,
     longLines: longLineNos.length,
     debt: debtLineNos.length,
     longLineNos,
     debtLineNos,
     // Pre-computed metrics (e.g. Python via py-detect) override the TS/JS detector.
-    functions: functions ?? detectFunctions(source),
+    functions: fns,
+    types: py ? [] : detectTypeDecls(source),
   };
 }
 

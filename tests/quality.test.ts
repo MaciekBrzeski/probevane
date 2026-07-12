@@ -194,3 +194,63 @@ describe('analyzeFile', () => {
     expect(analyzeFile('x.ts', src, DEFAULT_QUALITY).imports).toBe(3);
   });
 });
+
+describe('doc rules + comment-excluded sizes', () => {
+  it('undocumented function → doc-comment warn; documented → clean', () => {
+    const bare = 'function foo() {\n  return 1;\n}\n';
+    const r1 = analyzeProject([{ file: 'a.ts', source: bare }]);
+    expect(r1.violations.map((v) => v.rule)).toContain('doc-comment');
+    const docd = '/** adds one */\nfunction foo() {\n  return 1;\n}\n';
+    expect(analyzeProject([{ file: 'a.ts', source: docd }]).violations).toEqual([]);
+    // line comments count as docs too
+    const slash = '// adds one\nconst foo = () => {\n  return 1;\n};\n';
+    expect(analyzeProject([{ file: 'a.ts', source: slash }]).violations).toEqual([]);
+  });
+
+  it('nested functions are exempt — the parent doc covers the cluster', () => {
+    const src = '/** outer */\nfunction outer() {\n  const inner = () => {\n    return 2;\n  };\n  return inner();\n}\n';
+    expect(analyzeProject([{ file: 'a.ts', source: src }]).violations).toEqual([]);
+  });
+
+  it('exported interface/type without a shape comment → type-doc warn; local or documented → clean', () => {
+    const bare = 'export interface Foo {\n  a: number;\n}\nexport type Bar = { b: string };\n';
+    const rules = analyzeProject([{ file: 'a.ts', source: bare }]).violations.map((v) => v.rule);
+    expect(rules.filter((r) => r === 'type-doc').length).toBe(2);
+    const docd = '/** shape */\nexport interface Foo {\n  a: number;\n}\n';
+    expect(analyzeProject([{ file: 'a.ts', source: docd }]).violations).toEqual([]);
+    const local = 'interface Hidden {\n  a: number;\n}\nexport const use = (h: Hidden) => {\n  return h.a;\n};\n// used\n';
+    expect(analyzeProject([{ file: 'a.ts', source: local }]).violations.map((v) => v.rule)).not.toContain('type-doc');
+  });
+
+  it('requireDocs: false disables both rules', () => {
+    const bare = 'function foo() {\n  return 1;\n}\nexport interface Foo {\n  a: number;\n}\n';
+    const r = analyzeProject([{ file: 'a.ts', source: bare }], { ...DEFAULT_QUALITY, requireDocs: false });
+    expect(r.violations).toEqual([]);
+  });
+
+  it('comment-only lines are excluded from fn-size and file-size', () => {
+    // fn: 2 code lines + 3 comment lines inside; maxFnLoc 4 → passes only if comments excluded
+    const fn = [
+      '/** docs */',
+      'function foo() {',
+      '  // one',
+      '  // two',
+      '  // three',
+      '  return 1;',
+      '}',
+    ].join('\n');
+    const r = analyzeProject([{ file: 'a.ts', source: fn }], { ...DEFAULT_QUALITY, maxFnLoc: 4 });
+    expect(r.violations.map((v) => v.rule)).not.toContain('fn-size');
+    // file: 6 code lines + comments past the ceiling → file-size only counts code
+    const pad = Array.from({ length: 10 }, (_, i) => `// c${i}`).join('\n');
+    const file = `${pad}\n/** d */\nexport const x = 1;\n`;
+    const rf = analyzeProject([{ file: 'b.ts', source: file }], { ...DEFAULT_QUALITY, maxFileLoc: 5 });
+    expect(rf.violations.map((v) => v.rule)).not.toContain('file-size');
+  });
+
+  it('pre-computed functions without hasDoc (e.g. Python) skip the doc rule', () => {
+    const fns = [{ name: 'f', startLine: 1, endLine: 3, loc: 3, params: 0, complexity: 1, cognitive: 0, nesting: 0 }];
+    const r = analyzeProject([{ file: 'm.py', source: 'def f():\n    # c\n    return 1\n', functions: fns }]);
+    expect(r.violations.map((v) => v.rule)).not.toContain('doc-comment');
+  });
+});

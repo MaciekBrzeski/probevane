@@ -27,6 +27,7 @@ fixtures/**/cover.out
 # logs / scratch
 *.log
 .probevane/
+!.probevane/quality-baseline.json
 SPEC.md
 .probevane-live/
 test-results/
