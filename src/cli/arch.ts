@@ -42,12 +42,20 @@ async function main() {
 async function pyramid(dir: string, args: string[]) {
   const { buildGraph } = await import('../mock/graph.js');
   const { pyramidReport, pyramidDigest } = await import('../commands/arch/pyramid.js');
+  const { loadConfig } = await import('../util/config.js');
   const list = (flag: string) => {
     const i = args.indexOf(flag);
     return i >= 0 && args[i + 1] ? args[i + 1].split(',').map((s) => s.trim()).filter(Boolean) : undefined;
   };
-  const report = pyramidReport(await buildGraph(dir), { glue: list('--glue'), shared: list('--shared') });
+  // Roles: flag > probevane.config `arch.{glue,shared}` > coupling heuristic.
+  const cfg = (await loadConfig(dir)).arch ?? {};
+  const roles = { glue: list('--glue') ?? cfg.glue, shared: list('--shared') ?? cfg.shared };
+  const report = pyramidReport(await buildGraph(dir), roles);
   console.log(`# Pyramid structure report — ${dir}\n`);
+  if (roles.glue || roles.shared) {
+    const source = list('--glue') || list('--shared') ? 'flags' : 'probevane.config';
+    console.log(`_Declared roles (${source}) — glue: ${roles.glue?.join(', ') ?? 'inferred'} · shared: ${roles.shared?.join(', ') ?? 'inferred'}_\n`);
+  }
   console.log(pyramidDigest(report));
 }
 

@@ -23,6 +23,12 @@ export interface ProbevaneConfig {
   mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
   takeover?: string;
   budget?: number; // hard output-token ceiling per run
+  arch?: ArchRoles; // declared pyramid-model roles for `arch --pyramid` (flags override)
+}
+
+export interface ArchRoles {
+  glue?: string[]; // connection-layer dirs (composition root, wiring, I/O)
+  shared?: string[]; // common-base dirs every pyramid may import
 }
 
 const NAMES = ['probevane.config.ts', 'probevane.config.js', 'probevane.config.mjs', 'probevane.config.json'];
@@ -30,16 +36,27 @@ const NAMES = ['probevane.config.ts', 'probevane.config.js', 'probevane.config.m
 // The known config keys + their expected primitive type — drives validation so a
 // typo (`maxStep`) or wrong type (`minTests: "5"`) is a clear error, not silently
 // ignored. Keep in sync with ProbevaneConfig.
-const SCHEMA: Record<keyof ProbevaneConfig, 'string' | 'number' | 'boolean'> = {
+const SCHEMA: Record<Exclude<keyof ProbevaneConfig, 'arch'>, 'string' | 'number' | 'boolean'> = {
   model: 'string', kind: 'string', minTests: 'number', minCoverage: 'number',
   maxTargets: 'number', maxSteps: 'number', mock: 'boolean', mutation: 'boolean',
   strict: 'boolean', flakeGuard: 'boolean', a11y: 'boolean', visual: 'boolean', quality: 'boolean',
   mfe: 'boolean', takeover: 'string', budget: 'number',
 };
 
+/** Validate the nested `arch` block ({ glue?: string[], shared?: string[] }). */
+function checkArch(v: unknown): string | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return '"arch" must be an object ({ glue?, shared? })';
+  for (const [k, val] of Object.entries(v)) {
+    if (k !== 'glue' && k !== 'shared') return `unknown key "arch.${k}"`;
+    if (!Array.isArray(val) || val.some((s) => typeof s !== 'string')) return `"arch.${k}" must be string[]`;
+  }
+  return null;
+}
+
 /** Validate a single config entry; returns an error string or null. */
 function checkEntry(k: string, v: unknown): string | null {
-  const expected = SCHEMA[k as keyof ProbevaneConfig];
+  if (k === 'arch') return checkArch(v);
+  const expected = SCHEMA[k as Exclude<keyof ProbevaneConfig, 'arch'>];
   if (!expected) return `unknown key "${k}"`;
   if (typeof v !== expected) return `"${k}" must be ${expected} (got ${typeof v})`;
   if (k === 'kind' && v !== 'unit' && v !== 'e2e') return `"kind" must be "unit" or "e2e"`;

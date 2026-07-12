@@ -1,0 +1,6 @@
+{
+  "arch": {
+    "glue": ["cli", "server", "factory", "commands"],
+    "shared": ["util", "cost", "brain", "audit", "library"]
+  }
+}

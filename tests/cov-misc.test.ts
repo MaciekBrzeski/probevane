@@ -324,6 +324,16 @@ describe('config loadConfig / validateConfig / pick', () => {
     expect(validateConfig({ model: 'x', kind: 'unit', minTests: 2, mock: true })).toEqual([]);
   });
 
+  it('validateConfig accepts the nested arch role block, rejects malformed ones', () => {
+    expect(validateConfig({ arch: { glue: ['cli'], shared: ['util', 'cost'] } })).toEqual([]);
+    expect(validateConfig({ arch: { glue: [] } })).toEqual([]);
+    expect(validateConfig({ arch: 'cli' })).toEqual(['"arch" must be an object ({ glue?, shared? })']);
+    expect(validateConfig({ arch: ['cli'] })).toEqual(['"arch" must be an object ({ glue?, shared? })']);
+    expect(validateConfig({ arch: { blue: ['cli'] } })).toEqual(['unknown key "arch.blue"']);
+    expect(validateConfig({ arch: { glue: 'cli' } })).toEqual(['"arch.glue" must be string[]']);
+    expect(validateConfig({ arch: { shared: ['util', 7] } })).toEqual(['"arch.shared" must be string[]']);
+  });
+
   it('pick returns the first defined value, else undefined', () => {
     expect(pick(undefined, 2, 3)).toBe(2);
     expect(pick('a')).toBe('a');
