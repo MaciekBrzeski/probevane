@@ -11,6 +11,8 @@ import { flag, positionals } from '../util/args.js';
 // <state>/specs/<id>.json. That spec IS the specification a dark run executes.
 const VALUE_FLAGS = ['--answers', '--model', '--takeover', '--root'];
 
+// Entry: build + validate the RunSpec from the prompt, persist it, and print how
+// a dark run would execute it.
 async function main() {
   const args = process.argv.slice(2);
   const pos = positionals(args, VALUE_FLAGS);

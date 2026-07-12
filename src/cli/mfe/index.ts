@@ -28,6 +28,8 @@ async function resolveRepos(args: string[]): Promise<string[]> {
   return pos.length ? pos : ['.'];
 }
 
+// Entry: drive the fleet pipeline (runMfe), write the combined report only when
+// meaningful, then print the per-repo rollup; --strict exits 1 on errors.
 async function main() {
   const args = process.argv.slice(2);
   const repos = await resolveRepos(args);

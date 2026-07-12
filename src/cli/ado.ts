@@ -39,6 +39,8 @@ function runCli(directive: AdoDirective): Promise<{ ok: boolean; out: string }> 
   });
 }
 
+// `ado create` — file a tagged work item describing a probevane task, so a later
+// `ado run` poll picks it up and launches the loop.
 async function runCreate(args: string[], client: Client, cfg: AdoConfig, tag: string): Promise<void> {
   const type = flag(args, '--type') ?? 'Issue';
   const title = flag(args, '--title') ?? '[probevane] generate . --kind unit';
@@ -48,6 +50,8 @@ async function runCreate(args: string[], client: Client, cfg: AdoConfig, tag: st
   console.log(`      https://dev.azure.com/${cfg.org}/${cfg.project}/_workitems/edit/${id}`);
 }
 
+// `ado attach` — upload files and link them to a work item (evidence/artifacts
+// land on the board, not in chat).
 async function runAttach(args: string[], client: Client): Promise<void> {
   // probevane ado attach <id> <file...> [--comment "label"]
   const id = Number(args[1]);
@@ -64,6 +68,8 @@ async function runAttach(args: string[], client: Client): Promise<void> {
   }
 }
 
+// `ado qa` — record what was actually verified on the work item itself, so the
+// board documents the change (usage detailed in the body).
 async function runQa(args: string[], client: Client): Promise<void> {
   // probevane ado qa <id> --text "<natural-language QA summary>" [--comment]
   // Appends a human-readable QA section to the work item's Description (and optionally
@@ -100,6 +106,8 @@ async function runRun(client: Client, tag: string, todo: string, active: string,
   }
 }
 
+// Entry: resolve org/project/PAT config, then dispatch the subcommand
+// (run|create|attach|qa). A missing PAT is a hard exit with setup pointers.
 async function main() {
   const args = process.argv.slice(2);
   const sub = args[0];

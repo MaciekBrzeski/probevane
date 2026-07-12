@@ -107,6 +107,8 @@ async function costPreview(dir: string, untested: string[]): Promise<string> {
   return `- est. cost to cover: **$${sim[0].cost.toFixed(2)}** all-api · hybrid $${sim[1].cost.toFixed(2)} · bridge $0  _(${e} local-draftable, ${h} bridge)_`;
 }
 
+// Entry: detect the stack, diff since --base, then compose the markdown summary
+// from the optional generate/review-fix/cost sections.
 async function main() {
   const args = process.argv.slice(2);
   const dir = dirArg(args);
@@ -146,6 +148,7 @@ async function main() {
   if (!doGenerate && untested.length && args.includes('--strict')) process.exit(1);
 }
 
+/** Print the summary and mirror it to $GITHUB_STEP_SUMMARY when in Actions. */
 async function emit(md: string): Promise<void> {
   console.log(md);
   const summary = process.env.GITHUB_STEP_SUMMARY;

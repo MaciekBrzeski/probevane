@@ -28,6 +28,8 @@ async function main() {
   }
 }
 
+// Local flag variant: returns '' (not undefined) when --mermaid is passed without
+// a value, so the caller can distinguish "default the out path" from "flag absent".
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
   if (i < 0) return undefined;

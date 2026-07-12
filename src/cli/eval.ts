@@ -29,6 +29,9 @@ interface EvalCase {
 // Live mode: regenerate the fixture suite from zero before scoring. Returns
 // the run's cost/token footprint so the improvement-log can join quality × $.
 interface LiveStats { costUsd: number; tokensIn: number; tokensOut: number }
+// Regenerate the fixture's suite from zero with the gated loop (mutation on —
+// self-eval enforces the correctness floor); returns the run's cost/token stats,
+// or null when generation errored.
 async function liveGenerate(c: EvalCase, dir: string, adapter: Adapter, base: Baseline): Promise<LiveStats | null> {
   const { anthropicBrain } = await import('../brain/anthropic-sdk.js');
   const { generateTests } = await import('../loop/run/generation.js');
@@ -77,6 +80,8 @@ async function liveMutationScore(dir: string, adapter: Adapter): Promise<number 
     .catch(() => undefined);
 }
 
+// Score one fixture case against its committed baseline and append the
+// improvement-log row; live mode regenerates the suite + grades mutation first.
 async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
   const { live, flakeRuns, stamp, logPath } = opts;
   const base = JSON.parse(
@@ -126,6 +131,8 @@ async function runEvalCase(c: EvalCase, opts: EvalOpts): Promise<boolean> {
   return verdict.pass;
 }
 
+// Entry: run every case from eval/cases.jsonl (or --paths); exit 1 if any fails —
+// this is the harness's own no-regression gate.
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--paths')) return runPathCases(args);
@@ -197,6 +204,7 @@ async function startRecording(cassette: string): Promise<string> {
   return rec;
 }
 
+/** End recording: promote the sidecar over the cassette on accept, drop it otherwise. */
 async function finishRecording(rec: string, cassette: string, accepted: boolean, label: string): Promise<void> {
   delete process.env.PROBEVANE_RECORD;
   if (accepted) {
@@ -207,6 +215,8 @@ async function finishRecording(rec: string, cassette: string, accepted: boolean,
   }
 }
 
+// One refactor/feature/repair case: replay its cassette (default) or run
+// live/record, then score + judge against the baseline and log the row.
 async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   const { live, record, stamp, logPath } = opts;
   const base = JSON.parse(

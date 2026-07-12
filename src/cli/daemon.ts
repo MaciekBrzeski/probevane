@@ -51,6 +51,7 @@ const alertOpts = {
   errorBurst: Number(process.env.PROBEVANE_ALERT_ERRORS ?? DEFAULT_ALERT_OPTS.errorBurst),
 };
 
+/** Harness version for /health — from package.json; '0.0.0' outside a checkout. */
 async function pkgVersion(): Promise<string> {
   const p = join(process.env.PROBEVANE_ROOT ?? resolve('.'), 'package.json');
   return readFile(p, 'utf8')
@@ -101,6 +102,7 @@ async function scanRuns(): Promise<{ records: RunRecord[]; ledgers: number }> {
   return { records: all, ledgers: ledgers.length };
 }
 
+/** Uniform JSON response helper shared by every route (pretty-printed for curl). */
 function sendJson(res: ServerResponse, code: number, body: unknown) {
   const s = JSON.stringify(body, null, 2);
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' });
@@ -167,11 +169,12 @@ const server = createServer((req, res) => {
   void handle(req, res);
 });
 
-// Periodic alert evaluation → structured log (so alerts are recorded even with no
-// client polling /alerts; an external notifier can tail daemon.log.jsonl).
 let timer: NodeJS.Timeout | undefined;
 const WEBHOOK = process.env.PROBEVANE_ALERT_WEBHOOK; // POST new alerts here (Slack-compatible)
 const sentAlerts = new Set<string>(); // dedup across intervals — post each alert once
+// Periodic alert evaluation → structured log (so alerts are recorded even with no
+// client polling /alerts; an external notifier can tail daemon.log.jsonl). Also
+// trips the halt breaker and posts genuinely-new alerts to the webhook, once each.
 async function evalAlerts() {
   const { records, ledgers } = await scanRuns();
   const { daily } = aggregateOverTime(records);
@@ -212,6 +215,8 @@ process.on('unhandledRejection', (e: any) =>
 );
 
 let shuttingDown = false;
+// Graceful shutdown (SIGTERM/SIGINT): stop timers, reap PTYs, flush the log, close
+// the server — with a 5s hard cap so a hung connection can't block exit.
 async function shutdown(sig: string) {
   if (shuttingDown) return;
   shuttingDown = true;

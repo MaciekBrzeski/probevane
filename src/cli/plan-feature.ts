@@ -20,6 +20,8 @@ function state(args: string[], name: string): string | undefined {
   return undefined;
 }
 
+// Entry: read the two states, run the local planner, print or --out the plan.
+// Exits 2 on missing states, 1 when the planner fails.
 async function main() {
   const args = process.argv.slice(2);
   const from = state(args, 'from');

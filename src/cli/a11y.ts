@@ -10,6 +10,8 @@ import { a11yRules } from '../audit/a11y-rules.js';
 const COMPONENT_RE = /\.(tsx|jsx|vue|svelte)$/;
 const SKIP = new Set(['node_modules', 'dist', 'build', 'coverage', '.git']);
 
+// Entry: walk src/ for component sources, run the static a11y rules over each,
+// then print the graded markdown (mirrored to $GITHUB_STEP_SUMMARY in Actions).
 async function main() {
   const dir = resolve(process.argv.slice(2).find((a) => !a.startsWith('--')) ?? '.');
   const files = (await walk(join(dir, 'src')).catch(() => [])).filter((f) => COMPONENT_RE.test(f) && !/\.(test|spec)\./.test(f));
@@ -40,6 +42,7 @@ async function main() {
   if (errors > 0) process.exit(1);
 }
 
+/** Recursive file listing under dir, skipping vendored/build dirs (SKIP). */
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {

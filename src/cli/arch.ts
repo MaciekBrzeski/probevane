@@ -41,6 +41,8 @@ async function main() {
   }
 }
 
+// --pyramid: score the module graph against the pyramid model (roles: flags >
+// config > coupling inference), then append the folder-crowding check.
 async function pyramid(dir: string, args: string[]) {
   const { buildGraph } = await import('../mock/graph.js');
   const { pyramidReport, pyramidDigest } = await import('../commands/arch/pyramid.js');
@@ -73,6 +75,8 @@ async function pyramid(dir: string, args: string[]) {
   if (crowdedOut) console.log('\n' + crowdedOut);
 }
 
+// --snapshot: persist coupling metrics to a committed JSON and print drift vs the
+// previous snapshot — coupling regressions become visible in review.
 async function snapshot(dir: string, args: string[]) {
   const { buildGraph } = await import('../mock/graph.js');
   const { archMetrics, archDrift } = await import('../commands/arch/metrics.js');

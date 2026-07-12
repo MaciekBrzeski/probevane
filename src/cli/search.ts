@@ -13,6 +13,7 @@ import { flag } from '../util/args.js';
 
 const VALUE_FLAGS = new Set(['--top', '--threshold', '--query']);
 
+/** Positional args with value-flag values skipped — a --top value is never mistaken for the query. */
 function positionals(args: string[]): string[] {
   const pos: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -25,6 +26,7 @@ function positionals(args: string[]): string[] {
   return pos;
 }
 
+/** First positional that is a directory = dir; the rest (or --query) join into the concept. */
 function resolveDirAndQuery(args: string[]): { dir: string; query: string } {
   const pos = positionals(args);
   let dir = '.';
@@ -36,6 +38,8 @@ function resolveDirAndQuery(args: string[]): { dir: string; query: string } {
   return { dir: resolve(dir), query: flag(args, '--query') ?? parts.join(' ') };
 }
 
+// Entry: build/reuse the embedding index, then rank modules against the concept —
+// or list near-duplicate module pairs with --similar.
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const { dir, query } = resolveDirAndQuery(args);
