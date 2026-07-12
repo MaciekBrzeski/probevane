@@ -31,11 +31,12 @@ function skipString(raw: string, i: number, quote: string): number {
   return i + 1;
 }
 
+/** Single/double quote — the string openers skipInterp must step over. */
+const isQuote = (c: string): boolean => c === '"' || c === "'";
+
 /** Skip a `${ … }` interpolation from just after the `{`; balances braces and
  *  steps over strings + nested templates inside it (so a `}` or backtick within a
  *  string/nested-template doesn't end it early). Returns the index past the `}`. */
-const isQuote = (c: string): boolean => c === '"' || c === "'";
-
 function skipInterp(raw: string, i: number): number {
   let depth = 1;
   while (i < raw.length) {
@@ -179,10 +180,12 @@ const NEST_KINDS = new Set<SyntaxKind>([
   SyntaxKind.WhileStatement, SyntaxKind.DoStatement, SyntaxKind.CatchClause, SyntaxKind.SwitchStatement,
 ]);
 
+/** Any function-shaped node — the boundary at which body measurement stops descending. */
 function isFnLike(n: Node): boolean {
   return FN_KINDS.has(n.getKind());
 }
 
+/** `&&` / `||` binary — short-circuits are decision points, so they count as branches. */
 function isLogicalBinary(n: Node): boolean {
   if (!Node.isBinaryExpression(n)) return false;
   const op = n.getOperatorToken().getKind();
@@ -203,6 +206,7 @@ function fnName(n: Node): string {
   return '(anonymous)';
 }
 
+/** The function's body when it is a block; expression-body arrows yield undefined (nothing to size). */
 function blockBodyOf(n: Node): Node | undefined {
   const b = (n as { getBody?: () => Node | undefined }).getBody?.();
   return b && Node.isBlock(b) ? b : undefined;
@@ -294,6 +298,9 @@ export function detectFunctions(source: string): FnMetric[] {
   return out;
 }
 
+/** One interface/type-alias declaration in a file: where it is, whether it's
+ *  exported, and whether a shape comment precedes it. Filled by detectTypeDecls;
+ *  judged by the type-doc rule. */
 export interface TypeDecl {
   name: string;
   line: number;

@@ -17,6 +17,8 @@ const TEST = /\.(test|spec|d)\.[tj]sx?$/;
 const PY_TEST = /(^|\/)(test_[^/]+|[^/]+_test|conftest)\.py$/;
 const IS_PY = /\.py$/;
 
+/** Recursively collect file paths under dir, pruning SKIP dirs; unreadable
+ *  dirs read as empty so a bad entry can't fail the whole scan. */
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
@@ -34,6 +36,9 @@ export function selectInputPaths(allPaths: string[], changed?: string[]): string
   return allPaths.filter((p) => set.has(p));
 }
 
+/** The I/O entry point (CLI + daemon): walk the tree (preferring src/), read
+ *  non-test sources, attach Python metrics from the subprocess detector, and
+ *  run the pure analyzer. */
 export async function scanProject(
   dir: string,
   cfg: QualityConfig = DEFAULT_QUALITY,

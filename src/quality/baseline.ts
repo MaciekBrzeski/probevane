@@ -15,6 +15,7 @@ export function violationKey(v: QViolation): string {
   return `${v.file}::${v.rule}::${what}`;
 }
 
+/** Where the ratchet file lives inside the target project. */
 function baselinePath(dir: string): string {
   return join(dir, BASELINE_FILE);
 }
@@ -27,6 +28,8 @@ export function writeBaseline(dir: string, report: QualityReport): number {
   return keys.length;
 }
 
+/** Load the accepted key set; undefined when no baseline was ever written
+ *  (or it is unreadable) — callers then leave the report untouched. */
 function readBaseline(dir: string): Set<string> | undefined {
   try {
     return new Set(JSON.parse(readFileSync(baselinePath(dir), 'utf8')) as string[]);

@@ -68,6 +68,9 @@ print(json.dumps({f: funcs(s) for f, s in data.items()}))
 
 const PY_CANDIDATES = [process.env.PROBEVANE_PYTHON, 'python3', 'python'].filter(Boolean) as string[];
 
+/** Run the embedded analyzer script under `py`, feeding `input` on stdin.
+ *  Rejects on spawn failure or non-zero exit so the caller can fall through
+ *  to the next interpreter candidate. */
 function runPython(py: string, input: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(py, ['-c', PY], { stdio: ['pipe', 'pipe', 'pipe'] });

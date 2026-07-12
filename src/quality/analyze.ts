@@ -33,6 +33,9 @@ export const DEFAULT_QUALITY: QualityConfig = {
   requireDocs: true,
 };
 
+/** One threshold breach: where (file:line), which rule, and how far over
+ *  (value vs threshold). Built by the violation helpers; rendered by
+ *  formatQuality and counted into the gate's errors/warns. */
 export interface QViolation {
   file: string;
   line: number;
@@ -43,6 +46,8 @@ export interface QViolation {
   threshold: number;
 }
 
+/** Size/complexity measurements for one function. Filled by detectFunctions
+ *  (TS/JS AST) or py-detect (Python subprocess); judged by fnLevelViolations. */
 export interface FnMetric {
   name: string;
   startLine: number;
@@ -56,6 +61,9 @@ export interface FnMetric {
   commentLoc?: number; // comment-only lines inside the span — excluded from the size rule
 }
 
+/** Everything measured about one file — sizes, imports, debt, long lines,
+ *  per-function metrics, exported type decls. One per input, produced by
+ *  analyzeFile and aggregated into QualityReport. */
 export interface FileReport {
   file: string;
   loc: number;
@@ -69,12 +77,17 @@ export interface FileReport {
   types: TypeDecl[]; // exported interface/type-alias decls (doc-rule input)
 }
 
+/** One duplicated block: how big, how often, and every place it appears.
+ *  Emitted by findDuplication (maximal blocks, not fixed windows). */
 export interface Dup {
   lines: number; // size of the duplicated block
   count: number; // how many times it appears
   occurrences: { file: string; startLine: number }[];
 }
 
+/** The whole analysis: per-file reports, all violations, duplication, and a
+ *  0..100 health score. Returned by analyzeProject; consumed by the quality
+ *  CLI, gate, and baseline ratchet. */
 export interface QualityReport {
   files: FileReport[];
   functions: number;
@@ -99,6 +112,7 @@ import { mkViolation, fileLevelViolations, fnLevelViolations } from './analyze-v
 // (and keeps this very comment from tripping the rule).
 const DEBT_LEAD = /^\s*(TODO|FIXME|HACK|XXX)\b/;
 const DEBT_COLON = /\b(TODO|FIXME|HACK|XXX):/;
+/** True when the comment text is a real debt annotation per the rules above. */
 function isDebt(comment: string): boolean {
   return DEBT_LEAD.test(comment) || DEBT_COLON.test(comment);
 }
@@ -123,12 +137,16 @@ function commentOnlyLines(file: string, lines: string[], code: string[]): Set<nu
   return out;
 }
 
+/** How many members of `set` fall inside the inclusive [from, to] line range. */
 const countIn = (set: Set<number>, from: number, to: number): number => {
   let n = 0;
   for (let i = from; i <= to; i++) if (set.has(i)) n++;
   return n;
 };
 
+/** Measure one file: imports, code-width long lines, comment-borne debt,
+ *  comment-only lines, per-function metrics (detected here unless pre-computed,
+ *  e.g. Python), and exported type decls. Pure — the caller supplies the source. */
 export function analyzeFile(
   file: string,
   source: string,
@@ -177,9 +195,7 @@ export function analyzeFile(
 
 const DUP_CAP = 25;
 
-/** Cross-file duplicate-block detection — reports MAXIMAL blocks, not fixed-size
- *  windows. A duplicated 10-line block is one Dup of `lines:10`, not five
- *  overlapping 6-line ones. Returns whether the report was capped. */
+// One window occurrence: which file, and the 0-based line index it starts at.
 type Occ = { file: string; idx: number };
 
 /** Hash every minLines-window of each file → its occurrences (mostly-blank skipped). */
@@ -211,6 +227,9 @@ function extendBlock(occ: Occ[], codeOf: Map<string, string[]>, minLines: number
   return len;
 }
 
+/** Cross-file duplicate-block detection — reports MAXIMAL blocks, not fixed-size
+ *  windows. A duplicated 10-line block is one Dup of `lines:10`, not five
+ *  overlapping 6-line ones. Returns whether the report was capped. */
 export function findDuplication(
   perFile: { file: string; code: string[] }[],
   minLines: number,
@@ -250,6 +269,9 @@ export function findDuplication(
   return { dups: dups.slice(0, DUP_CAP), capped: dups.length > DUP_CAP };
 }
 
+/** The analyzer's entry point: measure every input, collect file/function/
+ *  duplication violations, and grade 0..100 (errors cost 5, warns 2). Pure —
+ *  scanProject does the I/O. */
 export function analyzeProject(
   inputs: { file: string; source: string; functions?: FnMetric[] }[],
   cfg: QualityConfig = DEFAULT_QUALITY,
@@ -285,6 +307,8 @@ export function analyzeProject(
   return { files, functions: fnCount, violations, duplication, duplicationCapped, errors, warns, score };
 }
 
+/** Violations as stable sorted `file:line: severity: [rule] message` lines —
+ *  the CLI's text output (and what the gate quotes back to the loop). */
 export function formatQuality(r: QualityReport): string {
   const lines = r.violations
     .slice()
