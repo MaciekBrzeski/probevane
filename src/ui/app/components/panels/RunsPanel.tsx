@@ -3,6 +3,8 @@
 // terminal run list renders.
 import { RUN_COLUMNS } from '../../../../util/theme.ts';
 
+// Static Runs-tab skeleton — loadRuns() in main.tsx swaps in the live tbody +
+// active-runs box, so this markup only renders once.
 export function RunsPanel(): Node {
   return (
     <section data-tab="runs">

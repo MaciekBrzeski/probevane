@@ -22,6 +22,7 @@ let es: EventSource | null = null;
 let sessionId: string | null = null;
 let inited = false;
 
+// One-line status under the toolbar — the tab's only feedback channel.
 function msg(text: string): void { $('termMsg').textContent = text; }
 
 /** Idempotent lazy init — wire toolbar, reattach a live session if one exists. */
@@ -42,6 +43,7 @@ export async function loadTerminal(): Promise<void> {
   }
 }
 
+// Spawn a PTY session on the daemon (sized to the fitted term), then attach its stream.
 async function startSession(cmd: string[]): Promise<void> {
   ensureTerm();
   fit?.fit();
@@ -53,6 +55,8 @@ async function startSession(cmd: string[]): Promise<void> {
   } catch (e) { msg('✗ ' + String(e)); }
 }
 
+// Lazy xterm construction — one instance reused across sessions so scrollback
+// and listeners survive a shell restart.
 function ensureTerm(): void {
   if (term) return;
   term = new Terminal({ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, cursorBlink: true,
@@ -68,6 +72,8 @@ function ensureTerm(): void {
 // Batch keystrokes ~10ms so a fast typer isn't one POST per char.
 let inQueue = '';
 let inTimer: ReturnType<typeof setTimeout> | null = null;
+// Queue keystrokes; the ~10ms timer flushes them as ONE base64 POST so a fast
+// typer isn't one request per char.
 function sendInput(s: string): void {
   inQueue += s;
   if (inTimer) return;
@@ -78,6 +84,8 @@ function sendInput(s: string): void {
   }, 10);
 }
 
+// Attach to a session's SSE stream: base64 frames → term.write, exit message →
+// status line + teardown. Replaces any previous stream.
 function openStream(id: string): void {
   ensureTerm();
   if (es) es.close();
@@ -94,6 +102,8 @@ function openStream(id: string): void {
   fitAndResize();
 }
 
+// Refit xterm to its box and tell the daemon the new PTY size so full-screen
+// programs redraw correctly.
 function fitAndResize(): void {
   if (!term || !fit) return;
   fit.fit();
@@ -105,6 +115,7 @@ function fitAndResize(): void {
 }
 
 let fitTimer: ReturnType<typeof setTimeout> | null = null;
+// Window-resize handler — coalesce refits to one per 150ms burst.
 function debouncedFit(): void {
   if (fitTimer) clearTimeout(fitTimer);
   fitTimer = setTimeout(fitAndResize, 150);

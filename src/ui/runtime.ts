@@ -10,6 +10,8 @@ export type Child = Node | string | number | null | undefined | false | Child[];
 
 type Props = Record<string, unknown> | null;
 
+// JSX factory: component tags are plain functions and get called; intrinsic
+// tags build a real element with props applied and children appended.
 export function h(
   tag: string | ((props: Record<string, unknown>) => Node),
   props: Props,
@@ -22,6 +24,8 @@ export function h(
   return node;
 }
 
+// Map one JSX prop onto the element: on* → listener, class → className,
+// dataset merge, known DOM property, else attribute — in that priority order.
 function applyProp(node: HTMLElement, k: string, v: unknown): void {
   if (v === null || v === undefined || v === false) return;
   if (k.startsWith('on') && typeof v === 'function') {
@@ -38,12 +42,15 @@ function applyProp(node: HTMLElement, k: string, v: unknown): void {
   }
 }
 
+// JSX fragment: children into a DocumentFragment — grouping without a wrapper.
 export function Fragment(props: { children?: Child[] }): Node {
   const frag = document.createDocumentFragment();
   append(frag, props.children ?? []);
   return frag;
 }
 
+// Append children, flattening nested arrays and skipping null/undefined/false
+// so JSX conditionals ({cond && ...}) just work.
 function append(parent: Node, children: Child[]): void {
   for (const c of children) {
     if (c === null || c === undefined || c === false) continue;
