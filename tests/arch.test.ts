@@ -133,3 +133,93 @@ describe('archDrift', () => {
     expect(archDrift(M(), next)).toContain('- edge loop → brain dropped (was 5)');
   });
 });
+
+// ---------------------------------------------------------------------------
+// pyramid model — isolated feature pyramids on a glue base
+// ---------------------------------------------------------------------------
+import { inferRole, pyramidReport, pyramidDigest } from '../src/commands/arch/pyramid.js';
+
+describe('pyramid.inferRole', () => {
+  it('classifies from coupling: composition root = glue, broad base = shared, rest = feature', () => {
+    expect(inferRole('cli', { fanIn: 0, fanOut: 5 })).toBe('glue');
+    expect(inferRole('util', { fanIn: 6, fanOut: 0 })).toBe('shared');
+    expect(inferRole('loop', { fanIn: 3, fanOut: 4 })).toBe('feature');
+  });
+  it('bare root-level files are connection layer', () => {
+    expect(inferRole('config.ts', { fanIn: 5, fanOut: 0 })).toBe('glue');
+  });
+  it('explicit overrides beat the heuristic', () => {
+    expect(inferRole('cost', { fanIn: 1, fanOut: 3 }, { shared: ['cost'] })).toBe('shared');
+    expect(inferRole('server', { fanIn: 2, fanOut: 1 }, { glue: ['server'] })).toBe('glue');
+  });
+});
+
+describe('pyramid.pyramidReport', () => {
+  // glue: cli (fanIn 0). shared: util (fanIn 4, fanOut 0). features: a, b, c, d.
+  const g = graph([
+    { path: 'src/cli/run.ts', kind: 'util', imports: ['src/a/api.ts', 'src/b/inner/deep.ts', 'src/util/x.ts'] },
+    { path: 'src/a/api.ts', kind: 'util', imports: ['src/a/impl.ts', 'src/b/api.ts', 'src/util/x.ts'] },
+    { path: 'src/a/impl.ts', kind: 'util', imports: [] },
+    { path: 'src/b/api.ts', kind: 'util', imports: ['src/b/inner/deep.ts', 'src/util/x.ts'] },
+    { path: 'src/b/inner/deep.ts', kind: 'util', imports: ['src/cli/run.ts'] },
+    { path: 'src/c/only.ts', kind: 'util', imports: ['src/util/x.ts'] },
+    { path: 'src/d/leaf.ts', kind: 'util', imports: [] },
+    { path: 'src/util/x.ts', kind: 'util', imports: ['src/d/leaf.ts'] },
+  ]);
+  const r = pyramidReport(g);
+  const find = (kind: string) => r.violations.find((v) => v.kind === kind);
+
+  it('flags feature→feature with cost + example', () => {
+    const v = find('feature→feature')!;
+    expect([v.from, v.to]).toEqual(['a', 'b']);
+    expect(v.count).toBe(1);
+    expect(v.examples[0]).toBe('src/a/api.ts → src/b/api.ts');
+  });
+  it('flags feature→glue inversion', () => {
+    const v = find('feature→glue')!;
+    expect([v.from, v.to]).toEqual(['b', 'cli']);
+  });
+  it('flags shared→feature (base depending on a tip)', () => {
+    const v = find('shared→feature')!;
+    expect([v.from, v.to]).toEqual(['util', 'd']);
+  });
+  it('flags glue deep-reach past a pyramid base, but not glue→base', () => {
+    const v = find('deep-reach')!;
+    expect([v.from, v.to]).toEqual(['cli', 'b']); // cli → b/inner/deep.ts
+    expect(r.violations.some((x) => x.kind === 'deep-reach' && x.to === 'a')).toBe(false); // cli → a/api.ts is legal
+  });
+  it('anyone→shared is legal, intra-pyramid imports count toward isolation', () => {
+    const a = r.dirs.find((d) => d.dir === 'a')!;
+    expect(a.role).toBe('feature');
+    expect(a.intra).toBe(1); // api → impl
+    expect(a.leaks).toBe(1); // api → b
+    expect(a.isolation).toBe(0.5);
+    const c = r.dirs.find((d) => d.dir === 'c')!;
+    expect(c.leaks).toBe(0); // c → util is legal
+    expect(c.isolation).toBe(1);
+  });
+  it('score = share of cross-dir imports that respect the model', () => {
+    // cross imports: cli→a, cli→b(deep), cli→util, a→b, a→util, b→util, b→cli, c→util, util→d = 9; bad = 4
+    expect(r.score).toBe(Math.round(100 * (1 - 4 / 9)));
+  });
+  it('a clean tree scores 100 and reports no violations (overrides flow through)', () => {
+    const clean = pyramidReport(graph([
+      { path: 'src/cli/run.ts', kind: 'util', imports: ['src/a/api.ts'] },
+      { path: 'src/a/api.ts', kind: 'util', imports: [] },
+    ]), { glue: ['cli'] }); // toy graph too small for the fanOut heuristic — declare the root
+    expect(clean.score).toBe(100);
+    expect(clean.violations).toEqual([]);
+  });
+  it('digest names roles, isolation, violations with fixes, and the score', () => {
+    const d = pyramidDigest(r);
+    expect(d).toContain('glue: cli');
+    expect(d).toContain('shared: util');
+    expect(d).toContain('[feature→feature] a → b (1)');
+    expect(d).toContain('fix: route through glue');
+    expect(d).toContain(`Pyramid score: ${r.score}/100`);
+  });
+  it('digest says so when the structure already fits', () => {
+    const clean = pyramidReport(graph([{ path: 'src/a/x.ts', kind: 'util', imports: [] }]));
+    expect(pyramidDigest(clean)).toContain('none — the structure already fits the model');
+  });
+});

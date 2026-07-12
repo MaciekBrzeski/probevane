@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { archCritique } from '../commands/arch/critique.js';
 import { dirArg } from './args.js';
 
-// probevane arch <dir> [--no-llm] [--folder-only] [--snapshot [--out <file>]]
+// probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d]] [--snapshot [--out <file>]]
 //
 // Experimental architecture critique: render the folder tree + dependency tree +
 // directory coupling metrics, then ask an LLM ($0 ollama) what could be
@@ -12,12 +12,17 @@ import { dirArg } from './args.js';
 // --snapshot: persist the coupling metrics (docs/arch-snapshot.json) and print
 // drift vs the previous snapshot — the committed file makes coupling
 // regressions visible over time. Still report-only, never a gate.
+// --pyramid: score the tree against the pyramid model (isolated feature
+// pyramids on a glue base, shared dirs as the common floor); roles are
+// inferred from coupling, --glue/--shared override the inference.
 async function main() {
   const args = process.argv.slice(2);
   const dir = dirArg(args);
-  const llm = !args.includes('--no-llm') && !args.includes('--folder-only') && !args.includes('--snapshot');
+  const llm = !args.includes('--no-llm') && !args.includes('--folder-only') && !args.includes('--snapshot')
+    && !args.includes('--pyramid');
 
   if (args.includes('--snapshot')) return snapshot(dir, args);
+  if (args.includes('--pyramid')) return pyramid(dir, args);
 
   const report = await archCritique(dir, { llm });
   console.log(`# Architecture critique — ${dir}`);
@@ -32,6 +37,18 @@ async function main() {
     console.log(`\n## Findings (${report.model})\n`);
     console.log(report.findings);
   }
+}
+
+async function pyramid(dir: string, args: string[]) {
+  const { buildGraph } = await import('../mock/graph.js');
+  const { pyramidReport, pyramidDigest } = await import('../commands/arch/pyramid.js');
+  const list = (flag: string) => {
+    const i = args.indexOf(flag);
+    return i >= 0 && args[i + 1] ? args[i + 1].split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+  };
+  const report = pyramidReport(await buildGraph(dir), { glue: list('--glue'), shared: list('--shared') });
+  console.log(`# Pyramid structure report — ${dir}\n`);
+  console.log(pyramidDigest(report));
 }
 
 async function snapshot(dir: string, args: string[]) {
