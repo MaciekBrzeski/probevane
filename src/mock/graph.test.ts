@@ -236,3 +236,84 @@ describe('buildGraph – missing src/ directory', () => {
     expect(graph.order.length).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// npm workspaces — vendored packages outside src/ join the graph, and their
+// package-name imports resolve like local ones.
+// ---------------------------------------------------------------------------
+import { loadWorkspaces, resolveWorkspaceImports } from './graph.js';
+
+/** Monorepo fixture: src/ + two workspace packages under pkgs/. */
+function makeMonorepo(): string {
+  const dir = mkdtempSync(join(rootDir, 'mono-'));
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'root', workspaces: ['pkgs/*'] }));
+  mkdirSync(join(dir, 'pkgs', 'core', 'src'), { recursive: true });
+  writeFileSync(join(dir, 'pkgs', 'core', 'package.json'), JSON.stringify({ name: '@w/core', main: 'src/index.ts' }));
+  writeFileSync(join(dir, 'pkgs', 'core', 'src', 'index.ts'), 'export const core = 1;\n');
+  writeFileSync(join(dir, 'pkgs', 'core', 'src', 'extra.ts'), 'export const extra = 1;\n');
+  mkdirSync(join(dir, 'pkgs', 'term'), { recursive: true });
+  writeFileSync(join(dir, 'pkgs', 'term', 'package.json'), JSON.stringify({ name: '@w/term' })); // no main → index
+  writeFileSync(join(dir, 'pkgs', 'term', 'index.ts'), "import { core } from '@w/core';\nexport const t = core;\n");
+  return dir;
+}
+
+describe('loadWorkspaces', () => {
+  it('expands trailing-* globs and reads each package name + entry', async () => {
+    const dir = makeMonorepo();
+    const ws = await loadWorkspaces(dir);
+    expect(ws).toEqual([
+      { name: '@w/core', dir: 'pkgs/core', main: 'src/index.ts' },
+      { name: '@w/term', dir: 'pkgs/term', main: 'index' },
+    ]);
+  });
+
+  it('handles the {packages: []} form, explicit dirs, and dirs without a package.json', async () => {
+    const dir = mkdtempSync(join(rootDir, 'mono-'));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ workspaces: { packages: ['a', 'ghost'] } }));
+    mkdirSync(join(dir, 'a'), { recursive: true });
+    writeFileSync(join(dir, 'a', 'package.json'), JSON.stringify({ name: 'a-pkg' }));
+    expect(await loadWorkspaces(dir)).toEqual([{ name: 'a-pkg', dir: 'a', main: 'index' }]);
+  });
+
+  it('no package.json / no workspaces field → []', async () => {
+    expect(await loadWorkspaces(mkdtempSync(join(rootDir, 'mono-')))).toEqual([]);
+  });
+});
+
+describe('resolveWorkspaceImports', () => {
+  const dir = '/proj';
+  const ws = [{ name: '@w/core', dir: 'pkgs/core', main: 'src/index.ts' }];
+  const files = ['/proj/pkgs/core/src/index.ts', '/proj/pkgs/core/src/extra.ts'];
+
+  it('bare package name resolves to the entry; name/sub to the sub file', () => {
+    expect(resolveWorkspaceImports("import { c } from '@w/core';", dir, files, ws)).toEqual(['pkgs/core/src/index.ts']);
+    expect(resolveWorkspaceImports("import { e } from '@w/core/src/extra';", dir, files, ws)).toEqual(['pkgs/core/src/extra.ts']);
+  });
+
+  it('skips type-only imports and unknown packages', () => {
+    expect(resolveWorkspaceImports("import type { C } from '@w/core';", dir, files, ws)).toEqual([]);
+    expect(resolveWorkspaceImports("import { type C } from '@w/core';", dir, files, ws)).toEqual([]);
+    expect(resolveWorkspaceImports("import react from 'react';", dir, files, ws)).toEqual([]);
+    expect(resolveWorkspaceImports("import x from '@w/core';", dir, files, [])).toEqual([]);
+  });
+});
+
+describe('buildGraph – npm workspaces', () => {
+  it('workspace sources join the graph and package-name imports become edges', async () => {
+    const dir = makeMonorepo();
+    writeSource(dir, 'app.ts', "import { core } from '@w/core';\nimport { t } from '@w/term';\nexport const a = core + t;\n");
+
+    const graph = await buildGraph(dir);
+    const paths = [...graph.nodes.keys()];
+    expect(paths).toContain('pkgs/core/src/index.ts');
+    expect(paths).toContain('pkgs/term/index.ts');
+
+    const imp = (p: string) => graph.nodes.get(p)!.imports;
+    expect(imp('src/app.ts')).toEqual(expect.arrayContaining(['pkgs/core/src/index.ts', 'pkgs/term/index.ts']));
+    // cross-workspace import (term → core) resolves too
+    expect(imp('pkgs/term/index.ts')).toEqual(['pkgs/core/src/index.ts']);
+    // topo order: core entry before its dependents
+    expect(graph.order.indexOf('pkgs/core/src/index.ts')).toBeLessThan(graph.order.indexOf('pkgs/term/index.ts'));
+  });
+});

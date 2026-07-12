@@ -53,6 +53,14 @@
         ]
       },
       {
+        "dir": "engine",
+        "files": 29,
+        "fanOut": 0,
+        "fanIn": 2,
+        "inbound": 10,
+        "imports": []
+      },
+      {
         "dir": "adapters",
         "files": 25,
         "fanOut": 3,
@@ -67,10 +75,11 @@
       {
         "dir": "ui",
         "files": 22,
-        "fanOut": 2,
+        "fanOut": 3,
         "fanIn": 0,
         "inbound": 0,
         "imports": [
+          "engine",
           "observe",
           "util"
         ]
@@ -89,10 +98,11 @@
       {
         "dir": "tui",
         "files": 14,
-        "fanOut": 1,
+        "fanOut": 2,
         "fanIn": 1,
         "inbound": 5,
         "imports": [
+          "engine",
           "util"
         ]
       },
@@ -386,7 +396,17 @@
       },
       {
         "from": "tui",
+        "to": "engine",
+        "count": 5
+      },
+      {
+        "from": "tui",
         "to": "util",
+        "count": 5
+      },
+      {
+        "from": "ui",
+        "to": "engine",
         "count": 5
       },
       {

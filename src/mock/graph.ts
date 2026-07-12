@@ -37,7 +37,18 @@ export async function buildGraph(dir: string): Promise<ModuleGraph> {
   // packages (e.g. pycad/) laid out at the repo root are still graphed.
   const hasSrc = await readdir(join(dir, 'src')).then(() => true).catch(() => false);
   const root = hasSrc ? join(dir, 'src') : dir;
-  const all = await walk(root).catch(() => []);
+  // npm-workspace packages live OUTSIDE src/ (e.g. a vendored engine/) but are
+  // pushed with the repo — scan them too so the graph covers everything, and
+  // resolve their package-name imports (`@scope/pkg`) like local ones. When the
+  // scan already roots at the whole dir the workspaces are walked anyway.
+  const workspaces = hasSrc ? await loadWorkspaces(dir) : [];
+  const wsRoots: string[] = [];
+  for (const ws of workspaces) {
+    const s = join(dir, ws.dir, 'src');
+    wsRoots.push(await readdir(s).then(() => s).catch(() => join(dir, ws.dir)));
+  }
+  const walks = await Promise.all([root, ...wsRoots].map((r) => walk(r).catch(() => [] as string[])));
+  const all = walks.flat();
   const isSource = (f: string) =>
     (/\.(tsx|ts|jsx|js)$/.test(f) && !/main\.[tj]sx?$/.test(f)) || IS_PY.test(f);
   const isTest = (f: string) => /\.(test|spec|d)\.[tj]sx?$/.test(f) || PY_TEST.test(f);
@@ -52,11 +63,76 @@ export async function buildGraph(dir: string): Promise<ModuleGraph> {
     const src = await readFile(abs, 'utf8').catch(() => '');
     const imports = IS_PY.test(abs)
       ? resolvePyImports(src, abs, dir, files)
-      : resolveLocalImports(src, abs, dir, files);
+      : [...resolveLocalImports(src, abs, dir, files), ...resolveWorkspaceImports(src, dir, files, workspaces)];
     nodes.set(rel, { path: rel, kind: classify(rel, src), imports, callsNetwork: NET.test(src) });
   }
 
   return { nodes, order: topoSort(nodes), testFiles };
+}
+
+export interface WorkspacePkg {
+  name: string; // package name, e.g. '@facet/core'
+  dir: string; // project-relative workspace dir, e.g. 'engine/core'
+  main: string; // entry file relative to the workspace dir (package.json main/module, default index)
+}
+
+/** Read the root package.json workspace list → named packages. Simple trailing-*
+ *  globs (`pkgs/*`) expand one level; non-packages (no package.json name) drop. */
+export async function loadWorkspaces(dir: string): Promise<WorkspacePkg[]> {
+  const pkg = await readJson(join(dir, 'package.json'));
+  const raw = pkg?.workspaces;
+  const patterns: string[] = Array.isArray(raw) ? raw : (raw as { packages?: string[] } | undefined)?.packages ?? [];
+  const out: WorkspacePkg[] = [];
+  for (const pattern of patterns.filter((p) => typeof p === 'string')) {
+    for (const wsDir of await expandWorkspacePattern(dir, pattern)) {
+      const wpkg = await readJson(join(dir, wsDir, 'package.json'));
+      if (typeof wpkg?.name === 'string')
+        out.push({ name: wpkg.name, dir: wsDir, main: typeof wpkg.module === 'string' ? wpkg.module : typeof wpkg.main === 'string' ? wpkg.main : 'index' });
+    }
+  }
+  return out;
+}
+
+async function readJson(file: string): Promise<Record<string, unknown> | null> {
+  try {
+    return JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** `engine/core` → itself; `pkgs/*` → each direct subdir. */
+async function expandWorkspacePattern(dir: string, pattern: string): Promise<string[]> {
+  if (!pattern.includes('*')) return [pattern];
+  const base = pattern.slice(0, pattern.indexOf('*')).replace(/\/$/, '');
+  const entries = await readdir(join(dir, base), { withFileTypes: true }).catch(() => []);
+  return entries.filter((e) => e.isDirectory() && !SKIP.has(e.name)).map((e) => `${base}/${e.name}`);
+}
+
+/** Resolve one workspace-package import spec to a scanned file, or null.
+ *  Bare name → the package entry (main/module); `name/sub` → that file. */
+function resolvePkgSpec(spec: string, dir: string, files: Set<string>, workspaces: WorkspacePkg[]): string | null {
+  const ws = workspaces.find((w) => spec === w.name || spec.startsWith(w.name + '/'));
+  if (!ws) return null;
+  const sub = spec === ws.name ? ws.main : spec.slice(ws.name.length + 1);
+  const base = resolve(dir, ws.dir, sub.replace(/^\.\//, '').replace(/\.js$/, ''));
+  const candidates = [base, `${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.jsx`, join(base, 'index.ts'), join(base, 'index.js')];
+  for (const c of candidates) if (files.has(c)) return c;
+  return null;
+}
+
+/** Workspace-package imports (`@scope/pkg`, `@scope/pkg/sub`) → resolved
+ *  project-relative files. Same type-only skips as resolveLocalImports. */
+export function resolveWorkspaceImports(src: string, dir: string, files: string[], workspaces: WorkspacePkg[]): string[] {
+  if (!workspaces.length) return [];
+  const fileSet = new Set(files);
+  const out = new Set<string>();
+  for (const m of src.matchAll(/import\s+(type\s+)?([^;]*?)from\s+['"]([^'"./][^'"]*)['"]/g)) {
+    if (m[1] || typeOnlyMembers(m[2])) continue;
+    const hit = resolvePkgSpec(m[3], dir, fileSet, workspaces);
+    if (hit) out.add(relative(dir, hit));
+  }
+  return [...out];
 }
 
 function classify(rel: string, src: string): NodeKind {
@@ -67,16 +143,18 @@ function classify(rel: string, src: string): NodeKind {
   return 'util';
 }
 
+/** `import { type A, type B } from ...` with ONLY type members → no runtime dep. */
+function typeOnlyMembers(members: string): boolean {
+  return /^\s*\{[^}]*\}\s*$/.test(members) && members.replace(/[{}]/g, '').split(',').every((s) => /^\s*type\s/.test(s));
+}
+
 export function resolveLocalImports(src: string, fromAbs: string, dir: string, files: string[]): string[] {
   const out = new Set<string>();
   // Match whole import statements; skip type-only imports (`import type ...`)
   // and pure type member imports — they carry no runtime dependency to mock.
   for (const m of src.matchAll(/import\s+(type\s+)?([^;]*?)from\s+['"](\.[^'"]+)['"]/g)) {
     if (m[1]) continue; // `import type { X } from ...`
-    const members = m[2];
-    // `import { type Product } from ...` with ONLY type members → skip
-    if (/^\s*\{[^}]*\}\s*$/.test(members) && members.replace(/[{}]/g, '').split(',').every((s) => /^\s*type\s/.test(s)))
-      continue;
+    if (typeOnlyMembers(m[2])) continue;
     const spec = m[3].replace(/\.js$/, '');
     const base = resolve(dirname(fromAbs), spec);
     const hit = files.find((f) => f === base || f.replace(/\.[tj]sx?$/, '') === base || f.replace(/\/index\.[tj]sx?$/, '') === base);
