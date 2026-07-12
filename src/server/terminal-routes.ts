@@ -17,6 +17,7 @@ export interface TermRouteCtx {
 }
 
 let CTX: TermRouteCtx;
+/** Wire daemon.ts's config in once at startup. */
 export function initTermRoutes(ctx: TermRouteCtx): void {
   CTX = ctx;
 }
@@ -52,12 +53,14 @@ async function handleSession(
   return true;
 }
 
+/** GET /term/sessions — JSON-safe summaries (no proc/ring handles). */
 function listSessions() {
   return [...sessions.values()].map((s) => ({
     id: s.id, cmd: s.cmd, startedAt: s.startedAt, live: s.exitCode === undefined, exitCode: s.exitCode,
   }));
 }
 
+/** POST /term/start — validate body + cwd, then spawn a PTY session (409 at the session cap). */
 async function handleStart(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   let body: { cmd?: string[]; cwd?: string; cols?: number; rows?: number };
   try {
@@ -78,6 +81,7 @@ async function handleStart(req: IncomingMessage, res: ServerResponse): Promise<b
   return true;
 }
 
+/** GET /term/stream — SSE attach: replay scrollback first, then live frames + heartbeat. */
 function handleStream(s: TermSession, req: IncomingMessage, res: ServerResponse): boolean {
   res.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -93,6 +97,7 @@ function handleStream(s: TermSession, req: IncomingMessage, res: ServerResponse)
   return true;
 }
 
+/** POST /term/input — forward base64 keystrokes to a live session (409 once exited). */
 async function handleInput(s: TermSession, req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   if (s.exitCode !== undefined) { CTX.sendJson(res, 409, { error: 'session exited' }); return true; }
   const b64 = (await readBody(req, CTX.MAX_BODY)).trim();
@@ -101,6 +106,7 @@ async function handleInput(s: TermSession, req: IncomingMessage, res: ServerResp
   return true;
 }
 
+/** POST /term/resize — resize the PTY; bad numbers fall back to 80x24. */
 async function handleResize(s: TermSession, req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   let body: { cols?: number; rows?: number };
   try {

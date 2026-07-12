@@ -22,6 +22,7 @@ export interface Job extends PersistedJob {
   proc?: ChildProcess; // runtime handle (not persisted) — for /cancel
 }
 
+/** Daemon config + shared helpers, filled by daemon.ts via initControl() — handlers read this instead of importing daemon.ts back. */
 export interface ControlCtx {
   BIN: string;
   JOBS_PATH: string;
@@ -45,12 +46,14 @@ let queue: QueueItem[] = [];
 let paused = false; // safety: set by Pillar C alert-halt / budget cap
 let supervising = false; // one in-flight dispatch at a time
 
+/** Wire the daemon's config/helpers in once at startup (module state — one daemon process). */
 export function initControl(ctx: ControlCtx): void {
   CTX = ctx;
 }
 
 export const getQueue = (): QueueItem[] => queue;
 export const isPaused = (): boolean => paused;
+/** Flip the supervisor pause flag (Pillar C alert-halt, budget cap, or the pause route). */
 export const setPaused = (v: boolean): void => {
   paused = v;
 };
@@ -117,6 +120,7 @@ function startJobProcess(job: Job) {
   });
 }
 
+/** POST /run — validate the launch plan, spawn the CLI child, and track it as a job. */
 export async function launch(req: IncomingMessage, res: ServerResponse) {
   let body: unknown;
   try {
@@ -159,10 +163,12 @@ export function cancelJob(id: string, res: ServerResponse) {
   return CTX.sendJson(res, 200, { id, status: 'cancelled' });
 }
 
+/** Rebuild the queue from disk (last-wins reduce over the append-only jsonl). */
 export async function loadQueue() {
   queue = reduceQueue(await readJsonl<QueueItem>(CTX.QUEUE_PATH).catch(() => []));
 }
 
+/** Upsert the item in memory and append its new state to queue.jsonl (reduced on load). */
 async function persistItem(item: QueueItem) {
   const i = queue.findIndex((q) => q.id === item.id);
   if (i >= 0) queue[i] = item;
@@ -170,6 +176,7 @@ async function persistItem(item: QueueItem) {
   await appendJsonl(CTX.QUEUE_PATH, item).catch(() => {});
 }
 
+/** POST /enqueue — validate the plan and park it on the supervisor queue for dispatch. */
 export async function enqueue(req: IncomingMessage, res: ServerResponse) {
   let body: unknown;
   try {
@@ -294,6 +301,7 @@ export async function streamFiles(
   }
 }
 
+/** GET /stream — SSE-tail the run's event logs (the transcript route reuses streamFiles). */
 export async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
   return streamFiles(dir, /^events-.*\.jsonl$/, res, req);
 }
