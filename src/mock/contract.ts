@@ -20,6 +20,8 @@ export interface Contracts {
 
 const FIXT_DIR = 'test-fixtures';
 
+/** Write each fetcher's array sample ONCE to test-fixtures/<name>.json — the
+ *  single frozen source of truth every downstream consumer's test imports. */
 export async function materializeFixtures(dir: string, plan: MockPlan): Promise<Record<string, unknown>> {
   const fixtures: Record<string, unknown> = {};
   for (const h of plan.handlers) {
@@ -57,11 +59,15 @@ export async function captureContracts(
   }
 }
 
+/** Persist the chain (fixtures + captured outputs) as test-fixtures/contracts.json
+ *  so generation can assert downstream modules against frozen upstream data. */
 export async function writeContracts(dir: string, contracts: Contracts): Promise<void> {
   await mkdir(join(dir, FIXT_DIR), { recursive: true });
   await writeFile(join(dir, FIXT_DIR, 'contracts.json'), JSON.stringify(contracts, null, 2) + '\n');
 }
 
+/** Load a previously written contracts.json; null when absent or unparsable
+ *  (chain not built yet) — callers fall back to plain mock synthesis. */
 export async function readContracts(dir: string): Promise<Contracts | null> {
   return readFile(join(dir, FIXT_DIR, 'contracts.json'), 'utf8')
     .then((s) => JSON.parse(s) as Contracts)
