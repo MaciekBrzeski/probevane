@@ -19,12 +19,14 @@ export function costExtras(scr: Screen, r: Rect, s: Snapshot): void {
   });
 }
 
+/** Daily-cost bars in the pane's upper half — per-day magnitude the sparkline alone can't show. */
 function upperBars(p: Painter, w: number, midY: number, s: Snapshot): void {
   p.text(2, 1, 'daily $', { fill: FG.dim });
   const rect = { x: 2, y: 2, w: w - 4, h: midY - 4 };
   barChart(p, { rect, values: s.daily.map((d) => d.cost), accent: FG.acc, track: FG.line });
 }
 
+/** Acceptance donut + legend in the lower half — accept vs reject share at a glance. */
 function acceptDonut(p: Painter, dy: number, acc: number): void {
   donut(p, {
     cx: 10, cy: dy + 6, r: 6, track: FG.line, label: `${Math.round(acc * 100)}%`, labelColor: FG.ok,

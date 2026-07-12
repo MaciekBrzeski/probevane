@@ -66,6 +66,7 @@ function components(hubs: ConstellationNode[]): string[][] {
   return comps.sort((a, b) => b.length - a.length);
 }
 
+/** Keep whole components, largest first, until `budget` nodes — a partial component would draw dangling edges; deps are pruned to kept ids. */
 function connectedCore(hubs: ConstellationNode[], budget: number): ConstellationNode[] {
   const keep = new Set<string>();
   for (const c of components(hubs)) { if (keep.size + c.length > budget) continue; for (const id of c) keep.add(id); }

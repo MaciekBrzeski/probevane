@@ -7,6 +7,7 @@
 import { TERMINAL_TABS } from '../util/theme.js';
 
 export const TABS: readonly string[] = TERMINAL_TABS.map((t) => t.id); // ['console','runs','cost']
+/** A tab id from TERMINAL_TABS ('console', 'runs', …) — plain string so the theme SSOT can grow without edits here. */
 export type Tab = string;
 
 // Label width per tab: 2 marker cols + 2 spaces around the name. Active and

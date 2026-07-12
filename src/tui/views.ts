@@ -15,14 +15,22 @@ import type { ConstellationNode } from '../observe/constellation.js';
 import type { Project } from './panes.js';
 import type { PipelineState } from '../observe/pipeline.js';
 
+/** A pane's cell box in screen coordinates — produced by layoutFor/spanToBox, consumed by every painter. */
 export interface Rect { x: number; y: number; w: number; h: number }
 
+/** Daemon health summary (version, uptime, ledger count) — feeds the status strip. */
 export interface Health { version?: string; uptimeSec?: number; ledgers?: number }
+/** Ledger roll-up — spend, accept rate, run count for the status strip + gauges. */
 export interface Totals { totalCost?: number; acceptRate?: number; runs?: number }
+/** One day's cost/token bucket — the series behind the cost sparkline and bar chart. */
 export interface Daily { date: string; cost: number; tokensOut?: number }
+/** A queued or active daemon job as the jobs feed reports it. */
 export interface Job { op: string; dir: string; status: string; startedAt: string }
+/** A rune in the loop's pipeline — name only; live state comes from PipelineState. */
 export interface Rune { name: string }
+/** A doctor/budget alert row — kind + severity pick the lamp colour. */
 export interface Alert { kind: string; severity: string; message: string }
+/** One run from the runs ledger — the outcome + cost columns of the runs table. */
 export interface RunRow {
   runId: string; label?: string; accepted?: boolean; stopReason?: string;
   cost?: number; ts?: string; model?: string; steps?: number;

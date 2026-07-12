@@ -9,6 +9,7 @@ import { trunc, FG } from './draw.js';
 import { paintWidget, emptyPane } from './facet.js';
 import { card, badge, progress, menu, type Painter } from '@facet/core';
 
+/** One project as the daemon reports it (the tui-app driver fetches) — name, run stats, and the last run for the card footer. */
 export interface Project {
   name: string; runCount?: number; acceptRate?: number;
   lastRun?: { op?: string; accepted?: boolean; stopReason?: string } | null;
@@ -20,6 +21,7 @@ const FGC: Style = { fg: FG.fg };
 const clip = (scr: Screen, r: Rect) => (s: string) => trunc(s, r.w - 4);
 interface Rect { x: number; y: number; w: number; h: number }
 
+/** `op:status` summary of the last run for the card footer — '—' when the project never ran. */
 function lastOutcome(p: Project): string {
   if (!p.lastRun) return '—';
   const status = p.lastRun.accepted ? 'accepted' : p.lastRun.stopReason ?? '?';
