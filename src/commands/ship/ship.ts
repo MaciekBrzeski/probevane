@@ -14,6 +14,8 @@ export interface DiaryRecord {
   editedFiles?: string[];
 }
 
+/** Outcome of a ship attempt — `shipped` with branch/PR url on success;
+ *  `reason` explains every skip or partial (no repo, push failed, …). */
 export interface ShipResult {
   shipped: boolean;
   branch?: string;
@@ -45,6 +47,9 @@ async function presentFiles(dir: string, files: string[]): Promise<string[]> {
   return out;
 }
 
+/** Ship one accepted run: branch, commit only the diary's files, push, open
+ *  the PR — returning early with a reason at each degrade point (no repo /
+ *  no files / no remote / gh failure) instead of throwing. */
 export async function shipRun(
   dir: string,
   rec: DiaryRecord,

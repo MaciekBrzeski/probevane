@@ -5,6 +5,8 @@
 
 export type PlanAction = 'generate' | 'refactor' | 'fix' | 'mfe-fix';
 
+/** One ranked to-do: which probevane action to run on which target, and why.
+ *  Assembled and prioritized by buildPlan. */
 export interface PlanItem {
   action: PlanAction;
   target: string; // file or repo the action applies to
@@ -12,6 +14,8 @@ export interface PlanItem {
   priority: number; // higher = do first
 }
 
+/** The read-only signals the CLI gathers for the planner — untested files,
+ *  thin coverage, quality errors, MFE standards errors. */
 export interface PlanInput {
   untested: string[]; // source files with no spec
   coverageGaps: string[]; // files below coverage (already-tested but thin)
@@ -28,6 +32,7 @@ export function untestedTargets(targets: { sourcePath: string }[], specs: string
   return targets.filter((t) => !blob.includes(base(t.sourcePath))).map((t) => t.sourcePath);
 }
 
+/** The ranked plan plus its one-line summary — what `probevane plan` prints. */
 export interface ProjectPlan {
   items: PlanItem[];
   summary: string;
@@ -59,6 +64,8 @@ export function buildPlan(input: PlanInput): ProjectPlan {
   return { items, summary };
 }
 
+/** Render the plan for the terminal: one block per item with the why and the
+ *  exact command to run — or the friendly nothing-to-do line. */
 export function formatPlan(plan: ProjectPlan): string {
   if (!plan.items.length) return 'Nothing to do — no untested targets, coverage gaps, or standards errors found.';
   const cmd: Record<PlanAction, string> = {

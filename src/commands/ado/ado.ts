@@ -11,6 +11,8 @@ export interface AdoConfig {
   pat: string;
 }
 
+/** A board work item as probevane sees it — the few System.* fields the loop
+ *  needs, flattened from the ADO payload by adoGetMany (tags split from ';'). */
 export interface AdoWorkItem {
   id: number;
   title: string;
@@ -127,6 +129,8 @@ function patchHeaders(ctx: AdoCtx): Record<string, string> {
   return { ...ctx.headers, 'content-type': 'application/json-patch+json' };
 }
 
+/** Parse an ADO response as JSON; non-2xx throws with status + body so every
+ *  client call surfaces ADO's own error message instead of a bare failure. */
 async function adoJson(res: Response): Promise<any> {
   if (!res.ok) throw new Error(`ADO ${res.status}: ${await res.text().catch(() => '')}`);
   return res.json();
@@ -228,6 +232,9 @@ async function adoLinkAttachment(ctx: AdoCtx, id: number, url: string, comment =
   await adoJson(res);
 }
 
+/** Build the fetch client: bind base url + auth headers once into a ctx and
+ *  expose each ADO operation as a closure over it. `doFetch` is injectable so
+ *  tests exercise the client without touching the network. */
 export function adoClient(cfg: AdoConfig, doFetch: typeof fetch = fetch) {
   const ctx: AdoCtx = {
     base: witBase(cfg.org, cfg.project),

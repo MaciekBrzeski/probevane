@@ -21,6 +21,9 @@ type Graph = Awaited<ReturnType<typeof buildGraph>>;
 type Plan = Awaited<ReturnType<typeof buildMockPlan>> | null;
 type Cov = Awaited<ReturnType<StackAdapter['coverage']>> | null;
 
+/** Assemble SPEC.md: gather graph / mock plan / coverage once, then emit the
+ *  overview, module graph, per-module sections and API surface — narrated
+ *  only when a brain is supplied. */
 export async function buildSpec(opts: SpecOptions): Promise<string> {
   const { dir, adapter } = opts;
   const graph = await buildGraph(dir);
@@ -116,6 +119,9 @@ function parseNarratives(
   }
 }
 
+/** LLM pass for --narrate: feed each module's probe digest, collect one-line
+ *  descriptions as `path: sentence` replies, chunked so no batch overruns the
+ *  model's output cap. */
 async function narrate(
   brain: Brain,
   graph: Awaited<ReturnType<typeof buildGraph>>,

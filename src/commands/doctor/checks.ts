@@ -213,12 +213,12 @@ export async function checkStaleCassettes(dir: string): Promise<DoctorReport> {
   return { findings, fixes: [] };
 }
 
-/** Run every check; adapter is optional (repo-only checks still run without one). */
 import {
   checkNodeModules, checkPlaywrightBrowsers, checkConfig,
   checkCredentials, checkEvalBijection, checkStaleCoverageReport,
 } from './lanes.js';
 
+/** Run every check; adapter is optional (repo-only checks still run without one). */
 export async function runDoctor(dir: string, adapter?: StackAdapter): Promise<DoctorReport> {
   const parts = await Promise.all([
     adapter ? checkToolchain(dir, adapter) : { findings: [], fixes: [] },
@@ -256,6 +256,8 @@ async function coverageExcludes(dir: string): Promise<RegExp[]> {
   return [];
 }
 
+/** Minimal glob→RegExp (escape, `**`→`.*`, `*`→`[^/]*`) — enough for vitest
+ *  exclude patterns without pulling in a glob dependency. */
 function globToRe(glob: string): RegExp {
   const re = glob
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')

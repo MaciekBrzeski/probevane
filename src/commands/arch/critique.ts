@@ -18,6 +18,8 @@ import { crowdingReport, crowdingDigest } from './crowding.js';
 const ARCH_BASE = process.env.PROBEVANE_ARCH_BASE ?? 'https://ollama.com/v1';
 const ARCH_MODEL = process.env.PROBEVANE_ARCH_MODEL ?? 'glm-5.2';
 
+/** API key for the arch model: env vars first, then the on-disk ollama key
+ *  file — throws naming the exact fix when neither exists. */
 function archKey(): string {
   const env = process.env.PROBEVANE_ARCH_KEY ?? process.env.PROBEVANE_API_KEY ?? process.env.OPENAI_API_KEY;
   if (env) return env;
@@ -41,6 +43,8 @@ const SYSTEM =
   'with cost 0-5 is cheap; a shared hub with a large ~N is expensive and needs a strong reason. ' +
   'Be terse and specific. Do NOT praise; only surface what to improve. If the structure is sound, say so.';
 
+/** One chat/completions call with the architect SYSTEM prompt → the findings
+ *  text. Falls back to `reasoning` for models that put their prose there. */
 async function llmCritique(prompt: string): Promise<string> {
   const res = await fetch(`${ARCH_BASE.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
@@ -57,6 +61,8 @@ async function llmCritique(prompt: string): Promise<string> {
   return m?.content || m?.reasoning || '';
 }
 
+/** Everything `arch` prints: the rendered trees, metrics digest, hub list and
+ *  the LLM findings (empty when --no-llm). Assembled by archCritique. */
 export interface ArchReport {
   model: string;
   folderTree: string;
@@ -79,6 +85,9 @@ export function archPrompt(folderTree: string, depTree: string, summary: string,
   ].join('\n');
 }
 
+/** The full arch pipeline: build the module graph, render folder + dependency
+ *  trees, compute coupling/crowding digests, then (unless llm:false) ask the
+ *  model for structural findings. */
 export async function archCritique(dir: string, opts: { llm?: boolean } = {}): Promise<ArchReport> {
   const graph = await buildGraph(dir);
   const paths = [...graph.nodes.keys()];

@@ -14,12 +14,17 @@ export interface PrefixCluster {
   files: string[]; // basenames
 }
 
+/** A file with zero intra-dir coupling whose importers all live elsewhere —
+ *  `suggest` is the dir that pulls it. Emitted by the crowding scan as a
+ *  concrete move candidate. */
 export interface MisplacedFile {
   file: string; // basename
   suggest: string; // the dir that pulls it
   pulls: number; // import statements from that dir
 }
 
+/** One over-threshold dir with its relief options: prefix clusters ready to
+ *  become subfolders and misplaced files to move out. Built by crowdingReport. */
 export interface DirCrowding {
   dir: string; // full dir path, e.g. 'src/cli'
   files: number;

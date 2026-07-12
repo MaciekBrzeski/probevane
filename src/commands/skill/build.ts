@@ -26,6 +26,8 @@ ${detail}
 `;
 }
 
+/** Generated SKILL.md — frontmatter + invocation guide + the same catalog
+ *  rows/detail as the wiki, so the skill can never drift from the dispatcher. */
 export function buildSkill(): string {
   const rows = COMMANDS.map((c) => `| \`${c.name}\` | ${c.summary} |`).join('\n');
   const detail = COMMANDS.map((c) => `### ${c.name}\n${c.summary}\n\n\`\`\`\n${c.usage}\n# e.g.\n${c.example}\n\`\`\``).join('\n\n');
