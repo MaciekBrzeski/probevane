@@ -91,7 +91,15 @@ async function reviewBeforeMerge(
 async function commitAndFinalize(ctx: AcceptCtx): Promise<void> {
   const { root, wt, rel, branch, onBranch, label, outcome, opts, log } = ctx;
   const files = outcome.editedFiles.map((f) => (rel ? join(rel, f) : f));
-  await commitFiles(wt, files, `probevane ${label}: ${files.length} file(s) (gates green)`);
+  // --no-verify: the loop's gates ARE the verification here; the repo's commit
+  // hooks would fire inside the worktree, which has no node_modules toolchain.
+  const committed = await commitFiles(wt, files, `probevane ${label}: ${files.length} file(s) (gates green)`, true);
+  if (!committed) {
+    // A silent "committed" here once DELETED an accepted run's edits — never
+    // claim success or remove the worktree when the commit didn't land.
+    log(`[probevane] worktree: COMMIT FAILED — nothing recorded on ${branch}; worktree KEPT at ${wt} for recovery`);
+    return;
+  }
   const stat = await diffStat(wt, 'HEAD~1'); // the committed change (incl. new files)
 
   const doMerge = await reviewBeforeMerge(wt, branch, opts, log);

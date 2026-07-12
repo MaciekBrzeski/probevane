@@ -407,6 +407,18 @@ describe('util/git in a real temp repo', () => {
     expect(readFileSync(join(repo, 'a.txt'), 'utf8')).toBe('hello\n');
   });
 
+  it('commitFiles: a failing pre-commit hook blocks unless noVerify (the worktree case)', async () => {
+    // Worktrees inherit hooksPath but not node_modules — a hook that can't run
+    // must not silently swallow an accepted run's commit (it once deleted one).
+    const repo = makeRepo();
+    mkdirSync(join(repo, 'hooks'), { recursive: true });
+    writeFileSync(join(repo, 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    gitCmd(repo, 'config', 'core.hooksPath', 'hooks');
+    writeFileSync(join(repo, 'h.txt'), 'x\n');
+    expect(await git.commitFiles(repo, ['h.txt'], 'blocked')).toBe(false); // hook fires → blocked
+    expect(await git.commitFiles(repo, ['h.txt'], 'bypassed', true)).toBe(true); // --no-verify lands
+  });
+
   it('createBranch switches branch; commitFiles needs files and commits them', async () => {
     const repo = makeRepo();
     expect(await git.commitFiles(repo, [], 'noop')).toBe(false); // empty file list

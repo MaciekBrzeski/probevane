@@ -82,11 +82,14 @@ export async function createBranch(dir: string, name: string): Promise<boolean> 
   return (await git(dir, ['checkout', '-b', name])).ok;
 }
 
-/** Stage the given files and commit them; returns false if nothing committed. */
-export async function commitFiles(dir: string, files: string[], message: string): Promise<boolean> {
+/** Stage the given files and commit them; returns false if nothing committed.
+ *  `noVerify` skips commit hooks — required in throwaway worktrees, where the
+ *  repo's hooksPath is inherited but its toolchain (node_modules) is not, so a
+ *  pre-commit hook dies on missing binaries and silently blocks the commit. */
+export async function commitFiles(dir: string, files: string[], message: string, noVerify = false): Promise<boolean> {
   if (!files.length) return false;
   if (!(await git(dir, ['add', '--', ...files])).ok) return false;
-  return (await git(dir, ['commit', '-m', message])).ok;
+  return (await git(dir, ['commit', ...(noVerify ? ['--no-verify'] : []), '-m', message])).ok;
 }
 
 /** Push `branch` to origin (sets upstream). False if no remote / push fails. */
