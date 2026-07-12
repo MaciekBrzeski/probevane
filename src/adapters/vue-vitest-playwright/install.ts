@@ -36,6 +36,8 @@ export default defineConfig({
 
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
+// Add the vue-test-utils/vitest/playwright toolchain, wire test scripts, and
+// write default configs — idempotent, never clobbers existing config.
 export async function installVue(dir: string): Promise<void> {
   const pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
   const all = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;

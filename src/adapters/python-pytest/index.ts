@@ -16,16 +16,15 @@ import { sh } from '../../util/exec.js';
 import { pyAuditRules } from '../../audit/rules-py.js';
 import { loadPrompt } from '../../library/prompt.js';
 
-// python-pytest — second first-class stack. Proves modularity: it implements
-// the SAME StackAdapter contract; loop/library/eval/gates are untouched.
-// Resolves a python interpreter from PROBEVANE_PY, a local .venv, else python3.
-
 const SKIP = ['__pycache__', '.venv', 'venv', '.git', 'node_modules', 'dist', 'build'];
 
+// Promise-flavored fs.exists — access() as a boolean.
 async function exists(p: string): Promise<boolean> {
   return access(p).then(() => true).catch(() => false);
 }
 
+// Interpreter resolution: PROBEVANE_PY > project .venv > system python3 —
+// mirrored synchronously in commands().
 async function pyBin(dir: string): Promise<string> {
   if (process.env.PROBEVANE_PY) return process.env.PROBEVANE_PY;
   // Absolute: sh() runs with cwd=dir, so a dir-relative interpreter path would
@@ -35,6 +34,9 @@ async function pyBin(dir: string): Promise<string> {
   return 'python3';
 }
 
+// python-pytest — second first-class stack. Proves modularity: it implements
+// the SAME StackAdapter contract; loop/library/eval/gates are untouched.
+// Resolves a python interpreter from PROBEVANE_PY, a local .venv, else python3.
 export const pythonAdapter: StackAdapter = {
   id: 'python-pytest',
 
@@ -186,11 +188,13 @@ export const pythonAdapter: StackAdapter = {
   },
 };
 
+// First integer capture of re in s; 0 when absent (JUnit XML attribute parsing).
 function intMatch(s: string, re: RegExp): number {
   const m = s.match(re);
   return m ? parseInt(m[1], 10) : 0;
 }
 
+// Recursive listing as root-relative paths, skipping venvs/VCS/build dirs.
 async function walk(root: string, dir: string): Promise<string[]> {
   const out: string[] = [];
   let entries;

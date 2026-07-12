@@ -10,11 +10,11 @@ import { loadPrompt } from '../../library/prompt.js';
 import { readCoverageSummary } from '../coverage-summary.js';
 import { walkFiles } from '../walk.js';
 
-// angular — Angular stack via jest-preset-angular (no browser, CI-friendly).
-// Tests use TestBed + jest. Same StackAdapter contract as the others.
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 const REPORT = '.probevane-jest.json';
 
+// angular — Angular stack via jest-preset-angular (no browser, CI-friendly).
+// Tests use TestBed + jest. Same StackAdapter contract as the others.
 export const angularAdapter: StackAdapter = {
   id: 'angular',
 

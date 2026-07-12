@@ -42,14 +42,14 @@ export async function probeReactUnit(dir: string, target: TestTarget): Promise<P
   };
 }
 
+const BASE_URL = process.env.PROBEVANE_BASE_URL ?? 'http://localhost:5173';
+
 // E2E probe — build an app-wide UI inventory (the user-facing ground truth) by
 // reading the JSX under src/: aria-labels, roles, button text, placeholders,
 // headings, and routes. This is the "probe-before-spec" step for e2e: the model
 // targets only selectors that actually exist, killing the assumed-entry
 // anti-pattern. (A live Playwright snapshot is a future enhancement; static
 // extraction is deterministic and accurate for these SPAs.)
-const BASE_URL = process.env.PROBEVANE_BASE_URL ?? 'http://localhost:5173';
-
 export async function probeReactE2e(dir: string, target: TestTarget): Promise<ProbeResult> {
   const files = await collectSources(join(dir, 'src'));
   let all = '';
@@ -81,6 +81,7 @@ export async function probeReactE2e(dir: string, target: TestTarget): Promise<Pr
   };
 }
 
+// All JSX/TSX sources under src/ (tests excluded) — the e2e inventory input.
 async function collectSources(root: string): Promise<string[]> {
   const out: string[] = [];
   let entries;
@@ -149,6 +150,8 @@ function collectDefaultExport(src: string, add: AddExport): void {
   }
 }
 
+// Regex fallback when ts-morph can't parse: union of the collect* passes above,
+// first-seen wins on duplicate names.
 function extractExports(src: string): ExportInfo[] {
   const out: ExportInfo[] = [];
   const seen = new Set<string>();
@@ -165,6 +168,7 @@ function extractExports(src: string): ExportInfo[] {
   return out;
 }
 
+// Regex fallback for *Props interfaces when the AST path fails.
 function extractProps(src: string): string[] {
   const out: string[] = [];
   for (const m of src.matchAll(/(?:export\s+)?interface\s+([A-Za-z0-9_]+Props?)\s*\{([^}]*)\}/g)) {
@@ -178,6 +182,7 @@ function extractProps(src: string): string[] {
   return out;
 }
 
+// Order-preserving dedupe for digest lists.
 function unique<T>(a: T[]): T[] {
   return [...new Set(a)];
 }

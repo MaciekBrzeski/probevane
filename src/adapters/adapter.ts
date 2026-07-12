@@ -7,6 +7,7 @@
 // implements this; nothing else should change.
 
 export type TestKind = 'unit' | 'e2e';
+/** Which suites one run() call covers — 'all' folds unit + e2e into a single result. */
 export type RunScope = 'unit' | 'e2e' | 'all';
 
 /** A thing we want to write tests for: a component, module, route, or endpoint. */
@@ -47,6 +48,8 @@ export interface GenCtx {
   promptHeader: string;
 }
 
+/** Outcome of one suite run, parsed from the runner's own report (not exit codes
+ *  alone). Filled by each adapter's run(); the validation gate trusts `green`. */
 export interface RunResult {
   passed: number;
   failed: number;
@@ -56,6 +59,8 @@ export interface RunResult {
   raw: string;
 }
 
+/** Coverage percentages parsed from the stack's report. Filled by coverage();
+ *  stacks that report a single total mirror it into the other fields. */
 export interface CoverageResult {
   statements: number; // percent 0..100
   branches: number;
@@ -82,6 +87,9 @@ export interface AuditRule {
   severity: 'error' | 'warn';
 }
 
+/** The per-stack contract (see header). Implemented once per stack under
+ *  src/adapters/<stack>/; the registry picks one by detect() score and the
+ *  loop/gates call the rest — they never invoke stack tooling directly. */
 export interface StackAdapter {
   id: string;
 

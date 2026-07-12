@@ -48,6 +48,7 @@ export async function discoverReact(dir: string, kind: TestKind): Promise<TestTa
   return scored.map((s) => s.t);
 }
 
+// Recursive file listing under src/, skipping build/test dirs.
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
@@ -62,6 +63,7 @@ async function walk(dir: string): Promise<string[]> {
   return out;
 }
 
+// File name minus dir + JS/TS extension — becomes the target's display name.
 function baseName(f: string): string {
   return f.split('/').pop()!.replace(/\.[tj]sx?$/, '');
 }

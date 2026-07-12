@@ -44,10 +44,12 @@ export async function probeVueUnit(dir: string, target: TestTarget): Promise<Pro
 
 const SKIP_DIRS = ['node_modules', 'dist', 'coverage'];
 
+// .vue SFCs and plain .ts modules count; specs, declarations, and main.ts don't.
 function isVueTarget(name: string): boolean {
   return /\.(vue|ts)$/.test(name) && !/\.(test|spec|d)\.ts$/.test(name) && !/main\.ts$/.test(name) && name !== 'vite-env.d.ts';
 }
 
+// Recursive target collection into `out`, skipping build dirs.
 async function walkVue(d: string, dir: string, out: TestTarget[]): Promise<void> {
   for (const e of await readdir(d, { withFileTypes: true }).catch(() => [])) {
     if (e.isDirectory()) {
@@ -59,12 +61,14 @@ async function walkVue(d: string, dir: string, out: TestTarget[]): Promise<void>
   }
 }
 
+// All testable SFCs/modules under src/; a missing src/ is just zero targets.
 export async function discoverVue(dir: string, _kind: string): Promise<TestTarget[]> {
   const out: TestTarget[] = [];
   await walkVue(join(dir, 'src'), dir, out).catch(() => {});
   return out;
 }
 
+// Order-preserving dedupe for digest lists.
 function uniq<T>(a: T[]): T[] {
   return [...new Set(a)];
 }
