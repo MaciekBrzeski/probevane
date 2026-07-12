@@ -16,6 +16,7 @@ import { LAYOUTS, spanToBox } from '../util/theme.js';
 import { FG } from './draw.js';
 import type { PipelineState } from '../observe/pipeline.js';
 
+/** Animation clock the tui-app driver ticks — t: frame ms for pulses, reveal: 0..1 intro sweep. */
 export interface Anim { t: number; reveal: number }
 /** Interactive tab state owned by the driver (docs selection/body, quality scan text). */
 export interface Ui { docsSel: number; docsBody: string; quality: string }
@@ -47,6 +48,7 @@ export function layoutFor(tab: string, w: number, h: number): Record<string, Rec
   return out;
 }
 
+/** Console body — hero pipeline (with stat/stepper/timeline overlays), telemetry, constellation. */
 export function paintConsole(
   scr: Screen, w: number, h: number, s: Snapshot, pipe: PipelineState, a: Anim, focus = 0,
 ): void {
@@ -65,6 +67,7 @@ export function paintRuns(scr: Screen, w: number, h: number, s: Snapshot, sel: n
   alertsPane(scr, L.alerts, s.alerts);
 }
 
+/** Cost body — daily sparkline + facet extras in its spare rows, alerts, animated gauges. */
 export function paintCost(scr: Screen, w: number, h: number, s: Snapshot, a: Anim): void {
   const L = layoutFor('cost', w, h);
   costPane(scr, L.cost, s.daily);
@@ -73,6 +76,7 @@ export function paintCost(scr: Screen, w: number, h: number, s: Snapshot, a: Ani
   gaugePane(scr, L.telemetry, s.totals, a);
 }
 
+/** Projects body — the responsive card grid fills the tab's single manifest cell. */
 export function paintProjects(scr: Screen, w: number, h: number, s: Snapshot): void {
   projectsPane(scr, layoutFor('projects', w, h).projects, s.projects);
 }
@@ -84,16 +88,19 @@ export function paintDocs(scr: Screen, w: number, h: number, s: Snapshot, ui: Ui
   textPane(scr, L.page, 'page', FG.acc, ui.docsBody ? ui.docsBody.split('\n') : ['↑↓ select a page']);
 }
 
+/** Launch body — operations menu beside the how-to-launch hint text. */
 export function paintLaunch(scr: Screen, w: number, h: number, s: Snapshot): void {
   const L = layoutFor('launch', w, h);
   menuPane(scr, L.ops, 'operations', s.ops);
   textPane(scr, L.launchHint, 'launch', FG.acc, LAUNCH_HELP);
 }
 
+/** Quality body — latest quality-scan text (ui.quality); 'scanning…' until it lands. */
 export function paintQuality(scr: Screen, w: number, h: number, ui: Ui): void {
   textPane(scr, layoutFor('quality', w, h).quality, 'quality', FG.ok, ui.quality ? ui.quality.split('\n') : ['scanning…']);
 }
 
+/** Terminal body — static how-to text; the real terminal is your shell via suspend (see TERMINAL_HELP). */
 export function paintTerminal(scr: Screen, w: number, h: number): void {
   textPane(scr, layoutFor('terminal', w, h).terminal, 'terminal', FG.acc, TERMINAL_HELP);
 }

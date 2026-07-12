@@ -6,6 +6,7 @@ import { putText, type Screen, type Style } from './screen.js';
 import { pad } from './draw.js';
 import { RUN_COLUMN_DROP, type RunColumn } from '../util/theme.js';
 
+/** A run column resolved to its painted width — produced by fitColumns, consumed by renderColumns. */
 export interface ColBox { col: RunColumn; w: number }
 const GAP = 1;
 const MIN_GROW = 8;
@@ -25,6 +26,7 @@ export function fitColumns(cols: RunColumn[], inner: number): ColBox[] {
   return active.map((c) => ({ col: c, w: c.grow ? growW : c.w }));
 }
 
+/** One cell's text + style for a run row — callers supply one per surviving column. */
 export interface TableCell { text: string; st: Style }
 /** Paint one row of cells (text + style per column) at (x,y), each padded/aligned to its column width. */
 export function renderColumns(scr: Screen, x: number, y: number, layout: ColBox[], cells: TableCell[]): void {
