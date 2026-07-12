@@ -1,7 +1,7 @@
 // Runs tab: active runs box + run-history table (tbody swapped by loadRuns()).
 // Column headers come from the shared RUN_COLUMNS schema — the SAME columns the
 // terminal run list renders.
-import { RUN_COLUMNS } from '../../theme.ts';
+import { RUN_COLUMNS } from '../../../util/theme.ts';
 
 export function RunsPanel(): Node {
   return (

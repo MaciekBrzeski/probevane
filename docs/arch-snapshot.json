@@ -3,10 +3,10 @@
     "dirs": [
       {
         "dir": "cli",
-        "files": 57,
-        "fanOut": 18,
-        "fanIn": 0,
-        "inbound": 0,
+        "files": 61,
+        "fanOut": 20,
+        "fanIn": 1,
+        "inbound": 1,
         "imports": [
           "adapters",
           "audit",
@@ -20,9 +20,11 @@
           "mfe",
           "mock",
           "observe",
+          "planner",
           "quality",
           "review",
           "server",
+          "spec-run",
           "tui",
           "util",
           "visual"
@@ -30,8 +32,8 @@
       },
       {
         "dir": "loop",
-        "files": 57,
-        "fanOut": 12,
+        "files": 58,
+        "fanOut": 13,
         "fanIn": 2,
         "inbound": 21,
         "imports": [
@@ -46,14 +48,15 @@
           "observe",
           "quality",
           "review",
-          "util"
+          "util",
+          "visual"
         ]
       },
       {
         "dir": "adapters",
         "files": 25,
         "fanOut": 3,
-        "fanIn": 3,
+        "fanIn": 4,
         "inbound": 26,
         "imports": [
           "audit",
@@ -63,20 +66,21 @@
       },
       {
         "dir": "ui",
-        "files": 23,
-        "fanOut": 1,
-        "fanIn": 1,
-        "inbound": 5,
+        "files": 22,
+        "fanOut": 2,
+        "fanIn": 0,
+        "inbound": 0,
         "imports": [
-          "observe"
+          "observe",
+          "util"
         ]
       },
       {
         "dir": "commands",
-        "files": 15,
+        "files": 16,
         "fanOut": 2,
-        "fanIn": 3,
-        "inbound": 12,
+        "fanIn": 4,
+        "inbound": 13,
         "imports": [
           "mock",
           "util"
@@ -89,19 +93,27 @@
         "fanIn": 1,
         "inbound": 5,
         "imports": [
-          "ui"
+          "util"
         ]
       },
       {
         "dir": "observe",
         "files": 13,
         "fanOut": 2,
-        "fanIn": 4,
-        "inbound": 27,
+        "fanIn": 5,
+        "inbound": 30,
         "imports": [
           "cost",
           "util"
         ]
+      },
+      {
+        "dir": "util",
+        "files": 9,
+        "fanOut": 0,
+        "fanIn": 18,
+        "inbound": 86,
+        "imports": []
       },
       {
         "dir": "audit",
@@ -117,37 +129,37 @@
         "dir": "brain",
         "files": 8,
         "fanOut": 2,
-        "fanIn": 2,
-        "inbound": 9,
+        "fanIn": 3,
+        "inbound": 11,
         "imports": [
           "cost",
           "util"
         ]
       },
       {
-        "dir": "util",
-        "files": 8,
-        "fanOut": 0,
-        "fanIn": 15,
-        "inbound": 69,
-        "imports": []
-      },
-      {
         "dir": "mfe",
         "files": 7,
         "fanOut": 1,
-        "fanIn": 3,
+        "fanIn": 4,
         "inbound": 10,
         "imports": [
           "util"
         ]
       },
       {
+        "dir": "quality",
+        "files": 7,
+        "fanOut": 0,
+        "fanIn": 5,
+        "inbound": 9,
+        "imports": []
+      },
+      {
         "dir": "cost",
         "files": 6,
         "fanOut": 1,
         "fanIn": 6,
-        "inbound": 14,
+        "inbound": 15,
         "imports": [
           "util"
         ]
@@ -173,12 +185,20 @@
         ]
       },
       {
-        "dir": "quality",
+        "dir": "spec-run",
         "files": 6,
-        "fanOut": 0,
-        "fanIn": 4,
-        "inbound": 9,
-        "imports": []
+        "fanOut": 7,
+        "fanIn": 1,
+        "inbound": 8,
+        "imports": [
+          "adapters",
+          "cli",
+          "commands",
+          "mfe",
+          "observe",
+          "quality",
+          "util"
+        ]
       },
       {
         "dir": "distill",
@@ -209,8 +229,8 @@
         "dir": "visual",
         "files": 4,
         "fanOut": 1,
-        "fanIn": 1,
-        "inbound": 2,
+        "fanIn": 2,
+        "inbound": 4,
         "imports": [
           "util"
         ]
@@ -227,6 +247,16 @@
           "cost",
           "mfe",
           "util"
+        ]
+      },
+      {
+        "dir": "planner",
+        "files": 2,
+        "fanOut": 1,
+        "fanIn": 1,
+        "inbound": 1,
+        "imports": [
+          "brain"
         ]
       },
       {
@@ -252,12 +282,12 @@
       {
         "from": "cli",
         "to": "util",
-        "count": 25
+        "count": 27
       },
       {
         "from": "cli",
         "to": "adapters",
-        "count": 23
+        "count": 22
       },
       {
         "from": "cli",
@@ -265,13 +295,13 @@
         "count": 17
       },
       {
-        "from": "adapters",
-        "to": "util",
-        "count": 13
-      },
-      {
         "from": "cli",
         "to": "observe",
+        "count": 15
+      },
+      {
+        "from": "adapters",
+        "to": "util",
         "count": 13
       },
       {
@@ -285,6 +315,11 @@
         "count": 10
       },
       {
+        "from": "loop",
+        "to": "util",
+        "count": 9
+      },
+      {
         "from": "adapters",
         "to": "audit",
         "count": 8
@@ -295,14 +330,19 @@
         "count": 8
       },
       {
-        "from": "loop",
-        "to": "util",
+        "from": "cli",
+        "to": "cost",
         "count": 8
       },
       {
         "from": "cli",
-        "to": "cost",
-        "count": 7
+        "to": "spec-run",
+        "count": 8
+      },
+      {
+        "from": "ui",
+        "to": "util",
+        "count": 8
       },
       {
         "from": "loop",
@@ -320,11 +360,6 @@
         "count": 6
       },
       {
-        "from": "cli",
-        "to": "mfe",
-        "count": 6
-      },
-      {
         "from": "commands",
         "to": "mock",
         "count": 6
@@ -336,7 +371,7 @@
       },
       {
         "from": "cli",
-        "to": "quality",
+        "to": "mfe",
         "count": 5
       },
       {
@@ -351,7 +386,7 @@
       },
       {
         "from": "tui",
-        "to": "ui",
+        "to": "util",
         "count": 5
       },
       {
@@ -367,6 +402,11 @@
       {
         "from": "cli",
         "to": "mock",
+        "count": 4
+      },
+      {
+        "from": "cli",
+        "to": "quality",
         "count": 4
       },
       {
@@ -470,6 +510,11 @@
         "count": 2
       },
       {
+        "from": "loop",
+        "to": "visual",
+        "count": 2
+      },
+      {
         "from": "observe",
         "to": "cost",
         "count": 2
@@ -477,6 +522,11 @@
       {
         "from": "observe",
         "to": "util",
+        "count": 2
+      },
+      {
+        "from": "planner",
+        "to": "brain",
         "count": 2
       },
       {
@@ -492,6 +542,11 @@
       {
         "from": "brain",
         "to": "cost",
+        "count": 1
+      },
+      {
+        "from": "cli",
+        "to": "planner",
         "count": 1
       },
       {
@@ -545,11 +600,51 @@
         "count": 1
       },
       {
+        "from": "spec-run",
+        "to": "cli",
+        "count": 1
+      },
+      {
+        "from": "spec-run",
+        "to": "adapters",
+        "count": 1
+      },
+      {
+        "from": "spec-run",
+        "to": "quality",
+        "count": 1
+      },
+      {
+        "from": "spec-run",
+        "to": "mfe",
+        "count": 1
+      },
+      {
+        "from": "spec-run",
+        "to": "commands",
+        "count": 1
+      },
+      {
+        "from": "spec-run",
+        "to": "util",
+        "count": 1
+      },
+      {
+        "from": "spec-run",
+        "to": "observe",
+        "count": 1
+      },
+      {
         "from": "visual",
         "to": "util",
         "count": 1
       }
     ],
-    "cycles": []
+    "cycles": [
+      [
+        "cli",
+        "spec-run"
+      ]
+    ]
   }
 }

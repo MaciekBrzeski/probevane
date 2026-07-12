@@ -10,7 +10,7 @@ import { tabSlots, tabLabel } from './tabs.js';
 import { fitColumns, renderColumns } from './table.js';
 import { graphFits, renderGraph } from './graph.js';
 import { emptyPane } from './facet.js';
-import { gauges as gaugeSpecs, packed, RUN_COLUMNS } from '../ui/theme.js';
+import { gauges as gaugeSpecs, packed, RUN_COLUMNS } from '../util/theme.js';
 import type { ConstellationNode } from '../observe/constellation.js';
 import type { Project } from './panes.js';
 import type { PipelineState } from '../observe/pipeline.js';

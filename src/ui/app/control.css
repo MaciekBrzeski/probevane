@@ -1,5 +1,5 @@
 /* Palette custom-props (--bg/--acc/--ok/… + --warn2/--frame aliases) are set on
-   :root at boot by main.tsx from the shared SSOT src/ui/theme.ts — NOT hardcoded
+   :root at boot by main.tsx from the shared SSOT src/util/theme.ts — NOT hardcoded
    here, so one edit repaints the browser and the terminal. Non-palette tokens stay: */
 :root { --glow:0 0 10px; --num:ui-monospace, SFMono-Regular, Menlo, monospace; }
 * { box-sizing:border-box; }
@@ -134,7 +134,7 @@ details.ok summary { color:var(--ok); }
 
 /* --- Console (LCARS): frames, gauges, sparks, node graphs ------------------ */
 /* Panes are absolutely positioned from the shared CONSOLE_PANES manifest
-   (src/ui/theme.ts spanToCss) — the SAME spans the terminal console lays out
+   (src/util/theme.ts spanToCss) — the SAME spans the terminal console lays out
    from (spanToBox). Edit the manifest, both move together. */
 .console-grid { position:relative; height:min(74vh, 680px); }
 .console-pane { position:absolute; padding:9px; }

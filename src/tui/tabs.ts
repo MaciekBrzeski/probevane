@@ -4,7 +4,7 @@
 // (src/tui/views.ts tabBar) and mouse hit-testing (src/cli/tui-app.ts) so both
 // agree on where each tab sits.
 
-import { TERMINAL_TABS } from '../ui/theme.js';
+import { TERMINAL_TABS } from '../util/theme.js';
 
 export const TABS: readonly string[] = TERMINAL_TABS.map((t) => t.id); // ['console','runs','cost']
 export type Tab = string;

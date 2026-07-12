@@ -12,7 +12,7 @@ import {
 import { projectsPane, listPane, menuPane, textPane } from './panes.js';
 import { consoleWidgets } from './console-widgets.js';
 import { costExtras } from './cost-widgets.js';
-import { LAYOUTS, spanToBox } from '../ui/theme.js';
+import { LAYOUTS, spanToBox } from '../util/theme.js';
 import { FG } from './draw.js';
 import type { PipelineState } from '../observe/pipeline.js';
 

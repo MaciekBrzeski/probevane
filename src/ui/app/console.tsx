@@ -1,5 +1,5 @@
 import { $, j } from './lib.ts';
-import { gauges, packed } from '../theme.ts';
+import { gauges, packed } from '../../util/theme.ts';
 import { constellation } from '../../observe/constellation.ts';
 import { pipelineReducer, replayDelayMs, type PipelineState } from '../../observe/pipeline.ts';
 

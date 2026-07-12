@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { blank, serialize, type Screen } from '../src/tui/screen.js';
 import { fitColumns, renderColumns } from '../src/tui/table.js';
-import { RUN_COLUMNS } from '../src/ui/theme.js';
+import { RUN_COLUMNS } from '../src/util/theme.js';
 
 const ids = (cols: { col: { id: string } }[]) => cols.map((c) => c.col.id);
 const plain = (s: string) => s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');

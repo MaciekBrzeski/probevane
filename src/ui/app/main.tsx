@@ -2,10 +2,10 @@
 // inline script (polling, tabs, drawer, markdown/mermaid, filtering) as functions.
 import { mount } from '../runtime.ts';
 import { $, j, esc, dirOf, applyPalette, type ProjectInfo, type RunRecord } from './lib.ts';
-import { RUN_COLUMNS } from '../theme.ts';
+import { RUN_COLUMNS } from '../../util/theme.ts';
 import { loadConsole, consolePipelineEvent, consolePipelineReset, startTheater } from './console.tsx';
 import { loadTerminal, terminalActivated } from './terminal.ts';
-applyPalette(); // shared palette SSOT → :root custom-props (see src/ui/theme.ts)
+applyPalette(); // shared palette SSOT → :root custom-props (see src/util/theme.ts)
 
 // CDN globals (loaded by shell.html script tags before this bundle runs).
 declare const marked: { parse(md: string, opts?: Record<string, unknown>): string };

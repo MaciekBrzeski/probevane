@@ -81,7 +81,7 @@ The shell drop closes the loop the whole console is about: run the harness (or `
 
 ## One model, two renderers (SSOT)
 
-The browser and terminal control centers are **thin adapters over one shared model**, `src/ui/theme.ts`. Edit it once, both repaint:
+The browser and terminal control centers are **thin adapters over one shared model**, `src/util/theme.ts` (a shared leaf, so neither presentation stack depends on the other). Edit it once, both repaint:
 
 | Model export | Browser adapter | Terminal adapter |
 |---|---|---|

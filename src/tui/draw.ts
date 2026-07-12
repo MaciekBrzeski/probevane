@@ -2,7 +2,7 @@
 // of the screen runtime. Colors mirror the web control center's palette.
 
 import type { Style } from './screen.js';
-import { PALETTE, packed, type ColorName } from '../ui/theme.js';
+import { PALETTE, packed, type ColorName } from '../util/theme.js';
 
 // Palette — packed 24-bit 0xRRGGBB derived from the shared theme SSOT
 // (src/ui/theme.ts), the SAME hexes the browser :root uses. screen.ts sgr()

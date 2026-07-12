@@ -23,7 +23,7 @@ try {
 //    facet bridge → @facet/core + @facet/render-term). This is the graph that
 //    crashed from a checkout; if the bundled facet under dist/node_modules is
 //    missing/broken it throws here.
-const MODULES = ['dist/tui/screens.js', 'dist/tui/views.js', 'dist/tui/cost-widgets.js', 'dist/tui/console-widgets.js', 'dist/ui/theme.js'];
+const MODULES = ['dist/tui/screens.js', 'dist/tui/views.js', 'dist/tui/cost-widgets.js', 'dist/tui/console-widgets.js', 'dist/util/theme.js'];
 for (const m of MODULES) {
   try { await import(pathToFileURL(join(ROOT, m)).href); }
   catch (e) { die(`import ${m}: ${e.message}`); }

@@ -4,7 +4,7 @@
 
 import { putText, type Screen, type Style } from './screen.js';
 import { pad } from './draw.js';
-import { RUN_COLUMN_DROP, type RunColumn } from '../ui/theme.js';
+import { RUN_COLUMN_DROP, type RunColumn } from '../util/theme.js';
 
 export interface ColBox { col: RunColumn; w: number }
 const GAP = 1;

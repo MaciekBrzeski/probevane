@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PALETTE, packed, cssVar, cssVars, TABS, TERMINAL_TABS, gauges, LAYOUTS, CONSOLE_PANES, RUN_COLUMNS, spanToBox, spanToCss } from '../src/ui/theme.js';
+import { PALETTE, packed, cssVar, cssVars, TABS, TERMINAL_TABS, gauges, LAYOUTS, CONSOLE_PANES, RUN_COLUMNS, spanToBox, spanToCss } from '../src/util/theme.js';
 
 describe('palette SSOT', () => {
   it('packs a hex into 0xRRGGBB for the terminal', () => {
