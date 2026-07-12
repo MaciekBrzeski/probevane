@@ -1,6 +1,6 @@
 import { basename, isAbsolute, relative } from 'node:path';
 import { loadConfig } from '../util/config.js';
-import { runDocs } from '../loop/run-docs.js';
+import { runDocs } from '../loop/run/docs.js';
 import { flag, dirArg } from './args.js';
 
 // probevane docs <dir> [--out <path>] [--sections a,b,c] [--model …] [--max-steps N] [--budget N]

@@ -24,10 +24,10 @@ import {
   difficultyCheck,
   stuckCheck,
   budgetCheck,
-} from '../src/loop/engine-escalation.js';
+} from '../src/loop/engine/escalation.js';
 import { RunCtx } from '../src/loop/ctx.js';
-import type { LoopRun, LoopState } from '../src/loop/engine-phases.js';
-import type { RunOptions } from '../src/loop/engine.js';
+import type { LoopRun, LoopState } from '../src/loop/engine/phases.js';
+import type { RunOptions } from '../src/loop/engine/index.js';
 import type { Msg, BrainResponse } from '../src/loop/types.js';
 import type { StackAdapter } from '../src/adapters/adapter.js';
 

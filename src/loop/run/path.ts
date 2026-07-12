@@ -1,13 +1,13 @@
-import type { StackAdapter } from '../adapters/adapter.js';
-import { brainFor, isDirectModel } from '../brain/select.js';
-import { assessComplexity, routeModels } from './complexity.js';
-import { profile, type ProfileName, type ProfileOpts } from './profiles.js';
-import { runLoop, type RunOutcome } from './engine.js';
-import { buildGraph } from '../mock/graph.js';
-import { focusDirective } from './scout.js';
-import { buildDepDigest } from './dep-digest.js';
-import { runInWorktree } from './worktree.js';
-import { reviewDiffText } from '../review/diff-review.js';
+import type { StackAdapter } from '../../adapters/adapter.js';
+import { brainFor, isDirectModel } from '../../brain/select.js';
+import { assessComplexity, routeModels } from '../complexity.js';
+import { profile, type ProfileName, type ProfileOpts } from '../profiles.js';
+import { runLoop, type RunOutcome } from '../engine/index.js';
+import { buildGraph } from '../../mock/graph.js';
+import { focusDirective } from '../scout.js';
+import { buildDepDigest } from '../dep-digest.js';
+import { runInWorktree } from '../worktree.js';
+import { reviewDiffText } from '../../review/diff-review.js';
 
 type Brain = ReturnType<typeof brainFor>;
 

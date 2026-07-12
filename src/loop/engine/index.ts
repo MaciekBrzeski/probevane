@@ -1,10 +1,10 @@
-import type { Brain } from '../brain/brain.js';
-import type { StackAdapter } from '../adapters/adapter.js';
-import { RunCtx } from './ctx.js';
-import type { Rune } from './rune.js';
-import type { Msg } from './types.js';
-import { headSha } from '../util/git.js';
-import { recordRun } from '../cost/ledger.js';
+import type { Brain } from '../../brain/brain.js';
+import type { StackAdapter } from '../../adapters/adapter.js';
+import { RunCtx } from '../ctx.js';
+import type { Rune } from '../rune.js';
+import type { Msg } from '../types.js';
+import { headSha } from '../../util/git.js';
+import { recordRun } from '../../cost/ledger.js';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -15,8 +15,8 @@ import {
   stableCacheIndex,
   type LoopRun,
   type LoopState,
-} from './engine-phases.js';
-import { userTurn } from './transcript.js';
+} from './phases.js';
+import { userTurn } from '../transcript.js';
 import {
   nudgeCheck,
   neverEditedCheck,
@@ -24,7 +24,7 @@ import {
   difficultyCheck,
   stuckCheck,
   budgetCheck,
-} from './engine-escalation.js';
+} from './escalation.js';
 
 // Re-exported for API compatibility (the engine's only consumer of stableCacheIndex
 // is the phase module; kept exported here so the public surface is unchanged).
@@ -111,7 +111,7 @@ async function createLoopRun(opts: RunOptions): Promise<LoopRun> {
   ctx.checkpointSha = await headSha(workdir).catch(() => '');
   const eventsOn = process.env.PROBEVANE_EVENTS !== '0';
   const eventsPath = join(workdir, '.probevane', `events-${runId}.jsonl`);
-  const { statePath } = await import('../util/state.js');
+  const { statePath } = await import('../../util/state.js');
   const eventsStatePath = statePath('events', `${runId}.jsonl`);
   if (eventsOn) mkdirSync(statePath('events'), { recursive: true });
   // Full transcript log → <workdir>/.probevane/transcript-<runId>.jsonl (PROBEVANE_TRANSCRIPT=0 disables).

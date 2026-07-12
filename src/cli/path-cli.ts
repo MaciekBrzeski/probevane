@@ -1,10 +1,10 @@
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { flag, dirArg } from './args.js';
 import { loadConfig, type ProbevaneConfig } from '../util/config.js';
-import { runPath, type RunPathOpts } from '../loop/run-path.js';
+import { runPath, type RunPathOpts } from '../loop/run/path.js';
 import type { ProfileName } from '../loop/profiles.js';
 import type { StackAdapter } from '../adapters/adapter.js';
-import type { RunOutcome } from '../loop/engine.js';
+import type { RunOutcome } from '../loop/engine/index.js';
 
 // Shared scaffolding for the single-task path CLIs (feature / refactor / repair /
 // fix / migrate / document). Each of those used to repeat the same flag parsing,

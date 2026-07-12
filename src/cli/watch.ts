@@ -38,8 +38,8 @@ async function main() {
     const action = hasTest ? 'repair' : 'generate';
     console.log(`[watch] ${rel} changed → ${action}`);
     if (!run) return;
-    const { runPath } = await import('../loop/run-path.js');
-    const { generateTests } = await import('../loop/run-generation.js');
+    const { runPath } = await import('../loop/run/path.js');
+    const { generateTests } = await import('../loop/run/generation.js');
     if (action === 'repair') {
       await runPath({
         dir, adapter, profileName: 'repair',

@@ -1,17 +1,17 @@
-import type { Brain } from '../brain/brain.js';
-import type { StackAdapter } from '../adapters/adapter.js';
-import { RunCtx } from './ctx.js';
-import type { Rune } from './rune.js';
-import { firstBlockBefore, firstBlockStop } from './rune.js';
-import { TOOL_SPECS, execTool } from './tools.js';
-import { capOutput } from '../util/exec.js';
-import type { Msg, ToolResult, BrainResponse } from './types.js';
-import { formatEvent } from './events.js';
-import { buildTurn, formatTurn, type TranscriptTurn } from './transcript.js';
-import { BASE_SYSTEM, MINIMAL_SYSTEM } from './engine-prompts.js';
-import { extractTestBlock } from './extract.js';
+import type { Brain } from '../../brain/brain.js';
+import type { StackAdapter } from '../../adapters/adapter.js';
+import { RunCtx } from '../ctx.js';
+import type { Rune } from '../rune.js';
+import { firstBlockBefore, firstBlockStop } from '../rune.js';
+import { TOOL_SPECS, execTool } from '../tools.js';
+import { capOutput } from '../../util/exec.js';
+import type { Msg, ToolResult, BrainResponse } from '../types.js';
+import { formatEvent } from '../events.js';
+import { buildTurn, formatTurn, type TranscriptTurn } from '../transcript.js';
+import { BASE_SYSTEM, MINIMAL_SYSTEM } from './prompts.js';
+import { extractTestBlock } from '../extract.js';
 import { appendFileSync } from 'node:fs';
-import type { RunOptions, RunOutcome } from './engine.js';
+import type { RunOptions, RunOutcome } from './index.js';
 
 // Turns to keep full tool_result bodies; older ones are pruned to a stub so the
 // transcript (re-sent every turn) stays bounded. The files persist on disk —
@@ -284,7 +284,7 @@ export async function runStep(lr: LoopRun): Promise<'break' | 'fallthrough'> {
   messages.push({ role: 'assistant', text: resp.text || undefined, toolCalls: resp.toolCalls });
   const results = resp.toolCalls.length ? await applyToolCalls(lr, resp) : [];
   // One transcript write per turn, after results are known. st.brain.model is read
-  // per turn → a takeover swap (engine-escalation swaps st.brain) is recorded on
+  // per turn → a takeover swap (engine/escalation swaps st.brain) is recorded on
   // the turns the stronger model drives. Covers tool turns, the final stop
   // paragraph, and text-extract prose (empty toolCalls → text-only turn).
   appendTranscript(lr, buildTurn({

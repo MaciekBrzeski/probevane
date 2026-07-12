@@ -6,7 +6,7 @@ import { draftLocal } from '../loop/draft-local.js';
 import { brainFor } from '../brain/select.js';
 import { runPool } from '../util/concurrent.js';
 import { anthropicBrain } from '../brain/anthropic-sdk.js';
-import { generateTests } from '../loop/run-generation.js';
+import { generateTests } from '../loop/run/generation.js';
 import { loadConfig, pick } from '../util/config.js';
 import type { TestKind } from '../adapters/adapter.js';
 import { flag, dirArg } from './args.js';

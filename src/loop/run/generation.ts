@@ -1,19 +1,19 @@
-import type { StackAdapter, TestKind, ProbeResult, TestTarget } from '../adapters/adapter.js';
-import type { Brain } from '../brain/brain.js';
-import { profile } from './profiles.js';
-import { runLoop, type RunOutcome } from './engine.js';
-import { retrieveFewShot } from '../library/retrieve.js';
-import { readTraces } from '../distill/collect.js';
-import { pickSimilarTrace } from '../library/similar.js';
-import { conventionalSpecPath } from './extract.js';
-import { propertyGuidance } from './property.js';
-import { mockInject } from './runes/mock_inject.js';
-import { buildChain } from '../mock/index.js';
-import { brainFor, isDirectModel } from '../brain/select.js';
-import { assessComplexity, routeModels } from './complexity.js';
-import { parseGaps, gapsDigest } from '../coverage/gaps.js';
-import type { RunCtx } from './ctx.js';
-import type { Rune } from './rune.js';
+import type { StackAdapter, TestKind, ProbeResult, TestTarget } from '../../adapters/adapter.js';
+import type { Brain } from '../../brain/brain.js';
+import { profile } from '../profiles.js';
+import { runLoop, type RunOutcome } from '../engine/index.js';
+import { retrieveFewShot } from '../../library/retrieve.js';
+import { readTraces } from '../../distill/collect.js';
+import { pickSimilarTrace } from '../../library/similar.js';
+import { conventionalSpecPath } from '../extract.js';
+import { propertyGuidance } from '../property.js';
+import { mockInject } from '../runes/mock_inject.js';
+import { buildChain } from '../../mock/index.js';
+import { brainFor, isDirectModel } from '../../brain/select.js';
+import { assessComplexity, routeModels } from '../complexity.js';
+import { parseGaps, gapsDigest } from '../../coverage/gaps.js';
+import type { RunCtx } from '../ctx.js';
+import type { Rune } from '../rune.js';
 
 // Shared generation core used by both `probevane generate` and the live eval.
 // Probe-grounds the task, then runs the gated write_tests loop.
@@ -106,7 +106,7 @@ async function buildGrounds(
   // model to write tests that kill them (the strongest "does it catch bugs" signal).
   let mutantGround = '';
   if (opts.mutationTarget) {
-    const { survivingMutants, mutantDigest } = await import('./mutation.js');
+    const { survivingMutants, mutantDigest } = await import('../mutation.js');
     const surv = await survivingMutants(dir, adapter).catch(() => []);
     const d = mutantDigest(surv);
     if (d) { mutantGround = `\n\n=== ${d}`; log(`[probevane] ${surv.length} surviving mutant(s) to target`); }

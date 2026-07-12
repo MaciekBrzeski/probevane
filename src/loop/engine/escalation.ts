@@ -1,6 +1,6 @@
-import { TOOL_SPECS } from './tools.js';
-import { isCircular, proposal as difficultyProposal } from './difficulty.js';
-import { stableCacheIndex, type LoopRun } from './engine-phases.js';
+import { TOOL_SPECS } from '../tools.js';
+import { isCircular, proposal as difficultyProposal } from '../difficulty.js';
+import { stableCacheIndex, type LoopRun } from './phases.js';
 
 // The stall-escalation ladder, ported 1:1 from runLoop's per-iteration tail. Each
 // check returns true when it took over control flow — nudge/consult return true to

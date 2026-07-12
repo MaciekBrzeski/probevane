@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findNode, repoMapFor, focusDirective } from '../src/loop/scout.js';
-import { runLoop } from '../src/loop/engine.js';
+import { runLoop } from '../src/loop/engine/index.js';
 import { profile } from '../src/loop/profiles.js';
 import type { ModuleGraph } from '../src/mock/graph.js';
 import type { Brain } from '../src/brain/brain.js';

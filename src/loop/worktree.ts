@@ -4,7 +4,7 @@ import { dirname, join, relative } from 'node:path';
 import {
   repoRoot, headSha, addWorktree, removeWorktree, diffStat, commitFiles, mergeBranch, currentBranch,
 } from '../util/git.js';
-import type { RunOutcome } from './engine.js';
+import type { RunOutcome } from './engine/index.js';
 import { getDiff, findingsMarkdown, type Finding } from '../review/diff-review.js';
 
 // `--worktree` isolation: run a path loop in a throwaway git worktree on its own

@@ -31,7 +31,7 @@ interface EvalCase {
 interface LiveStats { costUsd: number; tokensIn: number; tokensOut: number }
 async function liveGenerate(c: EvalCase, dir: string, adapter: Adapter, base: Baseline): Promise<LiveStats | null> {
   const { anthropicBrain } = await import('../brain/anthropic-sdk.js');
-  const { generateTests } = await import('../loop/run-generation.js');
+  const { generateTests } = await import('../loop/run/generation.js');
   const brain = anthropicBrain();
   console.log(`[eval] live generating ${c.fixture}.${c.kind}…`);
   const outcome = await generateTests({
@@ -219,7 +219,7 @@ async function runOnePathCase(c: PathCase, opts: PathOpts): Promise<boolean> {
   await adapter.install(dir).catch((e) => console.error(`[eval] install ${c.fixture}: ${e}`));
   const model = live ? opts.model : `replay:${cassette}`;
   const rec = record ? await startRecording(cassette) : '';
-  const { runPath } = await import('../loop/run-path.js');
+  const { runPath } = await import('../loop/run/path.js');
   console.log(`[eval] ${live ? (record ? 'recording' : 'live') : 'replay'} ${c.fixture}.${c.path}…`);
   const outcome = await runPath({
     dir,

@@ -40,7 +40,7 @@ async function maybeGenerate(
   untested: string[],
 ): Promise<number> {
   if (!(args.includes('--generate') && untested.length && process.env.ANTHROPIC_API_KEY)) return 0;
-  const { generateTests } = await import('../loop/run-generation.js');
+  const { generateTests } = await import('../loop/run/generation.js');
   const outcome = await generateTests({
     dir,
     kind: 'unit',
@@ -74,7 +74,7 @@ async function runReviewFix(args: string[], dir: string, cfg: Cfg, base: string,
   let reviewMd = '\n' + findingsMarkdown(findings);
   const actionable = findings.filter((f) => f.severity !== 'nit');
   if (!actionable.length) return reviewMd;
-  const { runPath } = await import('../loop/run-path.js');
+  const { runPath } = await import('../loop/run/path.js');
   console.error(`[probevane] review: ${actionable.length} actionable finding(s) — running fix path`);
   const outcome = await runPath({
     dir,

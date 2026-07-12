@@ -1,4 +1,4 @@
-// System prompts for the gated loop. Kept in their own module so engine-phases.ts
+// System prompts for the gated loop. Kept in their own module so engine/phases.ts
 // stays under the file-size bar (the prompts are long literals, not logic).
 
 export const BASE_SYSTEM = `You are probevane, an agent that edits a codebase to satisfy a task.

@@ -38,7 +38,7 @@ import {
   emit,
   type LoopRun,
   type LoopState,
-} from '../src/loop/engine-phases.js';
+} from '../src/loop/engine/phases.js';
 import { lineOf, mutationScore, survivingMutants, mutantDigest, MUTATIONS } from '../src/loop/mutation.js';
 import { buildDepDigest } from '../src/loop/dep-digest.js';
 import {

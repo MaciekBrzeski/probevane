@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, lstatSync } 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInWorktree } from '../src/loop/worktree.js';
-import type { RunOutcome } from '../src/loop/engine.js';
+import type { RunOutcome } from '../src/loop/engine/index.js';
 import type { Finding } from '../src/review/diff-review.js';
 
 const base = (over: Partial<RunOutcome>): RunOutcome => ({
