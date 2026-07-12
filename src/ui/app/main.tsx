@@ -48,10 +48,13 @@ $('tabs').addEventListener('click', (e) => {
 
 // --- drawer ---
 const drawer = $('drawer');
+// Open the right-hand drawer with a fresh title/empty body — every detail view
+// (project, run, live watch) starts here so stale content never flashes.
 function openDrawer(title: string) { $('drawerTitle').textContent = title; $('drawerBody').textContent = ''; drawer.classList.add('open'); }
 $('drawerClose').onclick = () => drawer.classList.remove('open');
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') drawer.classList.remove('open'); });
 let followES: EventSource | null = null;
+// Close any live transcript follow so reopening a drawer can't leak EventSources.
 function stopFollow() { if (followES) { followES.close(); followES = null; } }
 
 // --- Projects ---
@@ -63,6 +66,8 @@ async function loadProjects() {
     for (const p of projects) box.appendChild(<ProjectCard p={p} onOpen={openProject} />);
   } catch { $('projects').textContent = 'failed to load projects'; }
 }
+// Drawer view for a project card: its wiki page plus a link that jumps to the
+// runs tab pre-filtered to this project.
 async function openProject(p: ProjectInfo) {
   openDrawer('project — ' + p.name);
   const body = $('drawerBody');
@@ -96,6 +101,7 @@ async function loadWiki() {
     group('probevane', core); group('projects', projects);
   } catch { $('wikiList').textContent = 'failed to load wiki'; }
 }
+// Load one wiki page into the docs pane and render it (markdown + mermaid).
 async function openDoc(file: string) {
   $('docTitle').textContent = file.replace(/\.md$/, '');
   const body = $('docBody'); body.classList.remove('muted'); body.textContent = 'loading…';
@@ -122,7 +128,10 @@ async function renderMarkdown(container: HTMLElement, md: string) {
 
 // --- Runs ---
 let RUN_FILTER = '';
+// Set the run-history filter (project name) and redraw the table.
 function filterRuns(name: string) { RUN_FILTER = name || ''; loadRuns(); }
+// Refresh the Runs tab: active-jobs box + filtered history table. Two separate
+// try blocks on purpose — a dead /jobs must not hide the history.
 async function loadRuns() {
   try {
     const { jobs } = await j('/jobs');
@@ -152,6 +161,8 @@ async function loadRuns() {
     $('runs').querySelector('tbody')!.replaceWith(tb);
   } catch {}
 }
+// Drawer view for a finished run: replay button, headline stats, event
+// timeline, then the captured transcript — each section fails soft.
 async function openRun(r: RunRecord) {
   stopFollow();
   openDrawer('run — ' + (r.label || r.runId));
@@ -208,12 +219,15 @@ async function openRunLive(dir: string) {
   const once = (ev: MessageEvent) => { try { const e = JSON.parse(ev.data); if (e.runId) { es.removeEventListener('message', once); followTranscript(dir, e.runId, tbox); } } catch {} };
   es.addEventListener('message', once);
 }
+// Tail a run's transcript over SSE, appending turns as the model produces them.
 function followTranscript(dir: string, runId: string, tbox: HTMLElement) {
   stopFollow();
   followES = new EventSource('/transcript?dir=' + encodeURIComponent(dir) + '&runId=' + encodeURIComponent(runId) + '&follow=1');
   followES.onmessage = (ev) => { try { tbox.appendChild(<Turn t={JSON.parse(ev.data)} />); } catch {} };
 }
 
+// Programmatic tab switch — click the real button so the tabs handler does all
+// the toggling/loading in one place.
 function switchTab(go: string) { (document.querySelector(`nav.tabs button[data-go="${go}"]`) as HTMLElement).click(); }
 
 // Theater: replay a captured run's recorded event stream in the console ($0).
@@ -242,6 +256,8 @@ function setStat(id: string, text: string) {
 // innerHTML rewrites restart CSS entrance animations — only touch the DOM
 // when the payload actually changed (the 4s poll otherwise replays them).
 const LAST: Record<string, string> = {};
+// True only when this key's payload differs from the last poll — the guard
+// that keeps the 4s poll from replaying entrance animations (see above).
 function changed(key: string, payload: unknown): boolean {
   const j2 = JSON.stringify(payload);
   if (LAST[key] === j2) return false;
@@ -249,6 +265,8 @@ function changed(key: string, payload: unknown): boolean {
   return true;
 }
 
+// 4s heartbeat: health, cost aggregate, alerts, audit trail. Each fetch fails
+// soft so a dead daemon degrades to 'daemon down', not a broken page.
 async function poll() {
   try {
     const hlth = await j('/health');

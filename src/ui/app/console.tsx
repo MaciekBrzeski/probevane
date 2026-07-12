@@ -7,6 +7,8 @@ import { pipelineReducer, replayDelayMs, type PipelineState } from '../../observ
 type PipeRune = { name: string; phase: string; summary: string };
 let PIPE_RUNES: PipeRune[] = [];
 
+// (Re)draws the rune pipeline as a linear NodeGraph. Full redraw per event —
+// the graph is tiny, so diffing would cost more than it saves.
 function renderPipeline(states: Record<string, 'idle' | 'active' | 'ok' | 'err'> = {}) {
   if (!PIPE_RUNES.length) return;
   const nodes = PIPE_RUNES.map((r, i) => ({
@@ -17,6 +19,8 @@ function renderPipeline(states: Record<string, 'idle' | 'active' | 'ok' | 'err'>
   box.appendChild(<NodeGraph nodes={nodes} id="pipeSvg" compact={true} />);
 }
 
+// Console-tab boot: fetch pipeline, aggregate and module graph, fill the three
+// panes. Each fetch fails soft so one dead endpoint can't blank the tab.
 export async function loadConsole() {
   try {
     const p = await j('/pipeline');
@@ -48,6 +52,8 @@ export async function loadConsole() {
 // terminal failure leaves the blockers red. openRunLive feeds this.
 let PIPE_STATE: PipelineState = {};
 
+// Feed one SSE run event through the shared reducer and repaint the lights —
+// the state map persists so retries/accepts build on the prior flashes.
 export function consolePipelineEvent(ev: { tool?: string; gate?: string; accepted?: boolean; stopReason?: string }) {
   if (!PIPE_RUNES.length) return;
   PIPE_STATE = pipelineReducer(PIPE_STATE, ev, PIPE_RUNES.map((r) => r.name));
@@ -80,6 +86,8 @@ export async function startTheater(runId: string): Promise<boolean> {
   }
 }
 
+// Plays a recorded event list through the pipeline lights, pacing each step by
+// the recorded timestamps (replayDelayMs). A new show cancels the last one.
 export function consoleTheater(runId: string, events: TheaterEvent[], onTick?: (line: string, i: number) => void) {
   if (THEATER_TIMER) clearTimeout(THEATER_TIMER);
   consolePipelineReset();

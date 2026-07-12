@@ -5,6 +5,8 @@ import { SvgPainter } from '@facet/render-dom';
 import { sparkline } from '@facet/core';
 import { packed } from '../../../../util/theme.ts';
 
+// Draws one sparkline card: engine area+stroke plus an end dot marking the
+// latest value — SVG lands via innerHTML since the painter emits a string.
 export function Spark(props: { points: number[]; label: string; accent?: number; width?: number; height?: number }): Node {
   const w = props.width ?? 260;
   const ht = props.height ?? 64;

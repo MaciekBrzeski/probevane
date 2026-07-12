@@ -22,6 +22,8 @@ const PANE_BODY: Record<string, () => Node> = {
   constellation: () => <div id="constellation" class="muted">standby…</div>,
 };
 
+// Console-tab skeleton: one ScanFrame per CONSOLE_PANES entry, body picked by
+// pane id — layout stays a pure function of the shared manifest.
 export function ConsolePanel(): Node {
   return (
     <section data-tab="console">

@@ -14,6 +14,8 @@ export interface GraphNodeSpec {
   title?: string;
 }
 
+// Lays out the DAG (layoutDag) then renders edges-under-nodes into one <svg>;
+// state/weight become CSS classes so all animation stays in the stylesheet.
 export function NodeGraph(props: { nodes: GraphNodeSpec[]; id?: string; compact?: boolean }): Node {
   const dag: LayoutNode[] = props.nodes.map((n) => ({ id: n.id, deps: n.deps }));
   const compact = props.compact === true;

@@ -5,6 +5,8 @@ import { SvgPainter } from '@facet/render-dom';
 import { gauge } from '@facet/core';
 import { packed } from '../../../../util/theme.ts';
 
+// Draws one ring gauge through the engine widget and wraps it with its label —
+// SVG lands via innerHTML because the painter emits a string, not DOM nodes.
 export function Gauge(props: { value: number; label: string; accent?: number; size?: number }): Node {
   const size = props.size ?? 96;
   const p = new SvgPainter(size, size);

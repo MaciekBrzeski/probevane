@@ -37,6 +37,8 @@ export interface RunRecord {
   steps?: number;
 }
 
+/** One project card on the Projects tab — filled from the daemon's /projects
+ *  JSON (slug/name plus run stats aggregated from the ledger). */
 export interface ProjectInfo {
   slug: string;
   name: string;
@@ -45,6 +47,8 @@ export interface ProjectInfo {
   lastRun?: { accepted?: boolean; stopReason?: string } | null;
 }
 
+/** One transcript turn from /transcript — the run's transcript.jsonl rows,
+ *  rendered by components/Turn.tsx (text plus tool calls/results). */
 export interface TurnData {
   role: string;
   model?: string;
