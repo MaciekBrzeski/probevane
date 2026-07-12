@@ -13,6 +13,7 @@ const HOOKS = [
 ] as const;
 type Hook = (typeof HOOKS)[number];
 
+/** The loop phase a rune primarily acts in — the bucket the pipeline views lay runes out by. */
 export type Phase = 'context' | 'guard' | 'observer' | 'gate' | 'harvest';
 export const PHASES: { id: Phase; label: string; detail: string }[] = [
   { id: 'context', label: 'Context / prepare', detail: 'Before the run: prepare()/systemPromptAddition runes seed the model with project context, rules, and few-shot exemplars.' },
@@ -49,6 +50,8 @@ export const TOGGLES: { key: keyof ProfileOpts; label: string; detail: string }[
     'Adds mfe_gate — enforces Module Federation standards on a micro-frontend project (no-op off-federation).' },
 ];
 
+/** One rune as the pipeline views render it — hooks/phase derived live from profile(),
+ *  prose curated in rune-descriptions.ts, so the docs can't drift from the real pipeline. */
 export interface RuneInfo {
   name: string;
   hooks: Hook[];
@@ -64,10 +67,12 @@ export interface RuneInfo {
   rule?: string;
 }
 
+/** Which hooks a rune actually implements (method presence). */
 function hooksOf(r: Rune): Hook[] {
   return HOOKS.filter((h) => typeof (r as unknown as Record<string, unknown>)[h] === 'function');
 }
 
+/** Primary phase by strongest hook — a tool-vetoing rune is a guard even if it also gates. */
 function phaseOf(hooks: Hook[]): Phase {
   if (hooks.includes('beforeToolCall')) return 'guard';
   if (hooks.includes('shouldStop')) return 'gate';
@@ -102,6 +107,7 @@ export interface ModelRune extends RuneInfo {
   requiredBy: string | null; // null = always; else the TOGGLES label that adds it
   e2eOnly: boolean;          // visual gate only applies to e2e
 }
+/** profile name → its full ModelRune list — the wiki demo's whole data model. */
 export type PipelineModel = Record<string, ModelRune[]>;
 
 const ALL_ON: ProfileOpts = {
@@ -109,12 +115,15 @@ const ALL_ON: ProfileOpts = {
   assertMin: 80, a11y: true, visual: true, mfe: true,
 };
 
+/** ProfileOpts with exactly ONE toggle on — isolates which runes that toggle adds. */
 function optsForToggle(key: keyof ProfileOpts): ProfileOpts {
   const o: ProfileOpts = { kind: 'e2e' };
   (o as unknown as Record<string, unknown>)[key] = key === 'assertMin' ? 80 : true;
   return o;
 }
 
+/** The all-toggles pipeline with each rune labelled by the single toggle that
+ *  introduces it — diffed from real profile() calls, so labels can't drift. */
 export function pipelineModel(name: ProfileName): ModelRune[] {
   const full = describePipeline(name, ALL_ON).runes;
   const baseNames = new Set(describePipeline(name, { kind: 'e2e' }).runes.map((r) => r.name));
@@ -146,6 +155,7 @@ export function fullModel(): {
   return { profiles, toggles: TOGGLES, phases: PHASES, subroutines: SUBROUTINES, hookDescriptions: HOOK_DESCRIPTIONS };
 }
 
+/** Mermaid-safe node id (Mermaid chokes on punctuation in ids). */
 function nodeId(name: string): string {
   return name.replace(/[^a-zA-Z0-9_]/g, '_');
 }

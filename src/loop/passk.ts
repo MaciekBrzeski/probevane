@@ -18,6 +18,8 @@ export interface SuiteScore {
   value: number;
 }
 
+/** Measure one candidate suite: green/tests/coverage/audit folded into one comparable
+ *  value (red or audit-broken → -1, i.e. worthless). */
 export async function scoreSuite(dir: string, adapter: StackAdapter): Promise<SuiteScore> {
   const run = await adapter.run(dir, 'unit');
   const cov = await adapter.coverage(dir).catch(() => null);
@@ -29,6 +31,8 @@ export async function scoreSuite(dir: string, adapter: StackAdapter): Promise<Su
   return { green: run.green, tests: run.passed, coverage, auditScore: audit.score, auditErrors: audit.errors, value };
 }
 
+/** A scored candidate suite; `ref` carries whatever the orchestrator needs to restore
+ *  the winner (e.g. its snapshot dir). */
 export interface Candidate<T = unknown> {
   label: string;
   score: SuiteScore;

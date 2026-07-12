@@ -77,6 +77,8 @@ export function stableCacheIndex(
   return idx > 0 ? idx : undefined;
 }
 
+/** Stub all but the last `keepLast` tool-result turns — old file dumps cost tokens
+ *  on every re-send, and the model can re-read anything it still needs. */
 function pruneOldToolResults(messages: Msg[], keepLast: number): void {
   // Find user turns carrying tool results, oldest first; stub all but the last `keepLast`.
   const idxs = messages.flatMap((m, i) => (m.toolResults?.length ? [i] : []));
@@ -134,6 +136,8 @@ export function appendTranscript(lr: LoopRun, turn: TranscriptTurn): void {
   } catch { /* transcript is best-effort */ }
 }
 
+/** One brain completion over the current transcript (cache prefix + optional token
+ *  streaming); a thrown brain error ends the run as 'error' instead of crashing. */
 async function requestCompletion(lr: LoopRun): Promise<BrainResponse | null> {
   try {
     return await lr.st.brain.complete({
@@ -157,6 +161,9 @@ async function requestCompletion(lr: LoopRun): Promise<BrainResponse | null> {
   }
 }
 
+/** Execute a response's tool calls in order: rune veto first (a block feeds back as
+ *  an error result), then the tool, then afterToolCall observers. Tracks whether the
+ *  turn was productive for the barren counter. */
 async function applyToolCalls(lr: LoopRun, resp: BrainResponse): Promise<ToolResult[]> {
   const { ctx, runes, messages, log } = lr;
   const results: ToolResult[] = [];

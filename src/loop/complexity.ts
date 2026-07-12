@@ -13,6 +13,9 @@ export interface Complexity {
   reasons: string[];
 }
 
+/** Score how hard this project is to test (module count, network use, provider-heavy
+ *  targets) — the signal routeModels uses to START on a stronger brain instead of
+ *  waiting for the loop to stall. */
 export async function assessComplexity(dir: string, targets: TestTarget[]): Promise<Complexity> {
   const reasons: string[] = [];
   let score = 0;

@@ -18,6 +18,8 @@ import { sh } from '../util/exec.js';
 
 const DRAFT_SYSTEM = `You write ONE test file. Use ONLY the real exported names and literal values from the SOURCE below — do not invent identifiers or values. Assert concrete values; cover the happy path, edge cases, and error cases. Output the COMPLETE test file as a SINGLE fenced code block (start it with a \`// <path>\` comment) and NOTHING else.`;
 
+/** One draft attempt's verdict: did the spec land green+clean, where it was written,
+ *  and why it failed if not. The triage caller decides fallback on it. */
 export interface DraftResult {
   accepted: boolean;
   specPath: string;
@@ -38,6 +40,8 @@ function promptBlocks(source: string): { factBlock: string; propBlock: string } 
   return { factBlock, propBlock };
 }
 
+/** Assemble the per-attempt user prompt: task + facts + capped source, with
+ *  prior-failure feedback appended on repair turns. */
 function buildUser(o: {
   kind: TestKind;
   placement: string;
@@ -83,6 +87,9 @@ async function verifyDraft(o: {
   return { feedback, kind };
 }
 
+/** The focused single-target draft flow: prompt → extract ONE fenced spec → write →
+ *  verify with the real gates, with a few repair turns. Returns accepted=false for
+ *  the caller to fall back rather than looping forever. */
 export async function draftLocal(opts: {
   dir: string;
   target: { sourcePath: string; name: string };

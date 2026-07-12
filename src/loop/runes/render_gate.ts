@@ -39,6 +39,7 @@ const RENDER_SYSTEM =
   'You are a strict graphics QA reviewer. You are shown a screenshot of a running app after a rendering change. ' +
   'Judge ONLY what is visible. Reply with a single line starting with exactly PASS or FAIL, then a colon and a short concrete reason.';
 
+/** The vision judge's question: defect check + goal check, forced into a PASS/FAIL verdict line. */
 function judgePrompt(goal: string): string {
   return [
     `Goal of the change: ${goal}`,
@@ -61,6 +62,8 @@ async function judge(opts: RenderGateOpts, png: string): Promise<{ pass: boolean
   return { pass: passes * 2 > n, reasons: verdicts };
 }
 
+/** Gate body: optional reload → screenshot the live app → optional perf budget →
+ *  vision verdict; each failure blocks with actionable output. */
 async function renderShouldStop(ctx: RunCtx, opts: RenderGateOpts): Promise<RuneDecision> {
   const run = opts.runCmd ?? sh;
   const cap = opts.capture ?? defaultCapture;
@@ -95,6 +98,7 @@ async function renderShouldStop(ctx: RunCtx, opts: RenderGateOpts): Promise<Rune
   return ALLOW;
 }
 
+/** Build the visual-acceptance rune over the given app URL + goal. */
 export function renderGate(opts: RenderGateOpts): Rune {
   return {
     name: 'render_gate',
@@ -106,6 +110,7 @@ export function renderGate(opts: RenderGateOpts): Rune {
   };
 }
 
+/** Last n chars — enough failure output to act on without flooding the transcript. */
 function tail(s: string, n = 2000): string {
   return s.length > n ? s.slice(-n) : s;
 }

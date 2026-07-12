@@ -41,9 +41,12 @@ export function slugFor(path: string, spec: string): string {
   return `${stem}-${hash}`;
 }
 
+/** Single shared rune instance — all durable state lives in the library on disk. */
 export const libraryPromote: Rune = {
   name: 'library_promote',
 
+  /** On an accepted run (with PROBEVANE_TRACES=1), promote each new spec into the
+   *  library unless an identical one (content hash) is already there. */
   async onStop(ctx: RunCtx): Promise<void> {
     if (!ctx.accepted || process.env.PROBEVANE_TRACES !== '1') return;
     const existing = await readIndex().catch(() => []);

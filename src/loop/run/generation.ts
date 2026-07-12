@@ -205,6 +205,8 @@ function finalTaskFor(textExtract: boolean, task: string, specPathHint: string |
     : task;
 }
 
+/** The write_tests entrypoint: bootstrap the toolchain, probe ground truth, route
+ *  brains by complexity, assemble the task + rune pipeline, then drive the gated loop. */
 export async function generateTests(opts: GenerateOpts): Promise<RunOutcome> {
   const { dir, kind, adapter } = opts;
   const log = opts.log ?? (() => {});

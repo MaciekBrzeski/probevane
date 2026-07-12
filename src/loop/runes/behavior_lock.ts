@@ -18,6 +18,8 @@ interface BehaviorState {
 const BEHAVIOR_SYSTEM_PROMPT =
   'REFACTOR RULES: change the SOURCE only — do not edit, add, or delete any test file (the tests are the behavior contract). Every test that passes now must still pass when you finish, and you must actually change the source. If a test goes red, your refactor changed behavior — fix the source, not the test.';
 
+/** Snapshot the contract before any edit: passing-test count + typecheck state.
+ *  Zero passing tests → warn (nothing to lock) instead of pretending safety. */
 async function behaviorPrepare(ctx: RunCtx, state: BehaviorState): Promise<string | undefined> {
   const run = await ctx.adapter.run(ctx.workdir, 'unit');
   state.baselinePassed = run.passed;
@@ -28,6 +30,7 @@ async function behaviorPrepare(ctx: RunCtx, state: BehaviorState): Promise<strin
     : `Behavior contract: ${state.baselinePassed} tests must remain green.`;
 }
 
+/** Veto any write/delete touching a test file — the contract must not be weakened mid-refactor. */
 async function behaviorBeforeToolCall(call: ToolCall): Promise<RuneDecision> {
   if ((call.name === 'edit_file' || call.name === 'write_file' || call.name === 'delete_file') &&
     SPEC_RE.test(String((call.input as any).path ?? ''))) {
@@ -39,6 +42,8 @@ async function behaviorBeforeToolCall(call: ToolCall): Promise<RuneDecision> {
   return ALLOW;
 }
 
+/** Allow finishing only when source actually changed AND typecheck (if it started
+ *  clean) + every baseline test are still green. */
 async function behaviorShouldStop(ctx: RunCtx, state: BehaviorState): Promise<RuneDecision> {
   const sourceEdits = [...ctx.editedFiles].filter((f) => !SPEC_RE.test(f));
   if (sourceEdits.length === 0) {
@@ -58,6 +63,7 @@ async function behaviorShouldStop(ctx: RunCtx, state: BehaviorState): Promise<Ru
   return ALLOW;
 }
 
+/** Build the refactor safety-net rune; per-instance state holds the baseline snapshot. */
 export function behaviorLock(): Rune {
   const state: BehaviorState = { baselinePassed: 0, baselineTypecheckOk: true };
   return {
@@ -69,6 +75,7 @@ export function behaviorLock(): Rune {
   };
 }
 
+/** Last n chars — enough failure output to act on without flooding the transcript. */
 function tail(s: string, n = 2500): string {
   return s.length > n ? s.slice(-n) : s;
 }

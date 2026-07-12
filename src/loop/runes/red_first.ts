@@ -18,6 +18,7 @@ interface RedState {
 const RED_SYSTEM_PROMPT =
   'TDD (red-first): FIRST write a new test that specifies the feature and FAILS against the current code — you may not edit any source file until a new test is failing. Then implement the feature in source until that test passes. Do not weaken the test to make it pass.';
 
+/** Veto source edits until a new spec has been observed failing (the red phase). */
 async function redBeforeToolCall(call: ToolCall, state: RedState): Promise<RuneDecision> {
   const writing = call.name === 'write_file' || call.name === 'edit_file' || call.name === 'delete_file';
   if (writing && !isSpec(call) && !state.redConfirmed) {
@@ -29,9 +30,9 @@ async function redBeforeToolCall(call: ToolCall, state: RedState): Promise<RuneD
   return ALLOW;
 }
 
+// When a spec is (re)written and source hasn't been confirmed red yet, run
+// just that spec — if it fails, the red phase is satisfied.
 async function redAfterToolCall(call: ToolCall, result: ToolResult, ctx: RunCtx, state: RedState): Promise<void> {
-  // When a spec is (re)written and source hasn't been confirmed red yet, run
-  // just that spec — if it fails, the red phase is satisfied.
   if (state.redConfirmed || result.isError) return;
   if ((call.name === 'write_file' || call.name === 'edit_file') && isSpec(call)) {
     const path = String((call.input as any).path ?? '');
@@ -40,6 +41,7 @@ async function redAfterToolCall(call: ToolCall, result: ToolResult, ctx: RunCtx,
   }
 }
 
+/** No red ever observed → the "new" test proves nothing; block the finish. */
 async function redShouldStop(state: RedState): Promise<RuneDecision> {
   if (!state.redConfirmed) {
     return block(
@@ -50,6 +52,7 @@ async function redShouldStop(state: RedState): Promise<RuneDecision> {
   return ALLOW;
 }
 
+/** Build the TDD rune; per-instance state tracks whether red was observed. */
 export function redFirst(): Rune {
   const state: RedState = { redConfirmed: false };
   return {

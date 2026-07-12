@@ -16,6 +16,8 @@ export function flakeVerdict(sigs: string[], tolerance = 0): boolean {
   return sigs.length - mode > tolerance;
 }
 
+/** Build the flake rune: run the new specs `runs` times, block when the pass/fail
+ *  signatures disagree beyond `tolerance`. */
 export function flakeGate(runs = 3, tolerance = 0): Rune {
   return {
     name: 'flake_gate',

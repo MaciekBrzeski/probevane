@@ -115,6 +115,8 @@ function isRepoRoot(dir: string): boolean {
   );
 }
 
+/** Nearest ancestor that looks like a workspace/repo root (bounded walk); falls back
+ *  to the workdir itself when no marker is found. */
 export function workspaceRootOf(workdir: string): string {
   let dir = workdir;
   const fsRoot = parsePath(dir).root;
@@ -157,6 +159,7 @@ async function readFileTool(ctx: RunCtx, input: any): Promise<string> {
   return txt.length > 20_000 ? txt.slice(0, 20_000) + '\n…[truncated]' : txt;
 }
 
+/** List a directory (workspace-scoped read); a trailing / marks subdirs. */
 async function listDirTool(ctx: RunCtx, input: any): Promise<string> {
   ctx.reads++;
   const abs = safeReadPath(ctx, input.path ?? '.');
@@ -164,6 +167,7 @@ async function listDirTool(ctx: RunCtx, input: any): Promise<string> {
   return entries.map((e) => (e.isDirectory() ? e.name + '/' : e.name)).join('\n');
 }
 
+/** Create/overwrite a file inside the workdir, tracking it as this run's edit. */
 async function writeFileTool(ctx: RunCtx, input: any): Promise<string> {
   const abs = safePath(ctx, input.path);
   await mkdir(dirname(abs), { recursive: true });
@@ -174,6 +178,8 @@ async function writeFileTool(ctx: RunCtx, input: any): Promise<string> {
   return `wrote ${input.path} (${String(input.contents).length} bytes)`;
 }
 
+/** Replace ONE occurrence of old_string — must be found AND unique, else a hard
+ *  error the model can act on (add more context). */
 async function editFileTool(ctx: RunCtx, input: any): Promise<string> {
   const abs = safePath(ctx, input.path);
   const cur = await readFile(abs, 'utf8');
@@ -189,6 +195,7 @@ async function editFileTool(ctx: RunCtx, input: any): Promise<string> {
   return `edited ${input.path}`;
 }
 
+/** Delete a file and untrack it from the run's edits. */
 async function deleteFileTool(ctx: RunCtx, input: any): Promise<string> {
   const abs = safePath(ctx, input.path);
   await rm(abs);
@@ -197,11 +204,13 @@ async function deleteFileTool(ctx: RunCtx, input: any): Promise<string> {
   return `deleted ${input.path}`;
 }
 
+/** Record the plan on ctx — plan_first gates writes on its presence. */
 function planTool(ctx: RunCtx, input: any): string {
   ctx.plan = { text: String(input.plan), at: ctx.step };
   return 'plan recorded';
 }
 
+/** Tool dispatch — the single place a ToolCall becomes a real filesystem/plan action. */
 export async function execTool(call: ToolCall, ctx: RunCtx): Promise<string> {
   const input = call.input as any;
   switch (call.name) {
@@ -222,6 +231,7 @@ export async function execTool(call: ToolCall, ctx: RunCtx): Promise<string> {
   }
 }
 
+/** stat-based existence check that never throws. */
 export async function pathExists(p: string): Promise<boolean> {
   return stat(p).then(() => true).catch(() => false);
 }

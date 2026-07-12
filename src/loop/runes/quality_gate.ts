@@ -33,10 +33,13 @@ function worstByRule(report: QualityReport): Map<string, number> {
   return m;
 }
 
+/** Single-file quality report (analyzeProject over one source). */
 function analyze(file: string, source: string, cfg: QualityConfig): QualityReport {
   return analyzeProject([{ file, source }], cfg);
 }
 
+/** State the quality thresholds up front so the model designs under them instead of
+ *  discovering them at the gate. */
 function systemPrompt(cfg: QualityConfig): string {
   return [
     'CODE QUALITY (enforced by a quality gate on the source you edit): keep files',
@@ -70,6 +73,7 @@ async function fileRegression(ctx: RunCtx, cfg: QualityConfig, f: string): Promi
   return { file: f, rules: worseRules, report: formatQuality({ ...report, violations: errs }) };
 }
 
+/** Every edited file that got worse than its checkpoint baseline. */
 async function collectRegressions(ctx: RunCtx, cfg: QualityConfig, edited: string[]): Promise<Regression[]> {
   const regressed: Regression[] = [];
   for (const f of edited) {
@@ -79,6 +83,7 @@ async function collectRegressions(ctx: RunCtx, cfg: QualityConfig, edited: strin
   return regressed;
 }
 
+/** Block with the FIRST regressed file's report — one precise fix target, not a wall. */
 function blockRegressed(regressed: Regression[]): RuneDecision {
   const first = regressed[0];
   return block(
@@ -89,6 +94,7 @@ function blockRegressed(regressed: Regression[]): RuneDecision {
   );
 }
 
+/** Gate body: scope to the non-test source this run edited; allow when nothing regressed. */
 async function evalQuality(ctx: RunCtx, cfg: QualityConfig): Promise<RuneDecision> {
   const edited = [...ctx.editedFiles]
     .map((f) => f.replace(/^\.\//, ''))
@@ -99,6 +105,7 @@ async function evalQuality(ctx: RunCtx, cfg: QualityConfig): Promise<RuneDecisio
   return blockRegressed(regressed);
 }
 
+/** Build the quality rune with thresholds = defaults + overrides. */
 export function qualityGate(overrides?: Partial<QualityConfig>): Rune {
   const cfg: QualityConfig = { ...DEFAULT_QUALITY, ...(overrides ?? {}) };
   return {

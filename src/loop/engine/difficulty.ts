@@ -12,6 +12,7 @@ export interface DifficultySignals {
 
 export const CIRCULAR_THRESHOLD = 3;
 
+/** Most frequent item + its count — the "same thing keeps happening" signal both circular checks share. */
 function topRepeat(items: string[]): { value: string; count: number } | null {
   const counts = new Map<string, number>();
   let best: { value: string; count: number } | null = null;

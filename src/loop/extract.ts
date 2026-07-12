@@ -20,6 +20,8 @@ function findPath(infoLine: string, code: string, pre: string): string | undefin
   return pra?.[1];
 }
 
+/** A fenced code block pulled from model prose: the spec text + the path it names
+ *  (if any). Consumed by the text-extract fallback for non-tool-calling models. */
 export interface Extracted {
   path?: string;
   code: string;

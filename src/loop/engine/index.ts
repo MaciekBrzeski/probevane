@@ -62,6 +62,8 @@ export interface RunOptions {
   log?: (line: string) => void;
 }
 
+/** What a finished loop run reports to its caller (CLI / factory / ship): acceptance,
+ *  why it stopped, token/cost tallies, and the files it touched. */
 export interface RunOutcome {
   accepted: boolean;
   steps: number;
@@ -167,6 +169,8 @@ async function finalizeRun(lr: LoopRun): Promise<RunOutcome> {
   };
 }
 
+/** The gated agentic loop: step the brain until a gate-approved stop, escalating
+ *  (nudge → consult → takeover → difficulty/budget stop) when progress stalls. */
 export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
   const lr = await createLoopRun(opts);
   const { ctx } = lr;

@@ -16,6 +16,7 @@ const CODE_DENY = [
   /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock)$/,
 ];
 
+/** Read the guide being written (absolute outPath honored); null before the first write. */
 function readDoc(ctx: RunCtx, outPath: string): string | null {
   const p = isAbsolute(outPath) ? outPath : join(ctx.workdir, outPath); // join mangles an absolute outPath
   try { return readFileSync(p, 'utf8'); } catch { return null; }
