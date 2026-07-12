@@ -21,6 +21,7 @@ export interface TermSession {
   exitCode?: number;
 }
 
+/** Terminal config + logger, filled by daemon.ts via initTerminal() — paths and caps for the PTY bridge. */
 export interface TerminalCtx {
   BRIDGE: string; // scripts/pty-bridge.py
   PYTHON: string; // interpreter (default python3)
@@ -33,6 +34,7 @@ export interface TerminalCtx {
 let CTX: TerminalCtx;
 export const sessions = new Map<string, TermSession>();
 
+/** Wire the daemon's config in once at startup (module state — one daemon process). */
 export function initTerminal(ctx: TerminalCtx): void {
   CTX = ctx;
 }
@@ -42,10 +44,12 @@ export function termEnabled(): boolean {
   return process.env.PROBEVANE_TERMINAL === '1';
 }
 
+/** Push one SSE frame to every live subscriber of the session. */
 function broadcast(s: TermSession, frame: string): void {
   for (const res of s.subs) res.write(frame);
 }
 
+/** Append output to the scrollback ring, evicting oldest chunks past RING_BYTES. */
 function pushRing(s: TermSession, chunk: Buffer): void {
   s.ring.push(chunk);
   s.ringBytes += chunk.length;
@@ -85,25 +89,30 @@ function control(s: TermSession, msg: Record<string, unknown>): void {
   s.proc.stdin?.write(JSON.stringify(msg) + '\n');
 }
 
+/** Forward base64 keystrokes to the PTY (bumps lastSeen so the idle reaper spares it). */
 export function writeInput(s: TermSession, b64: string): void {
   s.lastSeen = Date.now();
   control(s, { t: 'd', b: b64 });
 }
 
+/** Resize the PTY, clamped to sane bounds so bad input can't wedge the bridge. */
 export function resize(s: TermSession, cols: number, rows: number): void {
   const clamp = (n: number) => Math.max(2, Math.min(500, Math.round(n) || 24));
   control(s, { t: 'r', c: clamp(cols), r: clamp(rows) });
 }
 
+/** Ask the bridge to exit cleanly; SIGTERM the child if it hasn't within 2s. */
 export function killSession(s: TermSession): void {
   control(s, { t: 'k' });
   setTimeout(() => { if (s.exitCode === undefined) s.proc.kill('SIGTERM'); }, 2000);
 }
 
+/** Subscribe an SSE response to live output (counts as activity for the reaper). */
 export function attach(s: TermSession, res: ServerResponse): void {
   s.subs.add(res);
   s.lastSeen = Date.now();
 }
+/** Drop a closed SSE response from the session's subscribers. */
 export function detach(s: TermSession, res: ServerResponse): void {
   s.subs.delete(res);
 }
@@ -114,6 +123,7 @@ export function ringReplayB64(s: TermSession): string {
   return sseFrame(JSON.stringify({ b: all.toString('base64') }));
 }
 
+/** True once live (unexited) sessions hit MAX_SESSIONS — /term/start refuses past this. */
 export function atCap(): boolean {
   let live = 0;
   for (const s of sessions.values()) if (s.exitCode === undefined) live++;
@@ -133,6 +143,7 @@ export function reapIdle(now: number, idleMs: number): string[] {
   return out;
 }
 
+/** Kill (if still live) and drop one session — the daemon timer's action per reapIdle id. */
 export function reap(id: string): void {
   const s = sessions.get(id);
   if (s && s.exitCode === undefined) killSession(s);

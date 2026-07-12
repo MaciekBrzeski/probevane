@@ -47,6 +47,7 @@ export interface RouteCtx {
 }
 
 let CTX: RouteCtx;
+/** Wire daemon.ts's config + observability deps in once at startup. */
 export function initRoutes(ctx: RouteCtx): void {
   CTX = ctx;
 }
@@ -275,6 +276,7 @@ async function handleGet(
   return handleMetrics(url, res);
 }
 
+/** Single entry for every daemon request: /term/* → POST → GET, with one catch-all 500. */
 export async function handle(req: IncomingMessage, res: ServerResponse) {
   const full = req.url ?? '/';
   const url = full.split('?')[0];
