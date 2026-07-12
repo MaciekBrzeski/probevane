@@ -31,6 +31,8 @@ export async function selectAdapter(dir: string): Promise<StackAdapter | null> {
   return best.a;
 }
 
+/** Same selection, but a miss is a hard error naming the known adapters —
+ *  for CLI paths where "no adapter" means the run cannot proceed. */
 export async function selectAdapterOrThrow(dir: string): Promise<StackAdapter> {
   const a = await selectAdapter(dir);
   if (!a) throw new Error(`probevane: no adapter matched ${dir} (known: ${ADAPTERS.map((x) => x.id).join(', ')})`);

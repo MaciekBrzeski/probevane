@@ -104,6 +104,7 @@ export const svelteAdapter: StackAdapter = {
   },
 };
 
+// Recursive file listing, skipping build/VCS dirs.
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {

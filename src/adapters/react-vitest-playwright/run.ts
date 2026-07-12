@@ -9,6 +9,7 @@ export async function runReact(dir: string, scope: RunScope, files?: string[]): 
   return mergeResults(parts);
 }
 
+// Coverage comes from vitest alone — playwright adds nothing to line coverage.
 export function coverageReact(dir: string): Promise<CoverageResult> {
   return coverageVitest(dir);
 }

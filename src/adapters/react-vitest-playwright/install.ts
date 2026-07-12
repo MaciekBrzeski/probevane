@@ -13,6 +13,8 @@ interface ProjectInfo {
   devUrl: string;
 }
 
+// Read what the app already is (React major, bundler, dev command/port) so the
+// install matches it instead of assuming Vite defaults.
 function inspect(pkg: any): ProjectInfo {
   const all = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;
   const reactMajor = majorOf(all.react) ?? 18;
@@ -25,6 +27,7 @@ function inspect(pkg: any): ProjectInfo {
   return { reactMajor, bundler, devCmd: scripts.dev ? 'npm run dev' : 'npm start', devUrl: 'http://localhost:5173' };
 }
 
+// Major version out of a semver range ("^18.2.0" -> 18).
 function majorOf(range?: string): number | null {
   if (!range) return null;
   const m = range.match(/(\d+)/);
@@ -41,6 +44,8 @@ function unitDeps(reactMajor: number): string[] {
 
 const VITEST_SETUP = `import '@testing-library/jest-dom/vitest';\n`;
 
+// The vitest config written for apps that have none; the emitted file carries
+// its own rationale comment for the target repo.
 function vitestConfig(): string {
   return `import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
@@ -66,6 +71,8 @@ export default defineConfig({
 `;
 }
 
+// Playwright config pointed at the project's OWN dev server (command + port
+// from inspect), so e2e runs against the real app.
 function pwConfig(info: ProjectInfo): string {
   return `import { defineConfig } from '@playwright/test';
 
@@ -114,6 +121,8 @@ async function writeConfigs(dir: string, info: ProjectInfo): Promise<void> {
   if (!(await exists(join(dir, 'playwright.config.ts')))) await writeFile(join(dir, 'playwright.config.ts'), pwConfig(info));
 }
 
+// Full install path: version-matched deps, test scripts, configs — each step
+// idempotent and never clobbering what a real app already has.
 export async function installReact(dir: string): Promise<void> {
   const pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
   const all = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;

@@ -10,6 +10,8 @@ import { readCoverageSummary } from './coverage-summary.js';
 
 const REPORT = '.probevane-vitest.json';
 
+// Run vitest with a JSON report FILE (not stdout) so counts survive custom
+// reporters and noisy output; `files` scopes the run to just-written specs.
 export async function runVitest(dir: string, files?: string[]): Promise<RunResult> {
   const scoped = files?.length ? ' ' + files.map((f) => JSON.stringify(f)).join(' ') : '';
   const r = await sh(`npx vitest run --reporter=json --outputFile=${REPORT}${scoped}`, dir);
@@ -32,6 +34,8 @@ export async function runVitest(dir: string, files?: string[]): Promise<RunResul
   };
 }
 
+// Run playwright and parse the line reporter for counts; scoping keeps only
+// e2e-ish paths so unit specs never leak into the browser run.
 export async function runPlaywright(dir: string, files?: string[]): Promise<RunResult> {
   const scoped = files?.length
     ? ' ' + files.filter((f) => /e2e|spec/.test(f)).map((f) => JSON.stringify(f)).join(' ')
@@ -51,6 +55,7 @@ export async function runPlaywright(dir: string, files?: string[]): Promise<RunR
   };
 }
 
+// Fold unit + e2e results into one: sums for counts, green only if every part is.
 export function mergeResults(parts: RunResult[]): RunResult {
   if (parts.length === 1) return parts[0];
   return {
@@ -62,6 +67,7 @@ export function mergeResults(parts: RunResult[]): RunResult {
   };
 }
 
+// Coverage via v8: json-summary feeds the gate, text lands in `raw` for humans.
 export async function coverageVitest(dir: string): Promise<CoverageResult> {
   const r = await sh(
     `npx vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=json --coverage.reporter=text`,

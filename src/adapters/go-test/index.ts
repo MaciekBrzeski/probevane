@@ -15,8 +15,6 @@ import { sh } from '../../util/exec.js';
 import { goAuditRules } from '../../audit/rules-go.js';
 import { loadPrompt } from '../../library/prompt.js';
 
-// go-test — Go stack via the stdlib `testing` package + table tests. Implements
-// the same StackAdapter contract; reuses the loop/audit/eval unchanged.
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
 /** Tally one `go test -json` line into pass/fail/skip counts (ignores non-JSON / parse errors). */
@@ -30,6 +28,8 @@ function tallyGoEvent(line: string, counts: { passed: number; failed: number; sk
   else if (e.Action === 'skip') counts.skipped++;
 }
 
+// go-test — Go stack via the stdlib `testing` package + table tests. Implements
+// the same StackAdapter contract; reuses the loop/audit/eval unchanged.
 export const goAdapter: StackAdapter = {
   id: 'go-test',
 
@@ -125,6 +125,7 @@ export const goAdapter: StackAdapter = {
   },
 };
 
+// Recursive file listing rooted at dir, skipping vendor/VCS/dep dirs.
 async function walk(dir: string, sub = ''): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(join(dir, sub), { withFileTypes: true }).catch(() => [])) {

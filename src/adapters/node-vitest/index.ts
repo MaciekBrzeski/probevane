@@ -18,9 +18,6 @@ import { astExtract } from '../ast-probe.js';
 import { readPackageDeps } from '../pkg-deps.js';
 import { walkFiles } from '../walk.js';
 
-// node-vitest — generic TS/JS library stack (vitest, no UI framework). Lets
-// probevane test plain Node libraries — including ITSELF. Detect scores below
-// the framework adapters so a React/Vue/Svelte app still picks its own.
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
 /** True when a vitest config lives in `dir` — the definitive marker of a vitest
@@ -28,6 +25,9 @@ const exists = (p: string) => access(p).then(() => true).catch(() => false);
 const hasVitestConfig = (dir: string) =>
   Promise.all(['ts', 'mts', 'js', 'mjs'].map((e) => exists(join(dir, `vitest.config.${e}`)))).then((r) => r.some(Boolean));
 
+// node-vitest — generic TS/JS library stack (vitest, no UI framework). Lets
+// probevane test plain Node libraries — including ITSELF. Detect scores below
+// the framework adapters so a React/Vue/Svelte app still picks its own.
 export const nodeAdapter: StackAdapter = {
   id: 'node-vitest',
 

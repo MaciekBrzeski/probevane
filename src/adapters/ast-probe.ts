@@ -10,11 +10,15 @@ export interface AstExport {
   isComponent: boolean;
   signature?: string;
 }
+/** What the AST probe extracts from one source file — filled by astExtract(),
+ *  folded into adapter probe digests. */
 export interface AstFacts {
   exports: AstExport[];
   props: string[];
 }
 
+// Fresh in-memory ts-morph project per probe — noResolve/skipLibCheck keep it
+// fast; nothing touches disk or the target's real tsconfig.
 function createProbeFile(src: string, fileName: string): SourceFile {
   const project = new Project({
     useInMemoryFileSystem: true,
@@ -29,6 +33,8 @@ function createProbeFile(src: string, fileName: string): SourceFile {
   return project.createSourceFile(fileName, src, { overwrite: true });
 }
 
+// Decide whether an export is a testable unit and whether it reads as a React
+// component (that flag steers which few-shot patterns the loop injects).
 function classifyExport(name: string, d: Node | undefined, isTsx: boolean): AstExport | null {
   // Skip type-only exports (interface / type alias / enum) — not testable units.
   if (d && (Node.isInterfaceDeclaration(d) || Node.isTypeAliasDeclaration(d) || Node.isEnumDeclaration(d))) return null;
@@ -37,6 +43,7 @@ function classifyExport(name: string, d: Node | undefined, isTsx: boolean): AstE
   return { name, isComponent, signature: d ? signatureOf(name, d) : undefined };
 }
 
+// Unique exported declarations, classified; type-only exports drop out here.
 function collectExports(sf: SourceFile, isTsx: boolean): AstExport[] {
   const exports: AstExport[] = [];
   const seen = new Set<string>();
@@ -49,6 +56,8 @@ function collectExports(sf: SourceFile, isTsx: boolean): AstExport[] {
   return exports;
 }
 
+// Parse one file and return exports + Props shapes; null on ANY failure so the
+// caller falls back to its regex probe (see header).
 export function astExtract(src: string, fileName = 'probe.tsx'): AstFacts | null {
   try {
     const sf = createProbeFile(src, fileName);
@@ -61,6 +70,7 @@ export function astExtract(src: string, fileName = 'probe.tsx'): AstFacts | null
   }
 }
 
+// A function declaration, or a const bound to an arrow/function expression.
 function isFunctionLike(d: Node): boolean {
   if (Node.isFunctionDeclaration(d)) return true;
   if (Node.isVariableDeclaration(d)) {
@@ -70,6 +80,8 @@ function isFunctionLike(d: Node): boolean {
   return false;
 }
 
+// Human-readable signature for the probe digest, whatever shape the export
+// declaration takes; falls back to the bare name.
 function signatureOf(name: string, d: Node): string | undefined {
   // Function declaration
   if (Node.isFunctionDeclaration(d) || Node.isMethodDeclaration(d)) return fnSig(name, d as any);
@@ -85,6 +97,8 @@ function signatureOf(name: string, d: Node): string | undefined {
   return name;
 }
 
+// "name(params): ret" from declared type nodes only — structural, never invokes
+// the type checker (keeps probes cheap).
 function fnSig(name: string, fn: { getParameters(): any[]; isAsync?(): boolean; getReturnTypeNode?(): any }): string {
   const params = fn
     .getParameters()
@@ -98,6 +112,7 @@ function fnSig(name: string, fn: { getParameters(): any[]; isAsync?(): boolean; 
   return `${asyncPrefix}${name}(${params})${ret ? `: ${ret}` : ''}`;
 }
 
+// Collect *Props interfaces/type-aliases as printable shapes for the digest.
 function extractProps(sf: SourceFile): string[] {
   const out: string[] = [];
   for (const iface of sf.getInterfaces()) {

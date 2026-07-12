@@ -15,10 +15,10 @@ import { sh } from '../../util/exec.js';
 import { rustAuditRules } from '../../audit/rules-rust.js';
 import { loadPrompt } from '../../library/prompt.js';
 
-// rust-cargo — Rust stack via the built-in test harness. Integration tests in
-// tests/<name>.rs use the crate's public API. Same StackAdapter contract.
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
+// rust-cargo — Rust stack via the built-in test harness. Integration tests in
+// tests/<name>.rs use the crate's public API. Same StackAdapter contract.
 export const rustAdapter: StackAdapter = {
   id: 'rust-cargo',
 
@@ -125,6 +125,7 @@ export function parseLlvmCovSummary(jsonText: string): CoverageResult {
   }
 }
 
+// Crate name from Cargo.toml, hyphens mapped to underscores for `use` paths.
 async function crateName(dir: string): Promise<string> {
   const toml = await readFile(join(dir, 'Cargo.toml'), 'utf8').catch(() => '');
   return (toml.match(/name\s*=\s*"([^"]+)"/)?.[1] ?? 'crate').replace(/-/g, '_');
