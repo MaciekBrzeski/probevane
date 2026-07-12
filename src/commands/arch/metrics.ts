@@ -12,6 +12,8 @@ export function topDir(path: string): string {
   return rel.length > 1 ? rel[0] : rel[0]; // a bare file under src keeps its filename as the bucket
 }
 
+/** Per-directory coupling row — size, fan-in/out, and the weighted inbound
+ *  count that prices a relocation. Computed by archMetrics. */
 export interface DirCoupling {
   dir: string;
   files: number;
@@ -21,6 +23,9 @@ export interface DirCoupling {
   imports: string[]; // dirs it depends on
 }
 
+/** The directory-level view of the module graph: coupling rows, weighted
+ *  cross-dir edges, mutual-import cycles. Output of archMetrics; input to
+ *  archDigest and archDrift. */
 export interface ArchMetrics {
   dirs: DirCoupling[];
   edges: { from: string; to: string; count: number }[]; // cross-dir import edges (weighted)
@@ -90,6 +95,7 @@ export function archDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta = 3
   return [...dirDrift(prev, next), ...edgeDrift(prev, next, minEdgeDelta), ...cycleDrift(prev, next)];
 }
 
+/** Dir-level drift: added/removed dirs plus per-dir file and fanOut changes. */
 function dirDrift(prev: ArchMetrics, next: ArchMetrics): string[] {
   const out: string[] = [];
   const prevDirs = new Map(prev.dirs.map((d) => [d.dir, d]));
@@ -104,6 +110,8 @@ function dirDrift(prev: ArchMetrics, next: ArchMetrics): string[] {
   return out;
 }
 
+/** Edge drift: cross-dir edges whose weight moved by >= minEdgeDelta —
+ *  smaller wobble is churn noise, not an architecture signal. */
 function edgeDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta: number): string[] {
   const out: string[] = [];
   const prevEdges = new Map(prev.edges.map((e) => [`${e.from}|${e.to}`, e.count]));
@@ -118,6 +126,7 @@ function edgeDrift(prev: ArchMetrics, next: ArchMetrics, minEdgeDelta: number): 
   return out;
 }
 
+/** Cycle drift: new A↔B dir cycles are flagged, resolved ones acknowledged. */
 function cycleDrift(prev: ArchMetrics, next: ArchMetrics): string[] {
   const out: string[] = [];
   const cyc = (m: ArchMetrics) => new Set(m.cycles.map(([a, b]) => [a, b].sort().join('↔')));

@@ -19,10 +19,13 @@ export function branchName(runId: string): string {
   return `probevane/${(runId || 'run').replace(/[^a-zA-Z0-9._/-]+/g, '-')}`;
 }
 
+/** One-line PR title: op + file count + repo basename — scannable in a PR list. */
 export function prTitle(info: ShipInfo): string {
   return `probevane(${info.op}): ${info.files.length} file(s) in ${info.repo.split('/').pop() || info.repo}`;
 }
 
+/** PR body: what ran, whichever result stats exist, the shipped files, and
+ *  the review-before-merge note (probevane never merges). */
 export function prBody(info: ShipInfo): string {
   const stat: string[] = [];
   if (info.tests !== undefined) stat.push(`${info.tests} tests`);

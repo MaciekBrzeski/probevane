@@ -20,12 +20,16 @@ import { topDir } from './metrics.js';
 
 export type DirRole = 'glue' | 'shared' | 'feature';
 
+/** Config-supplied role pins — dirs the classifier must treat as glue/shared/
+ *  feature regardless of what their coupling suggests. */
 export interface RoleOverrides {
   glue?: string[];
   shared?: string[];
   feature?: string[]; // pin as a pyramid even when coupling suggests glue/shared
 }
 
+/** One classified dir with its isolation math (intra vs leaking import
+ *  statements). Built per dir by the pyramid report. */
 export interface PyramidDir {
   dir: string;
   role: DirRole;
@@ -35,8 +39,11 @@ export interface PyramidDir {
   isolation: number; // intra / (intra + leaks) — 1 = perfectly isolated
 }
 
+/** The four ways an import can break the pyramid model (rules 1-4 above). */
 export type ViolationKind = 'feature→feature' | 'feature→glue' | 'shared→feature' | 'deep-reach';
 
+/** One rule break aggregated per dir pair: kind, weighted count (= the cost
+ *  to fix), sample imports, and the canned remedy from FIX. */
 export interface PyramidViolation {
   kind: ViolationKind;
   from: string;
@@ -46,6 +53,8 @@ export interface PyramidViolation {
   fix: string;
 }
 
+/** The full pyramid evaluation — classified dirs, violations sorted by cost,
+ *  and a 0-100 conformance score. What `arch --pyramid` renders. */
 export interface PyramidReport {
   dirs: PyramidDir[];
   violations: PyramidViolation[]; // sorted by count desc

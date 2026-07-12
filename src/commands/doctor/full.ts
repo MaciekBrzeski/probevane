@@ -16,6 +16,9 @@ export interface FullLine {
 
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
+/** Assemble the scorecard: suite-facing lines when an adapter matched, then
+ *  quality + arch, with the heavy graders listed as skipped alongside the
+ *  command that runs them. */
 export async function fullReport(dir: string, adapter?: StackAdapter): Promise<FullLine[]> {
   return [
     ...(adapter ? await suiteLines(dir, adapter) : []),
@@ -45,6 +48,8 @@ async function suiteLines(dir: string, adapter: StackAdapter): Promise<FullLine[
   return lines;
 }
 
+/** Audit the specs with the adapter's rules — any error flips the line red;
+ *  having no specs at all is itself the finding. */
 async function auditLine(dir: string, adapter: StackAdapter, specs: string[]): Promise<FullLine> {
   if (!specs.length) return { area: 'audit', summary: 'no spec files — probevane generate', ok: false };
   const { auditFiles } = await import('../../audit/core.js');
@@ -54,6 +59,7 @@ async function auditLine(dir: string, adapter: StackAdapter, specs: string[]): P
   return { area: 'audit', summary: `${specs.length} spec file(s): ${errors} error(s), ${warns} warn(s)`, ok: errors === 0 };
 }
 
+/** Assertion-strength score across the specs (weak vs strong), ok at >= 70. */
 async function assertionLine(dir: string, specs: string[]): Promise<FullLine> {
   const { scoreAssertions, aggregateScore } = await import('../../audit/assertion-score.js');
   const perFile = await Promise.all(specs.map(async (s) => ({
