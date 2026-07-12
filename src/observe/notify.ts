@@ -15,6 +15,8 @@ export function newAlerts(current: Alert[], sent: Set<string>): Alert[] {
   return current.filter((a) => !sent.has(alertKey(a)));
 }
 
+/** Webhook body built by buildAlertPayload() — Slack block-kit shape, but any
+ *  receiver that reads `text` works too. */
 export interface SlackPayload {
   text: string;
   blocks: { type: string; text: { type: string; text: string } }[];

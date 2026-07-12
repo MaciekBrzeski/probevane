@@ -8,6 +8,8 @@ import { appendJsonl, readJsonl } from '../util/jsonl.js';
 // like the ledger. Best-effort: an audit failure never breaks the mutation.
 export const AUDIT_PATH = statePath('audit.jsonl');
 
+/** One library-mutation record in audit.jsonl — appended by recordAudit(), read
+ *  back for the operator's audit view. */
 export interface AuditEntry {
   ts: string;
   action: string; // e.g. 'library.save', 'library.prune'
@@ -15,6 +17,8 @@ export interface AuditEntry {
   detail?: Record<string, unknown>;
 }
 
+/** Append one audit entry, stamping ts when absent. Swallows write errors — an
+ *  audit failure must never break the library mutation it records. */
 export async function recordAudit(
   e: Omit<AuditEntry, 'ts'> & { ts?: string },
   path = AUDIT_PATH,
@@ -23,6 +27,7 @@ export async function recordAudit(
   await appendJsonl(path, entry).catch(() => {}); // never break the caller
 }
 
+/** The full audit trail, oldest first (JSONL append order). */
 export async function readAudit(path = AUDIT_PATH): Promise<AuditEntry[]> {
   return readJsonl<AuditEntry>(path);
 }

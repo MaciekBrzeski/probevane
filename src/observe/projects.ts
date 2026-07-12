@@ -14,6 +14,8 @@ export interface LastRun {
   cost: number;
 }
 
+/** One project row for the control center — wiki-page identity plus
+ *  ledger-derived run stats. Built by buildProjects(). */
 export interface ProjectSummary {
   name: string; // display name, e.g. "react-shop"
   slug: string; // wiki page slug, e.g. "project-react-shop"

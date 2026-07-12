@@ -8,6 +8,8 @@ import { resolve } from 'node:path';
 import { newItem, type QueueItem } from './queue.js';
 import type { LaunchPlan } from './launch.js';
 
+/** One launched job as persisted to jobs.jsonl — the daemon appends a row per
+ *  status change; reduceJobs() collapses the log on load. */
 export interface PersistedJob {
   id: string;
   op: string;

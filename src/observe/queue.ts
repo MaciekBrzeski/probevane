@@ -5,6 +5,8 @@
 
 export type QueueStatus = 'queued' | 'running' | 'done' | 'error';
 
+/** One unit of queued work as persisted to queue.jsonl — created by newItem(),
+ *  advanced immutably by mark(), collapsed on load by reduceQueue(). */
 export interface QueueItem {
   id: string;
   op: string; // generate / refactor / factory / …
