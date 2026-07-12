@@ -151,6 +151,8 @@ describe('pyramid.inferRole', () => {
   it('explicit overrides beat the heuristic', () => {
     expect(inferRole('cost', { fanIn: 1, fanOut: 3 }, { shared: ['cost'] })).toBe('shared');
     expect(inferRole('server', { fanIn: 2, fanOut: 1 }, { glue: ['server'] })).toBe('glue');
+    // pin as pyramid even when coupling reads as glue (fanIn 0, imports several)
+    expect(inferRole('ui', { fanIn: 0, fanOut: 3 }, { feature: ['ui'] })).toBe('feature');
   });
 });
 

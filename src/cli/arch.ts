@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { archCritique } from '../commands/arch/critique.js';
 import { dirArg } from './args.js';
 
-// probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d]] [--snapshot [--out <file>]]
+// probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d] [--feature e,f]] [--snapshot [--out <file>]]
 //
 // Experimental architecture critique: render the folder tree + dependency tree +
 // directory coupling metrics, then ask an LLM ($0 ollama) what could be
@@ -47,14 +47,19 @@ async function pyramid(dir: string, args: string[]) {
     const i = args.indexOf(flag);
     return i >= 0 && args[i + 1] ? args[i + 1].split(',').map((s) => s.trim()).filter(Boolean) : undefined;
   };
-  // Roles: flag > probevane.config `arch.{glue,shared}` > coupling heuristic.
+  // Roles: flag > probevane.config `arch.{glue,shared,feature}` > coupling heuristic.
   const cfg = (await loadConfig(dir)).arch ?? {};
-  const roles = { glue: list('--glue') ?? cfg.glue, shared: list('--shared') ?? cfg.shared };
+  const roles = {
+    glue: list('--glue') ?? cfg.glue,
+    shared: list('--shared') ?? cfg.shared,
+    feature: list('--feature') ?? cfg.feature,
+  };
   const report = pyramidReport(await buildGraph(dir), roles);
   console.log(`# Pyramid structure report — ${dir}\n`);
-  if (roles.glue || roles.shared) {
-    const source = list('--glue') || list('--shared') ? 'flags' : 'probevane.config';
-    console.log(`_Declared roles (${source}) — glue: ${roles.glue?.join(', ') ?? 'inferred'} · shared: ${roles.shared?.join(', ') ?? 'inferred'}_\n`);
+  if (roles.glue || roles.shared || roles.feature) {
+    const source = list('--glue') || list('--shared') || list('--feature') ? 'flags' : 'probevane.config';
+    const show = (v?: string[]) => v?.join(', ') ?? 'inferred';
+    console.log(`_Declared roles (${source}) — glue: ${show(roles.glue)} · shared: ${show(roles.shared)} · feature: ${show(roles.feature)}_\n`);
   }
   console.log(pyramidDigest(report));
 }

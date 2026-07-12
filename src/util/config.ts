@@ -29,6 +29,7 @@ export interface ProbevaneConfig {
 export interface ArchRoles {
   glue?: string[]; // connection-layer dirs (composition root, wiring, I/O)
   shared?: string[]; // common-base dirs every pyramid may import
+  feature?: string[]; // pinned pyramids — beat the coupling heuristic
 }
 
 const NAMES = ['probevane.config.ts', 'probevane.config.js', 'probevane.config.mjs', 'probevane.config.json'];
@@ -45,11 +46,11 @@ const SCHEMA: Record<Exclude<keyof ProbevaneConfig, 'arch'>, 'string' | 'number'
 
 const isStringArray = (v: unknown): boolean => Array.isArray(v) && v.every((s) => typeof s === 'string');
 
-/** Validate the nested `arch` block ({ glue?: string[], shared?: string[] }). */
+/** Validate the nested `arch` block ({ glue?, shared?, feature? }: string[] each). */
 function checkArch(v: unknown): string | null {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return '"arch" must be an object ({ glue?, shared? })';
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return '"arch" must be an object ({ glue?, shared?, feature? })';
   for (const [k, val] of Object.entries(v)) {
-    if (k !== 'glue' && k !== 'shared') return `unknown key "arch.${k}"`;
+    if (k !== 'glue' && k !== 'shared' && k !== 'feature') return `unknown key "arch.${k}"`;
     if (!isStringArray(val)) return `"arch.${k}" must be string[]`;
   }
   return null;

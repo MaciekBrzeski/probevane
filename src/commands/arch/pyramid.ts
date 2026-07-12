@@ -23,6 +23,7 @@ export type DirRole = 'glue' | 'shared' | 'feature';
 export interface RoleOverrides {
   glue?: string[];
   shared?: string[];
+  feature?: string[]; // pin as a pyramid even when coupling suggests glue/shared
 }
 
 export interface PyramidDir {
@@ -73,6 +74,7 @@ export function inferRole(
 ): DirRole {
   if (overrides.glue?.includes(dir)) return 'glue';
   if (overrides.shared?.includes(dir)) return 'shared';
+  if (overrides.feature?.includes(dir)) return 'feature';
   if (dir.includes('.')) return 'glue'; // bare root-level file = connection layer
   if (c.fanIn >= 4 && c.fanOut <= 2) return 'shared'; // broad base, few needs of its own
   // Imports far more than it is imported = composition root. Not strict fanIn 0:
