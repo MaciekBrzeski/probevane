@@ -7,6 +7,8 @@ import { join, relative, dirname, resolve } from 'node:path';
 
 export type NodeKind = 'fetcher' | 'hook' | 'component' | 'util';
 
+/** One scanned source module: where it sits, what role it plays, and its
+ *  resolved local deps. Filled by buildGraph; consumed by synthesis + render. */
 export interface ModuleNode {
   path: string; // project-relative
   kind: NodeKind;
@@ -14,6 +16,8 @@ export interface ModuleNode {
   callsNetwork: boolean;
 }
 
+/** The scanned repo as a whole: every source module keyed by project-relative
+ *  path. Built by buildGraph; the backbone for mock synthesis and chaining. */
 export interface ModuleGraph {
   nodes: Map<string, ModuleNode>;
   /** Topological order, leaves (no local deps) first. Cyclic edges are dropped. */
@@ -32,6 +36,8 @@ const NET = /\b(fetch|axios|XMLHttpRequest|requests\.(get|post|put|delete)|urlli
 const IS_PY = /\.py$/;
 const PY_TEST = /(^|\/)(test_[^/]+|[^/]+_test|conftest)\.py$/;
 
+/** Scan the project (src/ + npm workspaces, or the whole dir for Python) and
+ *  build the module graph — regex import parse, so no TS compiler dependency. */
 export async function buildGraph(dir: string): Promise<ModuleGraph> {
   // Prefer src/ (JS/TS convention); fall back to the whole dir so Python
   // packages (e.g. pycad/) laid out at the repo root are still graphed.
@@ -70,6 +76,8 @@ export async function buildGraph(dir: string): Promise<ModuleGraph> {
   return { nodes, order: topoSort(nodes), testFiles };
 }
 
+/** One npm-workspace package from the root package.json. Filled by
+ *  loadWorkspaces so package-name imports resolve like local ones. */
 export interface WorkspacePkg {
   name: string; // package name, e.g. '@facet/core'
   dir: string; // project-relative workspace dir, e.g. 'engine/core'
@@ -93,6 +101,7 @@ export async function loadWorkspaces(dir: string): Promise<WorkspacePkg[]> {
   return out;
 }
 
+/** Parse a JSON file; null on missing/invalid — workspace scanning must never throw. */
 async function readJson(file: string): Promise<Record<string, unknown> | null> {
   try {
     return JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
@@ -135,6 +144,8 @@ export function resolveWorkspaceImports(src: string, dir: string, files: string[
   return [...out];
 }
 
+/** Bucket a module by role (network call → fetcher, use* name → hook, JSX or
+ *  PascalCase export → component, else util) so synthesis knows what to mock. */
 function classify(rel: string, src: string): NodeKind {
   if (NET.test(src)) return 'fetcher';
   const base = rel.split('/').pop()!.replace(/\.[tj]sx?$/, '');
@@ -148,6 +159,8 @@ function typeOnlyMembers(members: string): boolean {
   return /^\s*\{[^}]*\}\s*$/.test(members) && members.replace(/[{}]/g, '').split(',').every((s) => /^\s*type\s/.test(s));
 }
 
+/** Relative JS/TS imports → project-relative scanned files. Type-only imports
+ *  are skipped — they carry no runtime dependency worth mocking. */
 export function resolveLocalImports(src: string, fromAbs: string, dir: string, files: string[]): string[] {
   const out = new Set<string>();
   // Match whole import statements; skip type-only imports (`import type ...`)
@@ -216,6 +229,8 @@ export function resolvePyImports(src: string, fromAbs: string, dir: string, file
   return [...out];
 }
 
+/** DFS topological sort, deps before dependents, cycle edges dropped — the
+ *  chaining order so an upstream module's output can feed the next one. */
 function topoSort(nodes: Map<string, ModuleNode>): string[] {
   const order: string[] = [];
   const state = new Map<string, 0 | 1 | 2>(); // 0=unseen 1=onstack 2=done
@@ -231,6 +246,7 @@ function topoSort(nodes: Map<string, ModuleNode>): string[] {
   return order; // deps appear before dependents
 }
 
+/** Recursive file listing under dir, skipping vendored/generated dirs (SKIP). */
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(dir, { withFileTypes: true })) {

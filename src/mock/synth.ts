@@ -12,6 +12,8 @@ export interface HandlerSpec {
   sample: unknown; // sample response body
 }
 
+/** Everything a test generator needs to mock one module. Filled by
+ *  synthForModule; the digest is the part the LLM actually reads. */
 export interface MockBundle {
   module: string;
   handlers: HandlerSpec[];
@@ -22,6 +24,9 @@ export interface MockBundle {
 
 const NET_CALL = /\b(?:fetch|axios(?:\.\w+)?)\s*\(\s*[`'"]([^`'"]+)[`'"]/g;
 
+/** Derive one module's mock boundary from its source: network calls → handler
+ *  specs (sampled from OpenAPI when matched), networked/hook deps → vi.mock
+ *  candidates, Props interface → fixture hint. */
 export async function synthForModule(
   dir: string,
   node: ModuleNode,
@@ -59,6 +64,8 @@ export async function synthForModule(
   return { module: node.path, handlers, depMocks, props, digest };
 }
 
+/** Load the project's OpenAPI doc from the conventional paths; null when absent
+ *  or unparsable — sampling then falls back to neutral placeholders. */
 export async function loadOpenapi(dir: string): Promise<any | null> {
   for (const p of ['data/openapi.json', 'data/openapi.filtered.json', 'openapi.json']) {
     const abs = join(dir, p);
@@ -87,6 +94,8 @@ function sampleForPath(urlPattern: string, method: string, openapi: any | null):
   return urlPattern.includes(':') ? { id: 1 } : [];
 }
 
+/** Concrete sample value for an OpenAPI schema: follow $refs, prefer
+ *  example/enum, else dispatch on type. Depth-capped so cyclic schemas terminate. */
 export function sampleSchema(schema: any, comps: Record<string, any>, depth = 0): unknown {
   if (!schema || depth > 6) return null;
   if (schema.$ref) {
@@ -126,11 +135,14 @@ function sampleObject(schema: any, comps: Record<string, any>, depth: number): R
   return o;
 }
 
+/** Differentiate array items: give the i-th clone a distinct id/name so tests
+ *  can tell the entries apart. */
 function bump(v: unknown, i: number): unknown {
   if (v && typeof v === 'object' && 'id' in (v as any)) return { ...(v as any), id: i + 1, name: `Item ${i + 1}` };
   return v;
 }
 
+/** JSON deep-clone for plain objects (samples are JSON-shaped); scalars pass through. */
 function structuredCloneSafe<T>(v: T): T {
   return v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
 }
@@ -139,6 +151,8 @@ function structuredCloneSafe<T>(v: T): T {
 
 const AX_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete']);
 
+/** HTTP method for a matched network call: axios.<method> read off the call
+ *  head, else a nearby fetch `method:` option; defaults to GET. */
 function guessMethod(src: string, idx: number): string {
   // The match starts at `fetch(` or `axios.<method>(` — read the method off the head.
   const head = src.slice(idx, idx + 30);
@@ -148,6 +162,8 @@ function guessMethod(src: string, idx: number): string {
   return m ? m[1].toUpperCase() : 'GET';
 }
 
+/** Raw call URL → route pattern: strip origin/query, template ${x} → :x so it
+ *  lines up with OpenAPI {x} paths. */
 function normalizeUrl(raw: string): string {
   // strip origin, template ${id} → :id (keep the name so it matches OpenAPI {id}), drop query
   let u = raw.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
@@ -155,6 +171,8 @@ function normalizeUrl(raw: string): string {
   return u || '/';
 }
 
+/** Human/LLM-readable summary of one module's mock boundary — the text that
+ *  gets injected into generation prompts. */
 function renderDigest(node: ModuleNode, handlers: HandlerSpec[], depMocks: string[], props?: string): string {
   const lines = [`MOCK BOUNDARY for ${node.path} (${node.kind}):`];
   if (handlers.length) {

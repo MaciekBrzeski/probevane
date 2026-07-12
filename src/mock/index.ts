@@ -7,6 +7,8 @@ export type { MockBundle, HandlerSpec } from './synth.js';
 export type { ModuleGraph, ModuleNode } from './graph.js';
 export { buildGraph } from './graph.js';
 
+/** The whole-app mock plan handed to test generation. Filled by buildMockPlan;
+ *  buildChain enriches it with frozen fixtures + captured transformer outputs. */
 export interface MockPlan {
   graph: ModuleGraph;
   bundles: MockBundle[]; // one per module, in topological order

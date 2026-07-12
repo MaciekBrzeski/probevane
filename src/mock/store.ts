@@ -46,6 +46,8 @@ async function writeServer(mocksDir: string): Promise<void> {
   await writeFile(join(mocksDir, 'server.ts'), serverTs);
 }
 
+/** Write src/mocks/handlers.ts (+ server.ts) from the deduped handler specs and
+ *  wire MSW into vitest.setup.ts so every unit test is hermetic by default. */
 export async function writeMocks(
   dir: string,
   handlers: HandlerSpec[],
@@ -80,6 +82,8 @@ export async function writeMocks(
   return handlersPath;
 }
 
+/** Idempotently patch vitest.setup.ts: always register jest-dom matchers, and
+ *  append the global MSW server block once (guarded by SETUP_MARK). */
 async function patchVitestSetup(dir: string): Promise<void> {
   const setupPath = join(dir, 'vitest.setup.ts');
   let existing = (await access(setupPath).then(() => true).catch(() => false))

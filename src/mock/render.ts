@@ -6,9 +6,11 @@ import type { ModuleGraph, ModuleNode, NodeKind } from './graph.js';
 
 const ICON: Record<NodeKind, string> = { fetcher: '🌐', hook: '🪝', component: '🧩', util: '⚙️' };
 
+/** Path → Mermaid-safe node id (alphanumerics/underscores only). */
 function id(path: string): string {
   return path.replace(/[^a-zA-Z0-9]/g, '_');
 }
+/** Human node label: path without the src/ prefix, plus the module kind. */
 function label(n: ModuleNode): string {
   const base = n.path.replace(/^src\//, '');
   return `${base} (${n.kind})`;
@@ -21,6 +23,8 @@ function topDir(path: string): string {
   return parts.length >= 2 ? (parts[0] === 'src' ? parts[1] : parts[0]) : parts[0];
 }
 
+/** Module graph → Mermaid diagram (wiki/GitHub). Flat per-file nodes with kind
+ *  colors while small; big graphs collapse to a directory-level overview. */
 export function toMermaid(graph: ModuleGraph): string {
   // Big graphs (whole repos) are illegible as one flat node-per-file diagram, so
   // COLLAPSE to a directory-level overview: one node per top-level dir (with its
@@ -71,6 +75,8 @@ function dirLevelMermaid(graph: ModuleGraph): string {
   return lines.join('\n');
 }
 
+/** Modules imported by >= minImporters others — the hubs worth collapsing in
+ *  the trees so they don't drown the layout. Most-shared first. */
 export function sharedModules(graph: ModuleGraph, minImporters = 8): { path: string; importedBy: number }[] {
   const counts = new Map<string, number>();
   for (const n of graph.nodes.values()) {
@@ -85,6 +91,8 @@ export function sharedModules(graph: ModuleGraph, minImporters = 8): { path: str
     .sort((a, b) => (b.importedBy - a.importedBy) || a.path.localeCompare(b.path));
 }
 
+/** Module graph → ASCII dependency tree for the terminal: entry points at the
+ *  roots, deps below; revisits marked ↺, hubs optionally collapsed as ⇗ shared. */
 export function toAscii(graph: ModuleGraph, opts?: { collapseHubs?: number }): string {
   // Roots = modules nobody imports (the app's entry points). Walk down to deps.
   const imported = new Set<string>();
@@ -173,6 +181,7 @@ function countFiles(dir: FolderDir, kind: 'files' | 'tests'): number {
   return n;
 }
 
+/** One-line stats (module count by kind + how many touch the network) for logs. */
 export function graphSummary(graph: ModuleGraph): string {
   const byKind: Record<string, number> = {};
   let net = 0;
