@@ -37,7 +37,7 @@ Everything language-specific hides behind one interface (`StackAdapter`); everyt
 | `src/adapters/react-vitest-playwright/` | React adapter | **yes** |
 | `src/adapters/python-pytest/` | Python stub adapter | **yes** |
 | `src/adapters/registry.ts` | pick adapter by `detect()` confidence | no |
-| `src/loop/engine.ts` | the gated turn loop | no |
+| `src/loop/engine/index.ts` | the gated turn loop | no |
 | `src/loop/rune.ts` · `ctx.ts` | Rune contract + shared `RunCtx` | no |
 | `src/loop/runes/*` | individual gates | no |
 | `src/loop/tools.ts` | the tool surface (read/list/write/edit/plan) | no |

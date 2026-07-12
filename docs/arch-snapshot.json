@@ -86,7 +86,7 @@
       },
       {
         "dir": "commands",
-        "files": 16,
+        "files": 17,
         "fanOut": 2,
         "fanIn": 4,
         "inbound": 13,

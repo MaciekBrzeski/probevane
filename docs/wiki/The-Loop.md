@@ -1,6 +1,6 @@
 # The Loop
 
-Ported from runestone's `engine.rs::run_loop`. Lives in `src/loop/engine.ts`.
+Ported from runestone's `engine.rs::run_loop`. Lives in `src/loop/engine/index.ts`.
 
 ## One turn
 
