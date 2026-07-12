@@ -1,4 +1,4 @@
-import type { TurnData } from '../lib.ts';
+import type { TurnData } from '../../lib.ts';
 
 // One conversation turn (ported from renderTurn). XSS-critical: every
 // model/tool-derived string goes through text nodes (h() uses createTextNode

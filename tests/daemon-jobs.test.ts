@@ -79,7 +79,7 @@ describe('control center XSS guard (asset)', () => {
     expect(html).toContain('&lt;');
   });
   it('transcript renderer (Turn.tsx) never touches innerHTML; runtime defaults to text nodes', () => {
-    expect(ui('app/components/Turn.tsx')).not.toMatch(/innerHTML/);
+    expect(ui('app/components/items/Turn.tsx')).not.toMatch(/innerHTML/);
     expect(ui('runtime.ts')).toMatch(/createTextNode/);
   });
   it('every innerHTML site in the app escapes interpolations or injects trusted markdown/mermaid only', () => {
@@ -95,6 +95,6 @@ describe('control center XSS guard (asset)', () => {
     const { TABS } = await import('../src/util/theme.js');
     const ids = TABS.map((t) => t.id);
     for (const t of ['projects', 'runs', 'docs', 'launch', 'cost', 'quality', 'console', 'terminal']) expect(ids).toContain(t);
-    expect(ui('app/components/Tabs.tsx')).toContain('TABS'); // Tabs renders from the model, not literal markup
+    expect(ui('app/components/chrome/Tabs.tsx')).toContain('TABS'); // Tabs renders from the model, not literal markup
   });
 });

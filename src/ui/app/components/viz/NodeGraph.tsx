@@ -1,5 +1,5 @@
 import { layoutDag, type LayoutNode } from '@facet/core';
-import { esc } from '../lib.ts';
+import { esc } from '../../lib.ts';
 
 // SVG DAG renderer for the console: nodes as glowing capsules, edges as
 // curves with an animated dash-flow ("data moving through the pipe").

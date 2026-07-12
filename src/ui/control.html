@@ -287,7 +287,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     container.appendChild(node);
   }
 
-  // src/ui/app/components/Header.tsx
+  // src/ui/app/components/chrome/Header.tsx
   function Header() {
     return /* @__PURE__ */ h("header", null, /* @__PURE__ */ h("h1", null, "probevane ", /* @__PURE__ */ h("span", { class: "muted" }, "control center")), /* @__PURE__ */ h("span", { class: "stat" }, /* @__PURE__ */ h("span", { id: "healthDot", class: "dot", style: "background:var(--dim)" }), /* @__PURE__ */ h("span", { id: "health", class: "connecting" }, "connecting\u2026")), /* @__PURE__ */ h("span", { class: "stat" }, "cost ", /* @__PURE__ */ h("b", { id: "cost" }, "\u2013"), " \xB7 accept ", /* @__PURE__ */ h("b", { id: "accept" }, "\u2013"), " \xB7 alerts ", /* @__PURE__ */ h("b", { id: "alertN" }, "\u2013")), /* @__PURE__ */ h("span", { class: "spacer" }), /* @__PURE__ */ h("a", { href: "/demo/pipeline", target: "_blank" }, "pipeline \u2197"));
   }
@@ -482,47 +482,47 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   };
   var CONSOLE_PANES = LAYOUTS.console;
 
-  // src/ui/app/components/Tabs.tsx
+  // src/ui/app/components/chrome/Tabs.tsx
   function Tabs() {
     return /* @__PURE__ */ h("nav", { class: "tabs", id: "tabs" }, TABS.map((t, i) => /* @__PURE__ */ h("button", { "data-go": t.id, class: i === 0 ? "active" : void 0 }, t.title)));
   }
 
-  // src/ui/app/components/ProjectsPanel.tsx
+  // src/ui/app/components/panels/ProjectsPanel.tsx
   function ProjectsPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "projects", class: "active" }, /* @__PURE__ */ h("div", { class: "cards", id: "projects" }, /* @__PURE__ */ h("span", { class: "muted" }, "loading projects\u2026")));
   }
 
-  // src/ui/app/components/RunsPanel.tsx
+  // src/ui/app/components/panels/RunsPanel.tsx
   function RunsPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "runs" }, /* @__PURE__ */ h("div", { class: "panel wide", style: "margin-bottom:12px" }, /* @__PURE__ */ h("h2", null, "active runs"), /* @__PURE__ */ h("div", { id: "activeRuns", class: "muted" }, "no active runs")), /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "run history ", /* @__PURE__ */ h("span", { id: "runsMeta", class: "muted" })), /* @__PURE__ */ h("table", { id: "runs" }, /* @__PURE__ */ h("thead", null, /* @__PURE__ */ h("tr", null, RUN_COLUMNS.map((c) => /* @__PURE__ */ h("th", null, c.header)))), /* @__PURE__ */ h("tbody", null, /* @__PURE__ */ h("tr", null, /* @__PURE__ */ h("td", { class: "muted", colSpan: RUN_COLUMNS.length }, "loading\u2026"))))));
   }
 
-  // src/ui/app/components/WikiPanel.tsx
+  // src/ui/app/components/panels/WikiPanel.tsx
   function WikiPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "docs" }, /* @__PURE__ */ h("div", { class: "grid" }, /* @__PURE__ */ h("div", { class: "panel" }, /* @__PURE__ */ h("h2", null, "pages"), /* @__PURE__ */ h("div", { id: "wikiList", class: "muted" }, "loading\u2026")), /* @__PURE__ */ h("div", { class: "panel" }, /* @__PURE__ */ h("h2", { id: "docTitle" }, "select a page"), /* @__PURE__ */ h("div", { id: "docBody", class: "md muted" }, "click a page to render it here."))));
   }
 
-  // src/ui/app/components/LaunchPanel.tsx
+  // src/ui/app/components/panels/LaunchPanel.tsx
   function LaunchPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "launch" }, /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "run \u2014 write tests \xB7 refactor \xB7 feature \xB7 fix \xB7 quality"), /* @__PURE__ */ h("div", { class: "row" }, /* @__PURE__ */ h("label", null, "dir"), /* @__PURE__ */ h("input", { type: "text", id: "dir", placeholder: "/path/to/project" }), /* @__PURE__ */ h("label", null, "op"), /* @__PURE__ */ h("select", { id: "op" }), /* @__PURE__ */ h("label", null, "flags"), /* @__PURE__ */ h("input", { type: "text", id: "flags", placeholder: "--kind unit --model ollama", style: "width:280px" }), /* @__PURE__ */ h("button", { class: "act", id: "run" }, "RUN \u25B6"), /* @__PURE__ */ h("span", { id: "runMsg", class: "muted" }))));
   }
 
-  // src/ui/app/components/CostPanel.tsx
+  // src/ui/app/components/panels/CostPanel.tsx
   function CostPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "cost" }, /* @__PURE__ */ h("div", { class: "grid" }, /* @__PURE__ */ h("div", { class: "panel" }, /* @__PURE__ */ h("h2", null, "cost / day"), /* @__PURE__ */ h("div", { class: "bars", id: "bars" }), /* @__PURE__ */ h("div", { class: "muted", id: "aggMeta", style: "margin-top:8px" })), /* @__PURE__ */ h("div", { class: "panel" }, /* @__PURE__ */ h("h2", null, "alerts"), /* @__PURE__ */ h("div", { id: "alerts", class: "muted" }, "none")), /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "library audit trail"), /* @__PURE__ */ h("pre", { id: "audit", class: "muted" }, "\u2013"))));
   }
 
-  // src/ui/app/components/QualityPanel.tsx
+  // src/ui/app/components/panels/QualityPanel.tsx
   function QualityPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "quality" }, /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "quality ", /* @__PURE__ */ h("span", { id: "qmeta", class: "muted" })), /* @__PURE__ */ h("div", { class: "row" }, /* @__PURE__ */ h("label", null, "dir"), /* @__PURE__ */ h("input", { type: "text", id: "qdir", placeholder: "/path/to/project" }), /* @__PURE__ */ h("button", { class: "ghost", id: "qbtn" }, "scan")), /* @__PURE__ */ h("pre", { id: "quality", class: "muted" }, "enter a dir + scan to see file-size / complexity / duplication findings.")));
   }
 
-  // src/ui/app/components/ScanFrame.tsx
+  // src/ui/app/components/chrome/ScanFrame.tsx
   function ScanFrame(props) {
     return /* @__PURE__ */ h("div", { class: "scanframe", style: props.accent ? `--frame:${props.accent}` : void 0 }, /* @__PURE__ */ h("div", { class: "sf-elbow" }), /* @__PURE__ */ h("div", { class: "sf-title" }, props.title), /* @__PURE__ */ h("div", { class: "sf-body" }, props.children));
   }
 
-  // src/ui/app/components/ConsolePanel.tsx
+  // src/ui/app/components/panels/ConsolePanel.tsx
   var PANE_BODY = {
     pipeline: () => /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { id: "pipelineGraph", class: "muted" }, "standby\u2026"), /* @__PURE__ */ h("div", { id: "theaterTicker", class: "theater-ticker" })),
     telemetry: () => /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "gauges", id: "gauges" }), /* @__PURE__ */ h("div", { id: "sparks" })),
@@ -532,12 +532,12 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("section", { "data-tab": "console" }, /* @__PURE__ */ h("div", { class: "console-grid" }, CONSOLE_PANES.map((p) => /* @__PURE__ */ h("div", { class: "console-pane", style: spanToCss(p.span) }, /* @__PURE__ */ h(ScanFrame, { title: p.title, accent: cssVar(p.accent) }, PANE_BODY[p.id]())))));
   }
 
-  // src/ui/app/components/TerminalPanel.tsx
+  // src/ui/app/components/panels/TerminalPanel.tsx
   function TerminalPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "terminal" }, /* @__PURE__ */ h(ScanFrame, { title: "terminal", accent: "var(--ok)" }, /* @__PURE__ */ h("div", { class: "term-toolbar" }, /* @__PURE__ */ h("button", { class: "ghost", id: "termBash" }, "bash"), /* @__PURE__ */ h("button", { class: "ghost", id: "termClaude" }, "claude"), /* @__PURE__ */ h("button", { class: "ghost", id: "termKill" }, "kill"), /* @__PURE__ */ h("span", { id: "termMsg", class: "muted" })), /* @__PURE__ */ h("div", { id: "termMount", class: "term-mount" })));
   }
 
-  // src/ui/app/components/Drawer.tsx
+  // src/ui/app/components/chrome/Drawer.tsx
   function Drawer() {
     return /* @__PURE__ */ h("div", { class: "drawer", id: "drawer" }, /* @__PURE__ */ h("div", { class: "dhead" }, /* @__PURE__ */ h("b", { id: "drawerTitle" }, "detail"), /* @__PURE__ */ h("span", { class: "spacer" }), /* @__PURE__ */ h("button", { class: "ghost", id: "drawerClose" }, "\u2715")), /* @__PURE__ */ h("div", { class: "dbody", id: "drawerBody" }));
   }
@@ -555,25 +555,25 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return t || ".";
   }
 
-  // src/ui/app/components/ProjectCard.tsx
+  // src/ui/app/components/items/ProjectCard.tsx
   function ProjectCard({ p, onOpen }) {
     const st = p.lastRun ? p.lastRun.accepted ? "accepted" : p.lastRun.stopReason : "";
     return /* @__PURE__ */ h("div", { class: "card", dataset: { slug: p.slug, name: p.name }, onClick: () => onOpen(p) }, /* @__PURE__ */ h("h3", null, p.name), /* @__PURE__ */ h("div", { class: "muted" }, `${p.runCount} run(s) \xB7 ${(p.acceptRate * 100).toFixed(0)}% accepted`), p.lastRun && /* @__PURE__ */ h("span", { class: "tag " + esc(st) }, "last: " + st));
   }
 
-  // src/ui/app/components/RunRow.tsx
+  // src/ui/app/components/items/RunRow.tsx
   function RunRow({ r, onOpen }) {
     return /* @__PURE__ */ h("tr", { class: "clickable", onClick: () => onOpen(r) }, RUN_COLUMNS.map(
       (c) => c.id === "status" ? /* @__PURE__ */ h("td", null, /* @__PURE__ */ h("span", { class: "tag " + (r.accepted ? "accepted" : esc(r.stopReason)) }, r.accepted ? "accepted" : r.stopReason)) : /* @__PURE__ */ h("td", { class: c.muted ? "muted" : void 0 }, c.get(r))
     ));
   }
 
-  // src/ui/app/components/Turn.tsx
+  // src/ui/app/components/items/Turn.tsx
   function Turn({ t }) {
     return /* @__PURE__ */ h("div", { class: "turn " + (t.role === "user" ? "user" : "") }, /* @__PURE__ */ h("div", { class: "thead" }, `${t.role}${t.model ? " \xB7 " + t.model : ""} \xB7 step ${t.step}`), t.text && /* @__PURE__ */ h("div", { class: "txt" }, t.text), (t.toolCalls || []).map((c) => /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, "\u2192 " + c.name), /* @__PURE__ */ h("pre", null, typeof c.input === "string" ? c.input : JSON.stringify(c.input, null, 2)))), (t.toolResults || []).map((r) => /* @__PURE__ */ h("details", { class: r.ok ? "ok" : "err" }, /* @__PURE__ */ h("summary", null, (r.ok ? "\u2713 " : "\u2717 ") + r.name), /* @__PURE__ */ h("pre", null, r.content))));
   }
 
-  // src/ui/app/components/NodeGraph.tsx
+  // src/ui/app/components/viz/NodeGraph.tsx
   function NodeGraph(props) {
     const dag = props.nodes.map((n) => ({ id: n.id, deps: n.deps }));
     const compact = props.compact === true;
@@ -702,7 +702,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     }
   };
 
-  // src/ui/app/components/Gauge.tsx
+  // src/ui/app/components/viz/Gauge.tsx
   function Gauge(props) {
     const size = props.size ?? 96;
     const p = new SvgPainter(size, size);
@@ -724,7 +724,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "gauge-wrap" }, host.firstChild, /* @__PURE__ */ h("div", { class: "gauge-label" }, props.label));
   }
 
-  // src/ui/app/components/Spark.tsx
+  // src/ui/app/components/viz/Spark.tsx
   function Spark(props) {
     const w = props.width ?? 260;
     const ht = props.height ?? 64;

@@ -4,7 +4,7 @@
 // — the SAME manifest the terminal console lays out from (spanToBox). Each
 // pane is absolutely positioned by its span; inner containers are filled by
 // main.tsx (loadConsole/consoleTick).
-import { CONSOLE_PANES, cssVar, spanToCss } from '../../../util/theme.ts';
+import { CONSOLE_PANES, cssVar, spanToCss } from '../../../../util/theme.ts';
 
 const PANE_BODY: Record<string, () => Node> = {
   pipeline: () => (

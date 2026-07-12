@@ -3,7 +3,7 @@
 // self-drawing stroke + a `spark-dot` end circle (both CSS-animated as before).
 import { SvgPainter } from '@facet/render-dom';
 import { sparkline } from '@facet/core';
-import { packed } from '../../../util/theme.ts';
+import { packed } from '../../../../util/theme.ts';
 
 export function Spark(props: { points: number[]; label: string; accent?: number; width?: number; height?: number }): Node {
   const w = props.width ?? 260;

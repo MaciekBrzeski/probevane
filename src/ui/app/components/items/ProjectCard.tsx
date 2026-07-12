@@ -1,4 +1,4 @@
-import { esc, type ProjectInfo } from '../lib.ts';
+import { esc, type ProjectInfo } from '../../lib.ts';
 
 // One project card in the Projects grid (ported from the loadProjects loop body).
 export function ProjectCard({ p, onOpen }: { p: ProjectInfo; onOpen: (p: ProjectInfo) => void }): Node {

@@ -11,13 +11,41 @@
 
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = join(ROOT, 'src', 'ui', 'app');
 const COMPONENTS = join(APP, 'components');
 const OUT = join(ROOT, 'src', 'ui', 'control.html');
+
+// Component files may live in subfolders (components/panels/RunsPanel.tsx) —
+// tags still resolve by bare NAME, so names must be unique across the tree.
+function walkTsx(dir) {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory()) out.push(...walkTsx(join(dir, e.name)));
+    else if (e.name.endsWith('.tsx')) out.push(join(dir, e.name));
+  }
+  return out;
+}
+
+/** name → absolute file path for every component; throws on duplicate names. */
+function componentIndex() {
+  const index = new Map();
+  for (const file of walkTsx(COMPONENTS)) {
+    const name = file.slice(file.lastIndexOf('/') + 1).replace(/\.tsx$/, '');
+    const prev = index.get(name);
+    if (prev) {
+      throw new Error(
+        `build-ui: duplicate component name "${name}" — ${prev.replace(ROOT + '/', '')} vs ${file.replace(ROOT + '/', '')}; tags resolve by bare name, names must be unique`,
+      );
+    }
+    index.set(name, file);
+  }
+  return index;
+}
 
 // --- auto-import: scan each .tsx module for capitalized JSX tags that are not
 // imported and not declared locally, then prepend convention imports. Runs as
@@ -26,7 +54,7 @@ const OUT = join(ROOT, 'src', 'ui', 'control.html');
 // JSX — a real tag never follows an identifier char or a closing paren.
 const TAG_RE = /(?<![\w)])<([A-Z][A-Za-z0-9]*)[\s/>]/g;
 
-function autoImports(source, filePath) {
+function autoImports(source, filePath, components) {
   // A local named h/Fragment silently shadows the JSX factory (esbuild resolves
   // the factory lexically) — the whole component then crashes at runtime. Ban it.
   const shadow = source.match(/\b(?:const|let|var|function)\s+(h|Fragment)\b/);
@@ -45,11 +73,11 @@ function autoImports(source, filePath) {
   );
   const lines = [];
   for (const t of missing) {
-    const file = join(COMPONENTS, `${t}.tsx`);
-    if (!existsSync(file)) {
+    const file = components.get(t);
+    if (!file) {
       throw new Error(
         `build-ui: <${t}/> in ${filePath.replace(ROOT + '/', '')} has no ` +
-          `src/ui/app/components/${t}.tsx — component tags resolve by convention (one component per file, name = filename)`,
+          `${t}.tsx under src/ui/app/components/ — component tags resolve by convention (one component per file, name = filename)`,
       );
     }
     lines.push(`import { ${t} } from '${file}';`);
@@ -61,25 +89,26 @@ function autoImports(source, filePath) {
   return lines.length ? lines.join('\n') + '\n' + source : source;
 }
 
-const conventionPlugin = {
-  name: 'component-convention',
-  setup(b) {
-    b.onLoad({ filter: /src\/ui\/(app|app\/components)\/[^/]+\.tsx$/ }, (args) => ({
-      contents: autoImports(readFileSync(args.path, 'utf8'), args.path),
-      loader: 'tsx',
-      resolveDir: dirname(args.path),
-    }));
-  },
-};
+function conventionPlugin(components) {
+  return {
+    name: 'component-convention',
+    setup(b) {
+      // app root files + any depth under components/
+      b.onLoad({ filter: /src\/ui\/app(\/components(\/[^/]+)*)?\/[^/]+\.tsx$/ }, (args) => ({
+        contents: autoImports(readFileSync(args.path, 'utf8'), args.path, components),
+        loader: 'tsx',
+        resolveDir: dirname(args.path),
+      }));
+    },
+  };
+}
 
 // Bijection guard: every component file must export exactly its filename.
-function checkBijection() {
-  if (!existsSync(COMPONENTS)) return;
-  for (const f of readdirSync(COMPONENTS).filter((f) => f.endsWith('.tsx'))) {
-    const name = f.replace(/\.tsx$/, '');
-    const src = readFileSync(join(COMPONENTS, f), 'utf8');
+function checkBijection(components) {
+  for (const [name, file] of components) {
+    const src = readFileSync(file, 'utf8');
     if (!new RegExp(`export (function|const) ${name}\\b`).test(src)) {
-      throw new Error(`build-ui: components/${f} must export "${name}" (component name = filename)`);
+      throw new Error(`build-ui: ${file.replace(ROOT + '/', '')} must export "${name}" (component name = filename)`);
     }
   }
 }
@@ -87,12 +116,10 @@ function checkBijection() {
 // Ambient declarations so `tsc -p tsconfig.ui.json` type-checks the raw
 // sources (which never write imports): every component + h/Fragment becomes a
 // typed global. Regenerated each build; drift-gated with control.html.
-function writeAmbient() {
-  const names = existsSync(COMPONENTS)
-    ? readdirSync(COMPONENTS).filter((f) => f.endsWith('.tsx')).map((f) => f.replace(/\.tsx$/, ''))
-    : [];
-  const decls = names
-    .map((n) => `  const ${n}: typeof import('./components/${n}.tsx').${n};`)
+function writeAmbient(components) {
+  const decls = [...components.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([n, file]) => `  const ${n}: typeof import('./${relative(APP, file)}').${n};`)
     .join('\n');
   const body = `// GENERATED by scripts/build-ui.mjs — typed globals for the component
 // convention (tags resolve by filename; imports are injected at build time).
@@ -115,8 +142,9 @@ export {};
  * no rebuild step, no daemon restart.
  */
 export async function buildControlHtml() {
-  checkBijection();
-  writeAmbient();
+  const components = componentIndex();
+  checkBijection(components);
+  writeAmbient(components);
   const entry = join(APP, 'main.tsx');
   if (!existsSync(entry)) throw new Error('build-ui: src/ui/app/main.tsx missing');
 
@@ -128,7 +156,7 @@ export async function buildControlHtml() {
     target: 'es2022',
     jsxFactory: 'h',
     jsxFragment: 'Fragment',
-    plugins: [conventionPlugin],
+    plugins: [conventionPlugin(components)],
     minify: false, // generated file stays reviewable in diffs
   });
   const js = result.outputFiles[0].text;

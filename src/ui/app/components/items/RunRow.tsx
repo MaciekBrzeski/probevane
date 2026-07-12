@@ -1,5 +1,5 @@
-import { esc, type RunRecord } from '../lib.ts';
-import { RUN_COLUMNS } from '../../../util/theme.ts';
+import { esc, type RunRecord } from '../../lib.ts';
+import { RUN_COLUMNS } from '../../../../util/theme.ts';
 
 // One clickable row of the run-history table — cells from the shared RUN_COLUMNS
 // schema (the terminal renders the same columns as aligned text).

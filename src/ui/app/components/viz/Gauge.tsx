@@ -3,7 +3,7 @@
 // so the existing CSS animates its draw-in; the % text is tagged `gauge-num`.
 import { SvgPainter } from '@facet/render-dom';
 import { gauge } from '@facet/core';
-import { packed } from '../../../util/theme.ts';
+import { packed } from '../../../../util/theme.ts';
 
 export function Gauge(props: { value: number; label: string; accent?: number; size?: number }): Node {
   const size = props.size ?? 96;
