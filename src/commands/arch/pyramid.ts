@@ -113,49 +113,58 @@ function violationKind(fromRole: DirRole, toRole: DirRole, deep: boolean): Viola
   return null; // anyone→shared, glue→base-of-feature, glue→glue: all legal
 }
 
+/** Mutable tallies accumulated while walking every import edge. */
+interface Tally {
+  intra: Map<string, number>;
+  leaks: Map<string, number>;
+  agg: Map<string, PyramidViolation>;
+  cross: number;
+  bad: number;
+}
+
+/** Record one import edge into the tallies (intra, legal cross, or violation). */
+function tallyImport(t: Tally, roles: Map<string, DirRole>, fromPath: string, toPath: string): void {
+  const from = topDir(fromPath);
+  const to = topDir(toPath);
+  if (from === to) {
+    t.intra.set(from, (t.intra.get(from) ?? 0) + 1);
+    return;
+  }
+  t.cross++;
+  const kind = violationKind(roles.get(from)!, roles.get(to)!, relSegments(toPath).length > 1);
+  if (!kind) return;
+  t.bad++;
+  t.leaks.set(from, (t.leaks.get(from) ?? 0) + 1);
+  const key = `${kind}|${from}|${to}`;
+  const v = t.agg.get(key) ?? { kind, from, to, count: 0, examples: [], fix: FIX[kind] };
+  v.count++;
+  if (v.examples.length < 3) v.examples.push(`${fromPath} → ${toPath}`);
+  t.agg.set(key, v);
+}
+
 /** Evaluate the graph against the pyramid model. */
 export function pyramidReport(graph: ModuleGraph, overrides: RoleOverrides = {}): PyramidReport {
   const coupling = dirCoupling(graph);
   const roles = new Map<string, DirRole>();
   for (const [dir, c] of coupling) roles.set(dir, inferRole(dir, c, overrides));
 
-  const intra = new Map<string, number>();
-  const leaks = new Map<string, number>();
-  const agg = new Map<string, PyramidViolation>();
-  let cross = 0;
-  let bad = 0;
-  for (const n of graph.nodes.values()) {
-    const from = topDir(n.path);
+  const t: Tally = { intra: new Map(), leaks: new Map(), agg: new Map(), cross: 0, bad: 0 };
+  for (const n of graph.nodes.values())
     for (const dep of n.imports) {
       const target = graph.nodes.get(dep);
-      if (!target) continue;
-      const to = topDir(target.path);
-      if (from === to) {
-        intra.set(from, (intra.get(from) ?? 0) + 1);
-        continue;
-      }
-      cross++;
-      const kind = violationKind(roles.get(from)!, roles.get(to)!, relSegments(target.path).length > 1);
-      if (!kind) continue;
-      bad++;
-      leaks.set(from, (leaks.get(from) ?? 0) + 1);
-      const key = `${kind}|${from}|${to}`;
-      const v = agg.get(key) ?? { kind, from, to, count: 0, examples: [], fix: FIX[kind] };
-      v.count++;
-      if (v.examples.length < 3) v.examples.push(`${n.path} → ${target.path}`);
-      agg.set(key, v);
+      if (target) tallyImport(t, roles, n.path, target.path);
     }
-  }
 
   const dirs: PyramidDir[] = [...coupling.entries()]
     .map(([dir, c]) => {
-      const i = intra.get(dir) ?? 0;
-      const l = leaks.get(dir) ?? 0;
-      return { dir, role: roles.get(dir)!, files: c.files, intra: i, leaks: l, isolation: i + l === 0 ? 1 : i / (i + l) };
+      const i = t.intra.get(dir) ?? 0;
+      const l = t.leaks.get(dir) ?? 0;
+      const isolation = i + l === 0 ? 1 : i / (i + l);
+      return { dir, role: roles.get(dir)!, files: c.files, intra: i, leaks: l, isolation };
     })
     .sort((a, b) => a.isolation - b.isolation || b.files - a.files);
-  const violations = [...agg.values()].sort((a, b) => b.count - a.count);
-  const score = cross === 0 ? 100 : Math.round(100 * (1 - bad / cross));
+  const violations = [...t.agg.values()].sort((a, b) => b.count - a.count);
+  const score = t.cross === 0 ? 100 : Math.round(100 * (1 - t.bad / t.cross));
   return { dirs, violations, score };
 }
 

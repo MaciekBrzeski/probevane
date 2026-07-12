@@ -43,12 +43,14 @@ const SCHEMA: Record<Exclude<keyof ProbevaneConfig, 'arch'>, 'string' | 'number'
   mfe: 'boolean', takeover: 'string', budget: 'number',
 };
 
+const isStringArray = (v: unknown): boolean => Array.isArray(v) && v.every((s) => typeof s === 'string');
+
 /** Validate the nested `arch` block ({ glue?: string[], shared?: string[] }). */
 function checkArch(v: unknown): string | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return '"arch" must be an object ({ glue?, shared? })';
   for (const [k, val] of Object.entries(v)) {
     if (k !== 'glue' && k !== 'shared') return `unknown key "arch.${k}"`;
-    if (!Array.isArray(val) || val.some((s) => typeof s !== 'string')) return `"arch.${k}" must be string[]`;
+    if (!isStringArray(val)) return `"arch.${k}" must be string[]`;
   }
   return null;
 }
