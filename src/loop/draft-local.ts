@@ -4,7 +4,7 @@ import type { Brain } from '../brain/brain.js';
 import type { StackAdapter, TestKind, RunScope } from '../adapters/adapter.js';
 import { extractTestBlock, conventionalSpecPath } from './extract.js';
 import { auditFiles } from '../audit/core.js';
-import { firstFailure } from './runes/validation_gate.js';
+import { firstFailure } from './runes/index.js';
 import { factDigest } from './fact-digest.js';
 import { propertyGuidance, looksPropertyTestable } from './property.js';
 import { sh } from '../util/exec.js';

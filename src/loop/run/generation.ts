@@ -7,7 +7,7 @@ import { readTraces } from '../../distill/collect.js';
 import { pickSimilarTrace } from '../../library/similar.js';
 import { conventionalSpecPath } from '../extract.js';
 import { propertyGuidance } from '../property.js';
-import { mockInject } from '../runes/mock_inject.js';
+import { mockInject } from '../runes/index.js';
 import { buildChain } from '../../mock/index.js';
 import { brainFor, isDirectModel } from '../../brain/select.js';
 import { assessComplexity, routeModels } from '../complexity.js';

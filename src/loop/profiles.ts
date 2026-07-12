@@ -1,6 +1,6 @@
 import type { Rune } from './rune.js';
 import type { TestKind, RunScope } from '../adapters/adapter.js';
-import type { AcceptanceOpts } from './runes/acceptance_gate.js';
+import type { AcceptanceOpts } from './runes/index.js';
 import {
   contextInject, pathGuard, planFirst, noRegression, validationGate, auditGate,
   acceptanceGate, hermeticGate, mutationGate, a11yGate, visualGate, flakeGate,

@@ -4,12 +4,10 @@ import { routeModels } from '../complexity.js';
 import { runLoop, type RunOutcome } from '../engine/index.js';
 import { nullAdapter } from '../../adapters/null-adapter.js';
 import { buildDocsDigest } from '../digest.js';
-import { planFirst } from '../runes/plan_first.js';
-import { sessionDiary } from '../runes/session_diary.js';
-import { caveatHarvest } from '../runes/caveat_harvest.js';
 import {
+  planFirst, sessionDiary, caveatHarvest,
   docsContextInject, docsScopeGuard, docStructureGate, docReferenceGate, docsAcceptance,
-} from '../runes/docs.js';
+} from '../runes/index.js';
 
 // Narrative documentation loop — stack-agnostic (no adapter, no tests). Grounds a
 // docs-writer model on a project digest and gates the output on structure +
