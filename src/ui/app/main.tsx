@@ -1,6 +1,7 @@
 // Control-center entry: mounts shell components into #app, then ports the old
 // inline script (polling, tabs, drawer, markdown/mermaid, filtering) as functions.
 import { mount } from '../runtime.ts';
+import { loadChecks } from './checks-tab.tsx';
 import { $, j, esc, dirOf, applyPalette, type ProjectInfo, type RunRecord } from './lib.ts';
 import { RUN_COLUMNS } from '../../util/theme.ts';
 import { loadConsole, consolePipelineEvent, consolePipelineReset, startTheater } from './console.tsx';
@@ -25,6 +26,7 @@ mount(
     <LaunchPanel />
     <CostPanel />
     <QualityPanel />
+    <ChecksPanel />
     <ConsolePanel />
     <TerminalPanel />
     <Drawer />
@@ -43,6 +45,7 @@ $('tabs').addEventListener('click', (e) => {
   if (go === 'projects') loadProjects();
   if (go === 'runs') loadRuns();
   if (go === 'docs') loadWiki();
+  if (go === 'checks') loadChecks();
   if (go === 'terminal') { loadTerminal(); terminalActivated(); }
 });
 

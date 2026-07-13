@@ -598,3 +598,16 @@ timestamp,target,kind,pass,audit_score,tests,coverage,flake,library_good,library
 2026-07-12T20:01:08.292Z,angular-counter,unit,1,5,3,100,0,,,ci-baseline,,,,
 2026-07-12T20:01:08.292Z,node-calc,unit,1,5,9,100,0,,,ci-baseline,,,,
 2026-07-12T20:01:08.292Z,react-shop,unit,1,5,23,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,react-todo,unit,1,5,2,92.85,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,react-forms,unit,1,5,6,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,py-calc,unit,1,5,5,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,vue-counter,unit,1,5,7,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,go-calc,unit,1,5,4,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,svelte-counter,unit,1,5,6,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,rust-calc,unit,1,5,4,0,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,angular-counter,unit,1,5,3,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,node-calc,unit,1,5,9,100,0,,,ci-baseline,,,,
+2026-07-13T11:57:49.740Z,react-shop,unit,1,5,23,100,0,,,ci-baseline,,,,
+2026-07-13T11:58:29.270Z,react-todo,refactor,1,5,2,92.85,0,,,path-replay,,,8045,1055
+2026-07-13T11:58:29.270Z,py-calc,feature,1,5,6,100,0,,,path-replay,,,11343,641
+2026-07-13T11:58:29.270Z,py-calc,repair,1,5,5,100,0,,,path-replay,,,5869,346

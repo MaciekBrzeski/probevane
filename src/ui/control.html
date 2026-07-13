@@ -237,6 +237,15 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   *, *::before, *::after { animation:none !important; transition:none !important; }
 }
 
+/* --- checks tab: gate scoreboard --- */
+.checks-gauges { display:flex; gap:22px; margin:8px 0 14px; }
+.checks-cols { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+.checks-cols h3 { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 8px; }
+.lamp { border-left:3px solid var(--line); padding:4px 8px; margin-bottom:6px; background:var(--panel); }
+.checks-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.checks-bar-label { min-width:170px; color:var(--fg); }
+.checks-bar { height:10px; background:var(--acc); border-radius:2px; min-width:2px; box-shadow:0 0 6px var(--acc); }
+
 </style>
 </head>
 <body>
@@ -426,6 +435,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     { id: "launch", title: "Launch", accent: "acc", terminal: true },
     { id: "cost", title: "Cost / Alerts", accent: "warn", terminal: true },
     { id: "quality", title: "Quality", accent: "ok", terminal: true },
+    { id: "checks", title: "Checks", accent: "ok", terminal: false },
+    // gate scoreboard (browser-only for now)
     { id: "console", title: "Console", accent: "acc", terminal: true },
     { id: "terminal", title: "Terminal", accent: "acc", terminal: true }
   ];
@@ -517,6 +528,11 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("section", { "data-tab": "quality" }, /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "quality ", /* @__PURE__ */ h("span", { id: "qmeta", class: "muted" })), /* @__PURE__ */ h("div", { class: "row" }, /* @__PURE__ */ h("label", null, "dir"), /* @__PURE__ */ h("input", { type: "text", id: "qdir", placeholder: "/path/to/project" }), /* @__PURE__ */ h("button", { class: "ghost", id: "qbtn" }, "scan")), /* @__PURE__ */ h("pre", { id: "quality", class: "muted" }, "enter a dir + scan to see file-size / complexity / duplication findings.")));
   }
 
+  // src/ui/app/components/panels/ChecksPanel.tsx
+  function ChecksPanel() {
+    return /* @__PURE__ */ h("section", { "data-tab": "checks" }, /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "checks ", /* @__PURE__ */ h("span", { id: "checksmeta", class: "muted" })), /* @__PURE__ */ h("div", { id: "checks-body", class: "muted" }, "loading gate scoreboard\u2026")));
+  }
+
   // src/ui/app/components/chrome/ScanFrame.tsx
   function ScanFrame(props) {
     return /* @__PURE__ */ h("div", { class: "scanframe", style: props.accent ? `--frame:${props.accent}` : void 0 }, /* @__PURE__ */ h("div", { class: "sf-elbow" }), /* @__PURE__ */ h("div", { class: "sf-title" }, props.title), /* @__PURE__ */ h("div", { class: "sf-body" }, props.children));
@@ -571,35 +587,6 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   // src/ui/app/components/items/Turn.tsx
   function Turn({ t }) {
     return /* @__PURE__ */ h("div", { class: "turn " + (t.role === "user" ? "user" : "") }, /* @__PURE__ */ h("div", { class: "thead" }, `${t.role}${t.model ? " \xB7 " + t.model : ""} \xB7 step ${t.step}`), t.text && /* @__PURE__ */ h("div", { class: "txt" }, t.text), (t.toolCalls || []).map((c) => /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, "\u2192 " + c.name), /* @__PURE__ */ h("pre", null, typeof c.input === "string" ? c.input : JSON.stringify(c.input, null, 2)))), (t.toolResults || []).map((r) => /* @__PURE__ */ h("details", { class: r.ok ? "ok" : "err" }, /* @__PURE__ */ h("summary", null, (r.ok ? "\u2713 " : "\u2717 ") + r.name), /* @__PURE__ */ h("pre", null, r.content))));
-  }
-
-  // src/ui/app/components/viz/NodeGraph.tsx
-  function NodeGraph(props) {
-    const dag = props.nodes.map((n) => ({ id: n.id, deps: n.deps }));
-    const compact = props.compact === true;
-    const nodeW = compact ? 88 : 110;
-    const l = layoutDag(dag, compact ? { colGap: 98, rowGap: 56, pad: 24 } : {});
-    const pos = new Map(l.nodes.map((n) => [n.id, n]));
-    const spec = new Map(props.nodes.map((n) => [n.id, n]));
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", `0 0 ${l.width} ${l.height}`);
-    svg.setAttribute("width", String(l.width));
-    svg.setAttribute("height", String(l.height));
-    svg.setAttribute("class", "nodegraph");
-    if (props.id) svg.id = props.id;
-    const edges = l.edges.map(({ from, to }) => {
-      const a = pos.get(from);
-      const b = pos.get(to);
-      const midX = (a.x + b.x) / 2 + nodeW / 2;
-      return `<path class="ng-edge" data-from="${esc(from)}" data-to="${esc(to)}" d="M ${a.x + nodeW} ${a.y + 16} C ${midX} ${a.y + 16}, ${midX} ${b.y + 16}, ${b.x} ${b.y + 16}" pathLength="1"/>`;
-    }).join("");
-    const nodes = l.nodes.map((n) => {
-      const s = spec.get(n.id);
-      const w = Math.round(8 + (s.weight ?? 0) * 10);
-      return `<g class="ng-node ${s.state ?? "idle"}" data-node="${esc(n.id)}" transform="translate(${n.x},${n.y})"><title>${esc(s.title ?? s.label)}</title><rect rx="16" width="${nodeW}" height="32" stroke-width="${(s.weight ?? 0) > 0.6 ? 2.5 : 1.5}"/><circle class="ng-lamp" cx="${compact ? 12 : 16}" cy="16" r="${Math.min(6, w / 2)}"/><text x="${compact ? 24 : 30}" y="21">${esc(s.label.slice(0, compact ? 9 : 12))}</text></g>`;
-    }).join("");
-    svg.innerHTML = edges + nodes;
-    return /* @__PURE__ */ h("div", { class: "nodegraph-wrap" }, svg);
   }
 
   // engine/render-dom/src/svg-painter.ts
@@ -702,6 +689,22 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     }
   };
 
+  // src/ui/app/components/viz/Spark.tsx
+  function Spark(props) {
+    const w = props.width ?? 260;
+    const ht = props.height ?? 64;
+    const accent = props.accent ?? packed("acc");
+    const pts = props.points.length ? props.points : [0];
+    const p = new SvgPainter(w, ht);
+    sparkline(p, { rect: { x: 0, y: 6, w, h: ht - 16 }, points: pts, accent, area: true, strokeWidth: 2, tag: "spark-line", pathLength: 1 });
+    const max = Math.max(1e-9, ...pts);
+    const lastY = 6 + (ht - 16) - pts[pts.length - 1] / max * (ht - 16);
+    p.circle(w, lastY, 3, { fill: accent, tag: "spark-dot" });
+    const host = document.createElement("div");
+    host.innerHTML = p.toSvg();
+    return /* @__PURE__ */ h("div", { class: "spark-wrap" }, /* @__PURE__ */ h("div", { class: "spark-label" }, props.label), host.firstChild);
+  }
+
   // src/ui/app/components/viz/Gauge.tsx
   function Gauge(props) {
     const size = props.size ?? 96;
@@ -724,20 +727,81 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "gauge-wrap" }, host.firstChild, /* @__PURE__ */ h("div", { class: "gauge-label" }, props.label));
   }
 
-  // src/ui/app/components/viz/Spark.tsx
-  function Spark(props) {
-    const w = props.width ?? 260;
-    const ht = props.height ?? 64;
-    const accent = props.accent ?? packed("acc");
-    const pts = props.points.length ? props.points : [0];
-    const p = new SvgPainter(w, ht);
-    sparkline(p, { rect: { x: 0, y: 6, w, h: ht - 16 }, points: pts, accent, area: true, strokeWidth: 2, tag: "spark-line", pathLength: 1 });
-    const max = Math.max(1e-9, ...pts);
-    const lastY = 6 + (ht - 16) - pts[pts.length - 1] / max * (ht - 16);
-    p.circle(w, lastY, 3, { fill: accent, tag: "spark-dot" });
-    const host = document.createElement("div");
-    host.innerHTML = p.toSvg();
-    return /* @__PURE__ */ h("div", { class: "spark-wrap" }, /* @__PURE__ */ h("div", { class: "spark-label" }, props.label), host.firstChild);
+  // src/ui/app/checks-tab.tsx
+  var $2 = (id) => document.getElementById(id);
+  var ring = (v) => Math.min(v, 0.999);
+  function lamp(ok, label, value) {
+    const tone = ok ? "ok" : "err";
+    return /* @__PURE__ */ h("div", { class: "lamp", style: `border-left-color:var(--${tone})` }, /* @__PURE__ */ h("span", { style: `color:var(--${tone})` }, ok ? "\u2713" : "\u2717"), " ", label, " ", /* @__PURE__ */ h("span", { class: "muted" }, value));
+  }
+  function lampAbsent(label, hint) {
+    return /* @__PURE__ */ h("div", { class: "lamp", style: "border-left-color:var(--line)" }, /* @__PURE__ */ h("span", { class: "muted" }, "\u2014"), " ", label, " ", /* @__PURE__ */ h("span", { class: "muted" }, hint));
+  }
+  function gateLamps(d) {
+    const cov = d.coverage;
+    return /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("h3", null, "gates"), lamp(d.quality.errors === 0, "quality --strict", `${d.quality.errors} err / ${d.quality.warns} warn`), lamp(
+      d.pyramid.violations === 0,
+      "pyramid model",
+      `${d.pyramid.violations} violation(s) \xB7 ${d.pyramid.features} pyramids on ${d.pyramid.shared} shared / ${d.pyramid.glue} glue`
+    ), lamp(d.cycles === 0, "dir cycles", String(d.cycles)), lamp(d.quality.docBacklog === 0, "doc backlog (pre-ratchet)", `${d.quality.docBacklog} undocumented`), cov ? lamp(
+      cov.statements >= 90 && cov.branches >= 90,
+      "coverage floors",
+      `${cov.statements}% stmts \xB7 ${cov.branches}% branch \xB7 ${cov.functions}% fn`
+    ) : lampAbsent("coverage", "no artifact \u2014 run npm run coverage"));
+  }
+  function trendColumn(d) {
+    const maxCrowd = Math.max(1, ...d.crowding.map((c) => c.files));
+    const last = d.evalHistory[d.evalHistory.length - 1];
+    return /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("h3", null, "crowded dirs (over the file cap)"), d.crowding.length ? d.crowding.map((c) => /* @__PURE__ */ h("div", { class: "checks-bar-row" }, /* @__PURE__ */ h("span", { class: "checks-bar-label" }, c.dir), /* @__PURE__ */ h("div", { class: "checks-bar", style: `width:${Math.round(c.files / maxCrowd * 100)}%` }), /* @__PURE__ */ h("span", { class: "muted" }, c.files))) : /* @__PURE__ */ h("div", { class: "muted" }, "none \u2014 every dir under the cap"), /* @__PURE__ */ h("h3", { style: "margin-top:14px" }, "fixture eval \u2014 pass rate per run"), d.evalHistory.length ? /* @__PURE__ */ h(
+      Spark,
+      {
+        points: d.evalHistory.map((e) => e.ratio),
+        label: `last ${d.evalHistory.length} runs \xB7 latest ${Math.round((last?.ratio ?? 0) * 100)}%`,
+        accent: packed("ok")
+      }
+    ) : /* @__PURE__ */ h("div", { class: "muted" }, "no improvement-log yet"));
+  }
+  async function loadChecks() {
+    const body = $2("checks-body");
+    const d = await fetch("/checks").then((r) => r.ok ? r.json() : null).catch(() => null);
+    if (!d) {
+      body.textContent = "checks endpoint unavailable";
+      return;
+    }
+    $2("checksmeta").textContent = `${d.quality.files} files \xB7 ${d.quality.functions} functions`;
+    body.classList.remove("muted");
+    body.replaceChildren(
+      /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "checks-gauges" }, /* @__PURE__ */ h(Gauge, { value: ring(d.quality.grade / 100), label: `quality ${d.quality.grade}/100`, accent: packed("ok") }), /* @__PURE__ */ h(Gauge, { value: ring(d.pyramid.score / 100), label: `pyramid ${d.pyramid.score}/100`, accent: packed("acc") }), d.coverage ? /* @__PURE__ */ h(Gauge, { value: ring(d.coverage.statements / 100), label: "coverage (stmts)", accent: packed("mag") }) : null), /* @__PURE__ */ h("div", { class: "checks-cols" }, gateLamps(d), trendColumn(d)))
+    );
+  }
+
+  // src/ui/app/components/viz/NodeGraph.tsx
+  function NodeGraph(props) {
+    const dag = props.nodes.map((n) => ({ id: n.id, deps: n.deps }));
+    const compact = props.compact === true;
+    const nodeW = compact ? 88 : 110;
+    const l = layoutDag(dag, compact ? { colGap: 98, rowGap: 56, pad: 24 } : {});
+    const pos = new Map(l.nodes.map((n) => [n.id, n]));
+    const spec = new Map(props.nodes.map((n) => [n.id, n]));
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${l.width} ${l.height}`);
+    svg.setAttribute("width", String(l.width));
+    svg.setAttribute("height", String(l.height));
+    svg.setAttribute("class", "nodegraph");
+    if (props.id) svg.id = props.id;
+    const edges = l.edges.map(({ from, to }) => {
+      const a = pos.get(from);
+      const b = pos.get(to);
+      const midX = (a.x + b.x) / 2 + nodeW / 2;
+      return `<path class="ng-edge" data-from="${esc(from)}" data-to="${esc(to)}" d="M ${a.x + nodeW} ${a.y + 16} C ${midX} ${a.y + 16}, ${midX} ${b.y + 16}, ${b.x} ${b.y + 16}" pathLength="1"/>`;
+    }).join("");
+    const nodes = l.nodes.map((n) => {
+      const s = spec.get(n.id);
+      const w = Math.round(8 + (s.weight ?? 0) * 10);
+      return `<g class="ng-node ${s.state ?? "idle"}" data-node="${esc(n.id)}" transform="translate(${n.x},${n.y})"><title>${esc(s.title ?? s.label)}</title><rect rx="16" width="${nodeW}" height="32" stroke-width="${(s.weight ?? 0) > 0.6 ? 2.5 : 1.5}"/><circle class="ng-lamp" cx="${compact ? 12 : 16}" cy="16" r="${Math.min(6, w / 2)}"/><text x="${compact ? 24 : 30}" y="21">${esc(s.label.slice(0, compact ? 9 : 12))}</text></g>`;
+    }).join("");
+    svg.innerHTML = edges + nodes;
+    return /* @__PURE__ */ h("div", { class: "nodegraph-wrap" }, svg);
   }
 
   // src/observe/constellation.ts
@@ -994,7 +1058,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   applyPalette();
   mount(
     document.getElementById("app"),
-    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
+    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ChecksPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
   );
   try {
     mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "dark" });
@@ -1009,6 +1073,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     if (go === "projects") loadProjects();
     if (go === "runs") loadRuns();
     if (go === "docs") loadWiki();
+    if (go === "checks") loadChecks();
     if (go === "terminal") {
       loadTerminal();
       terminalActivated();

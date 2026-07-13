@@ -230,6 +230,25 @@ async function handleWikiRaw(url: string, res: ServerResponse): Promise<boolean>
   return true;
 }
 
+/** The analysis GETs (/quality scan, /checks gate scoreboard) — split from
+ *  handleGet to keep the dispatcher under the complexity bar. True = handled. */
+async function handleAnalysis(url: string, query: URLSearchParams, res: ServerResponse): Promise<boolean> {
+  if (url === '/quality') {
+    const dir = query.get('dir');
+    if (!dir) CTX.sendJson(res, 400, { error: 'dir query param required' });
+    else CTX.sendJson(res, 200, await scanProject(resolve(dir)));
+    return true;
+  }
+  if (url === '/checks') {
+    // Gate scoreboard for the Checks tab: cheap gates run live, heavy ones read
+    // from artifacts. Defaults to the daemon's own cwd (the repo it serves).
+    const { collectChecks } = await import('./checks.js');
+    CTX.sendJson(res, 200, await collectChecks(query.get('dir') ?? '.'));
+    return true;
+  }
+  return false;
+}
+
 /** GET routes. */
 async function handleGet(
   url: string,
@@ -254,11 +273,7 @@ async function handleGet(
     if (!dir) return CTX.sendJson(res, 400, { error: 'dir query param required' });
     return streamEvents(dir, res, req);
   }
-  if (url === '/quality') {
-    const dir = query.get('dir');
-    if (!dir) return CTX.sendJson(res, 400, { error: 'dir query param required' });
-    return CTX.sendJson(res, 200, await scanProject(resolve(dir)));
-  }
+  if (await handleAnalysis(url, query, res)) return;
   if (url === '/ops') {
     const { LAUNCH_OPS } = await import('../observe/launch.js');
     return CTX.sendJson(res, 200, { ops: LAUNCH_OPS });

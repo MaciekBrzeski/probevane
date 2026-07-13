@@ -227,3 +227,12 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation:none !important; transition:none !important; }
 }
+
+/* --- checks tab: gate scoreboard --- */
+.checks-gauges { display:flex; gap:22px; margin:8px 0 14px; }
+.checks-cols { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+.checks-cols h3 { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 8px; }
+.lamp { border-left:3px solid var(--line); padding:4px 8px; margin-bottom:6px; background:var(--panel); }
+.checks-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.checks-bar-label { min-width:170px; color:var(--fg); }
+.checks-bar { height:10px; background:var(--acc); border-radius:2px; min-width:2px; box-shadow:0 0 6px var(--acc); }
