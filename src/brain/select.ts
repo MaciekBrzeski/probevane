@@ -33,6 +33,9 @@ function resolveBrain(model?: string): Brain {
   return anthropicBrain(model && model !== 'auto' ? (ALIAS[model] ?? model) : undefined);
 }
 
+/** Public entry: resolve --model to a Brain. `replay:` takes precedence over
+ *  everything (offline, deterministic); PROBEVANE_RECORD wraps any live brain
+ *  so a paid run can later be replayed for free. */
 export function brainFor(model?: string): Brain {
   if (model?.startsWith('replay:')) return replayBrain(model.slice('replay:'.length));
   const brain = resolveBrain(model);

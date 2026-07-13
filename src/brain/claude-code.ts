@@ -22,6 +22,10 @@ const CONTRACT = [
   'Do NOT execute tools yourself, do NOT read or write files — only emit the JSON decision.',
 ].join('\n');
 
+/** Brain over headless `claude -p`: renders the whole turn as one prompt,
+ *  parses the JSON decision back out, and threads the CLI's reported
+ *  usage/cost into the ledger. PROBEVANE_CC_SUBSCRIPTION=1 strips the API key
+ *  so the CLI bills the Max subscription instead. */
 export function claudeCodeBrain(model?: string): Brain {
   return {
     id: 'claude-code',
@@ -54,6 +58,9 @@ export function claudeCodeBrain(model?: string): Brain {
   };
 }
 
+/** Flatten a BrainRequest into one text prompt: contract, system, tool
+ *  schemas, transcript as labelled sections — the CLI has no native tool-use
+ *  API, so everything the Messages API carries structurally goes in as text. */
 function buildPrompt(req: BrainRequest): string {
   const tools = req.tools
     .map((t: ToolSpec) => `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.inputSchema)}`)
@@ -68,6 +75,8 @@ function buildPrompt(req: BrainRequest): string {
   ].join('\n');
 }
 
+/** Render one transcript Msg as plain text (ASSISTANT/USER lines with CALL /
+ *  RESULT markers) so the CLI model can read the tool history it never ran. */
 function renderMsg(m: Msg): string {
   if (m.role === 'assistant') {
     const calls = (m.toolCalls ?? []).map((c) => `CALL ${c.name}(${JSON.stringify(c.input)})`).join('\n');
@@ -97,6 +106,9 @@ export function extractJson(text: string): any | null {
   );
 }
 
+/** execFile wrapper: prompt fed via stdin (avoids argv length limits), big
+ *  maxBuffer for long transcripts, rejects with stderr attached so CLI
+ *  failures stay diagnosable. */
 function run(cmd: string, args: string[], input: string, env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(

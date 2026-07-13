@@ -18,6 +18,10 @@ const DIR = process.env.PROBEVANE_BRIDGE_DIR ?? statePath('bridge');
 const POLL_MS = Number(process.env.PROBEVANE_BRIDGE_POLL_MS ?? 1000);
 const TIMEOUT_MS = Number(process.env.PROBEVANE_BRIDGE_TIMEOUT_MS ?? 900_000);
 
+/** The $0 brain: each complete() writes the exact API-shaped request to
+ *  req-<pid>-<seq>.json and blocks until the host session writes the matching
+ *  res file. pid+seq keys mean concurrent runs share one queue without
+ *  collisions; both files are deleted after use so the queue self-cleans. */
 export function bridgeBrain(): Brain {
   let seq = 0;
   const pid = process.pid; // unique per process → no req/res collision when runs are concurrent
@@ -46,6 +50,9 @@ export function bridgeBrain(): Brain {
   };
 }
 
+/** Wait for the host to write resPath: re-check every POLL_MS, tolerate a
+ *  half-written file (parse failure → retry next tick), give up after
+ *  TIMEOUT_MS so an abandoned host can't hang the loop forever. */
 function poll(resPath: string): Promise<any> {
   const start = Date.now();
   return new Promise((resolve, reject) => {
@@ -61,6 +68,9 @@ function poll(resPath: string): Promise<any> {
   });
 }
 
+/** Normalize the host's loose response JSON into a BrainResponse: drop
+ *  malformed tool calls, synthesize ids, infer stop reason from call count,
+ *  and prefer host-reported usage/cost over our heuristic estimates. */
 export function toResponse(res: any, estimatedInput = 0): BrainResponse {
   const calls: ToolCall[] = Array.isArray(res?.tool_calls)
     ? res.tool_calls

@@ -119,6 +119,10 @@ function callApi(client: Anthropic, body: any, req: BrainRequest): Promise<Brain
   );
 }
 
+/** The default Brain: one SDK client, each complete() a cached+limited+retried
+ *  streaming Messages call. Construction is cheap and does NOT check the key —
+ *  that happens on first use (buildRequestBody), so a $0/local run can hold a
+ *  never-invoked takeover brain without ANTHROPIC_API_KEY set. */
 export function anthropicBrain(model = DEFAULT_MODEL): Brain {
   const client = new Anthropic(); // reads ANTHROPIC_API_KEY
   return {
@@ -142,6 +146,9 @@ export function withCacheBreakpoint(am: any): any {
   return { ...am, content };
 }
 
+/** Convert a loop Msg to Anthropic content blocks: assistant → text + tool_use,
+ *  user → tool_result(s) + text. Falls back to plain-string content when empty
+ *  so the API never sees an empty block array. */
 export function toApiMsg(m: Msg): any {
   const content: any[] = [];
   if (m.role === 'assistant') {
@@ -161,6 +168,9 @@ export function toApiMsg(m: Msg): any {
   return { role: m.role, content: content.length ? content : (m.text ?? '') };
 }
 
+/** Map an API message back to the loop's BrainResponse: concatenated text,
+ *  tool calls, normalized stop reason, and usage incl. cache read/write so the
+ *  cost ledger can price cached turns correctly. */
 export function fromApi(resp: any): BrainResponse {
   let text = '';
   const toolCalls: ToolCall[] = [];

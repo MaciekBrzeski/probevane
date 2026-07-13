@@ -7,8 +7,11 @@
 export class Limiter {
   private active = 0;
   private queue: Array<() => void> = [];
+  /** max = how many run() calls may be in flight at once (Infinity = off). */
   constructor(private max: number) {}
 
+  /** Run fn under the cap: park on the queue while at capacity; always
+   *  releases the slot (and wakes the next waiter) even when fn throws. */
   async run<T>(fn: () => Promise<T>): Promise<T> {
     if (this.active >= this.max) await new Promise<void>((r) => this.queue.push(r));
     this.active++;
