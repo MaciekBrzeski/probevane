@@ -6,11 +6,17 @@ command init
   summary Detect the stack and install test deps + config.
   usage probevane init <dir>
   example probevane init ./my-app
+  dir
+  handler init#run
 
 command plan
   summary Read-only action plan ($0, no LLM) — untested targets + coverage gaps + source-quality errors + MFE standards errors → a prioritized generate/refactor/fix/mfe-fix to-do list. The map before pointing the loop at a repo.
   usage probevane plan <dir> [--kind unit|e2e] [--json]
   example probevane plan ./app
+  dir
+  flag --kind str = unit "unit|e2e"
+  flag --json bool "machine output"
+  handler plan-cmd#run
 
 command plan-feature
   summary Feature planner — a LOCAL model fills in the middle: give it the CURRENT state and DESIRED state and it writes the detailed, ordered steps between them. Fill-in-the-middle (prefix=current, suffix=desired) when the model supports it, chat framing otherwise.
@@ -86,6 +92,8 @@ command mock
   summary Synthesize the mock boundary (MSW handlers, fixtures, contracts) from the module graph.
   usage probevane mock <dir>
   example probevane mock ./app
+  dir
+  handler mock#run
 
 command graph
   summary Render the module dependency graph (ASCII tree + Mermaid).
@@ -129,6 +137,8 @@ command status
   summary Quick dashboard: adapter, suite result, coverage.
   usage probevane status <dir>
   example probevane status ./app
+  dir
+  handler status#run
 
 command learn
   summary Save a spec to the cross-project learning library.
@@ -224,6 +234,9 @@ command assert-score
   summary Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation).
   usage probevane assert-score <dir> [--json]
   example probevane assert-score ./app
+  dir
+  flag --json bool "machine output"
+  handler assert-score#run
 
 command simcost
   summary Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger.
