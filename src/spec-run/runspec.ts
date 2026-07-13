@@ -11,6 +11,7 @@ import { LAUNCH_OPS, type LaunchPlan } from '../observe/launch.js';
 // fill-modes (interactive answers OR a policy file), one consumer.
 
 export const SPEC_PATHS = ['write_tests', 'feature', 'refactor', 'repair', 'fix', 'migrate', 'document'] as const;
+/** One of SPEC_PATHS — the task path a spec routes to. */
 export type SpecPath = (typeof SPEC_PATHS)[number];
 
 // Which CLI op each path dispatches to (write_tests → generate; the rest are 1:1).
@@ -19,6 +20,8 @@ export const PATH_OP: Record<SpecPath, string> = {
   repair: 'repair', fix: 'fix', migrate: 'migrate', document: 'document',
 };
 
+/** Accept floors for a dark run — intake defaults fill them for write_tests;
+ *  the task paths leave them empty. */
 export interface Acceptance {
   minTests?: number;
   minCoverage?: number;
@@ -28,6 +31,8 @@ export interface Acceptance {
   shellChecks?: string[];
 }
 
+/** The frozen run specification — built by intake/resolveSpec, persisted under
+ *  <state>/specs/, executed via specToLaunchPlan. */
 export interface RunSpec {
   id: string;
   prompt: string; // the original NL prompt this spec was distilled from
@@ -69,6 +74,7 @@ export function validateRunSpec(spec: unknown): string[] {
   return errs;
 }
 
+// Emit `name <value>` only when the value is set — keeps the argv free of "undefined".
 const numFlag = (flags: string[], name: string, v?: number) => {
   if (v !== undefined) flags.push(name, String(v));
 };

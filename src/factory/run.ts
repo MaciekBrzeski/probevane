@@ -35,6 +35,8 @@ export interface FactoryOpts {
   log: (l: string) => void;
 }
 
+/** Spawn one repo's `generate` as a child process with its own PROBEVANE_STATE —
+ *  true state isolation + crash containment; output is tag-prefixed into the log. */
 function runChild(opts: FactoryOpts, repo: string, stateDir: string, reportPath: string): Promise<number> {
   return new Promise((res) => {
     const child = spawn(
@@ -160,6 +162,8 @@ async function revertErrored(
   }
 }
 
+/** One repo end-to-end: isolated state dir → gated run (with retry) → measure +
+ *  ship on accept, revert on error. Always resolves to a report row. */
 async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepoResult> {
   const dir = resolve(repo);
   const stateDir = join(opts.stateRoot, slug(repo));
@@ -192,6 +196,9 @@ async function processRepo(repo: string, opts: FactoryOpts): Promise<FactoryRepo
   return base;
 }
 
+/** Fleet entry point: pool the repos at the given concurrency (carrying --resume'd
+ *  accepts instead of re-running them), aggregate the rows, then check cross-repo
+ *  MFE shared-version alignment. */
 export async function runFactory(opts: FactoryOpts): Promise<FactoryReport> {
   const priorByRepo = new Map((opts.prior?.results ?? []).map((r) => [r.repo, r] as const));
   const results = await runPool(

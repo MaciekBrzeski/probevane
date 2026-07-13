@@ -14,6 +14,7 @@ export interface CheckpointOpts {
   fullPage?: boolean;
 }
 
+/** Snapshot the page as `name` and diff against the stored baseline (first run writes it). */
 export async function checkpoint(page: Page, name: string, opts: CheckpointOpts = {}): Promise<void> {
   // Best-effort settle — a short bounded wait, so a page holding an open
   // connection (SSE/websocket) never reaches "networkidle" and doesn't hang.
