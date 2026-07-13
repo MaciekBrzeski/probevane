@@ -1,0 +1,2 @@
+[probevane] audit: 1 file(s), 0 error(s), 0 warn(s), score 5/5
+exit=0

@@ -1,0 +1,15 @@
+[probevane] 1 modules (1 component); 0 touch the network
+
+🧩 App.tsx
+
+--- Mermaid (paste into the wiki / GitHub, or pass --mermaid <file>) ---
+
+```mermaid
+graph TD
+  src_App_tsx["App.tsx (component)"]:::component
+  classDef fetcher fill:#fde2e2,stroke:#c0392b;
+  classDef hook fill:#e2ecfd,stroke:#2b6cb0;
+  classDef component fill:#e6f7e6,stroke:#27ae60;
+  classDef util fill:#f0f0f0,stroke:#888;
+```
+exit=0

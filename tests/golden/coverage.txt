@@ -1,0 +1,2 @@
+[probevane] coverage statements=92.85% branches=80% functions=55.55% lines=92.85%
+exit=0

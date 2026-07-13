@@ -39,8 +39,6 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
 | `arch` | Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits. --snapshot persists the coupling metrics (docs/arch-snapshot.json) and prints drift vs the previous snapshot — commit it to make coupling regressions visible over time. --pyramid scores the tree against the pyramid structure model (isolated feature pyramids on a glue base, shared dirs as the common floor): dir roles inferred from coupling, declared durably in probevane.config (arch: { glue, shared, feature }) or per-run via --glue/--shared/--feature (flag > config > heuristic); flags feature→feature, feature→glue, shared→feature and glue deep-reach imports with per-violation fix cost, 0-100 score; appends the folder-crowding check — dirs over --max-files (config arch.maxFiles, default 15) get subfolder candidates (>=3 same-prefix files) and move suggestions for zero-cohesion files (index/barrel + registry patterns suppressed). |
-| `visual` | The VISUAL task path — edit render/shader/material source to hit a visual goal. Acceptance oracle is render_gate, not test counts: screenshot the running app, a vision model judges it renders cleanly and matches the goal (adversarial majority via --vision-votes, optional perf budget via --perf-cmd), critique fed back into the loop until PASS; behavior_lock keeps the existing suite green. Start the dev server first and pass its URL. $0 vision via PROBEVANE_VISION_BASE (ollama) or claude with credits. |
-| `plan-feature` | Feature planner — give it the CURRENT state and the DESIRED state and a LOCAL model fills in the middle: the detailed, ordered steps between them. Literal fill-in-the-middle (prefix=current, suffix=desired) when the model supports FIM, chat framing otherwise (--mode auto|fim|chat). Default model from PROBEVANE_PLAN_MODEL (local:mk-coder:lora-v8). |
 | `design` | Combined design loop — write a Playwright spec that screenshots each page/tab, a vision model judges each shot for design practice, then rewrite the target html's <style> to address findings, and repeat. Leaves the spec as a visual-regression test. $0 vision via PROBEVANE_VISION_BASE (ollama cloud minimax-m3). |
 | `enqueue` | Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake. |
 | `scan` | Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon). |
@@ -151,7 +149,7 @@ probevane document <dir> [--only <path>] [--task "<focus>"] [--model …] [--for
 The VISUAL/graphics path: edit render/shader/material/geometry source to hit a visual goal. The existing test suite stays green (behavior_lock); the acceptance oracle is render_gate, NOT a test count — a running app is screenshotted and a vision model judges whether it renders cleanly AND matches the goal (+ optional perf budget), feeding its critique back into the loop until it passes. Start the dev server first and pass its URL. $0 vision via PROBEVANE_VISION_BASE (ollama) or claude with credits.
 
 ```bash
-probevane visual <dir> --url <running-app-url> --goal "<what to achieve>" [--reload "<cmd>"] [--perf-cmd "<cmd>"] [--selector <css>] [--vision-votes N] [--task "<hint>"] [--model …] [--only <path>] [--budget N]
+probevane visual <dir> --url <running-app-url> --goal "<what to achieve>" [--reload "<cmd>"] [--perf-cmd "<cmd>"] [--selector <css>] [--vision-votes N] [--settle <ms>] [--task "<hint>"] [--model …] [--only <path>] [--budget N]
 # e.g. probevane visual packages/render --url http://localhost:5173 --goal "creatures have visibly dense fur"
 ```
 
@@ -329,22 +327,6 @@ Experimental architecture critique — render the on-disk folder tree + module d
 ```bash
 probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d] [--feature e,f] [--max-files N]] [--snapshot [--out <file>]]
 # e.g. probevane arch . --pyramid
-```
-
-### visual
-The VISUAL task path — edit render/shader/material source to hit a visual goal. Acceptance oracle is render_gate, not test counts: screenshot the running app, a vision model judges it renders cleanly and matches the goal (adversarial majority via --vision-votes, optional perf budget via --perf-cmd), critique fed back into the loop until PASS; behavior_lock keeps the existing suite green. Start the dev server first and pass its URL. $0 vision via PROBEVANE_VISION_BASE (ollama) or claude with credits.
-
-```bash
-probevane visual <dir> --url <running-app-url> --goal "<what to achieve>" [--task "<hint>"] [--reload "<cmd>"] [--perf-cmd "<cmd>"] [--selector <css>] [--vision-votes N] [--settle <ms>] [--model …] [--budget N] [--only <path>]
-# e.g. probevane visual ./app --url http://localhost:5173 --goal "water renders with animated waves, no z-fighting"
-```
-
-### plan-feature
-Feature planner — give it the CURRENT state and the DESIRED state and a LOCAL model fills in the middle: the detailed, ordered steps between them. Literal fill-in-the-middle (prefix=current, suffix=desired) when the model supports FIM, chat framing otherwise (--mode auto|fim|chat). Default model from PROBEVANE_PLAN_MODEL (local:mk-coder:lora-v8).
-
-```bash
-probevane plan-feature --from "<current>" --to "<desired>" [--from-file f] [--to-file f] [--model local:<id>|ollama:<id>] [--mode auto|fim|chat] [--steps N] [--json] [--out f]
-# e.g. probevane plan-feature --from "todo app, no persistence" --to "todos survive reload via localStorage"
 ```
 
 ### design
