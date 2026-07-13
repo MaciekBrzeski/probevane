@@ -1,0 +1,186 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { parseVane } from '../src/vane/parse.js';
+import { validateVane } from '../src/vane/validate.js';
+import { formatVaneError, type CommandDecl, type AdapterDecl, type ProfileDecl } from '../src/vane/ast.js';
+import { loadVaneFile, loadCommands, loadAdapterManifest, clearVaneCache, vaneRoot } from '../src/vane/load.js';
+import { isGeneratedSource } from '../src/util/generated.js';
+
+/** Parse + assert zero errors — happy-path helper. */
+function parseOk(src: string) {
+  const { ast, errors } = parseVane(src, 'test.vane');
+  expect(errors).toEqual([]);
+  return ast;
+}
+
+describe('vane parse — command', () => {
+  const SRC = [
+    '# static gate',
+    'command mutation',
+    '  summary Full per-site mutation test — flips operators.',
+    '  usage probevane mutation <dir> [--budget N] [--all]',
+    '  example probevane mutation . --budget 60',
+    '  dir',
+    '  arg prompt str "the NL task"',
+    '  flag --budget int = 0 "cap mutants; 0 = no cap"',
+    '  flag --only list "path substrings"',
+    '  flag --mermaid str? "file; bare flag = default path"',
+    '  flag --json bool',
+    '  handler mutation#run',
+  ].join('\n');
+
+  it('parses every field of a full command decl', () => {
+    const [d] = parseOk(SRC).decls as CommandDecl[];
+    expect(d.kind).toBe('command');
+    expect(d.name).toBe('mutation');
+    expect(d.summary).toContain('mutation test — flips'); // unicode dash survives
+    expect(d.dir).toBe(true);
+    expect(d.args).toEqual([{ name: 'prompt', doc: 'the NL task', pos: { file: 'test.vane', line: 7 } }]);
+    expect(d.flags.map((f) => [f.name, f.type, f.def ?? null, f.doc])).toEqual([
+      ['budget', 'int', '0', 'cap mutants; 0 = no cap'],
+      ['only', 'list', null, 'path substrings'],
+      ['mermaid', 'str?', null, 'file; bare flag = default path'],
+      ['json', 'bool', null, ''],
+    ]);
+    expect(d.handler).toEqual({ module: 'mutation', export: 'run' });
+    expect(validateVane({ file: 'test.vane', decls: [d] })).toEqual([]);
+  });
+
+  it('catalog-only decl (no spec section) is valid', () => {
+    const ast = parseOk('command tui\n  summary Terminal dashboard.\n  usage probevane tui\n  example probevane tui\n');
+    expect(validateVane(ast)).toEqual([]);
+    expect((ast.decls[0] as CommandDecl).handler).toBeUndefined();
+  });
+});
+
+describe('vane parse — profile + alias', () => {
+  it('parses segments, conditionals, calls and aliases', () => {
+    const ast = parseOk([
+      'profile visual',
+      '  preamble unit',
+      '  safety-net behavior_lock',
+      '  if render: green-gates render_gate(render)',
+      '  harvest',
+      'profile repair',
+      '  preamble unit',
+      'alias fix = repair',
+    ].join('\n'));
+    const [visual] = ast.decls as ProfileDecl[];
+    expect(visual.segments.map((s) => s.id)).toEqual(['preamble', 'safety-net', 'green-gates', 'harvest']);
+    expect(visual.segments[2].cond).toBe('render');
+    expect(visual.segments[2].tokens).toEqual(['render_gate(render)']);
+    expect(validateVane(ast)).toEqual([]);
+  });
+
+  it('alias to unknown profile is a positioned error', () => {
+    const ast = parseOk('alias fix = ghost\n');
+    const errs = validateVane(ast);
+    expect(errs.length).toBe(1);
+    expect(formatVaneError(errs[0])).toBe("test.vane:1: alias 'fix' targets unknown profile 'ghost'");
+  });
+});
+
+describe('vane parse — adapter manifest', () => {
+  it('parses commands, patterns, audit-rules and a dedented guidance block', () => {
+    const ast = parseOk([
+      'adapter go-test',
+      '  command test-unit = go test ./...',
+      '  command lint = gofmt -l . || true',
+      '  patterns unit = go-unit-patterns.md',
+      '  audit-rules = go',
+      '  guidance unit:',
+      '    one <name>_test.go per source file, SAME package.',
+      '    table-driven tests with t.Run.',
+    ].join('\n'));
+    const [d] = ast.decls as AdapterDecl[];
+    expect(d.commands).toEqual({ 'test-unit': 'go test ./...', lint: 'gofmt -l . || true' });
+    expect(d.patterns).toEqual({ unit: 'go-unit-patterns.md' });
+    expect(d.auditRules).toBe('go');
+    expect(d.guidance.unit).toBe('one <name>_test.go per source file, SAME package.\ntable-driven tests with t.Run.');
+  });
+});
+
+describe('vane parse — error classes (all positioned)', () => {
+  const errsOf = (src: string) => {
+    const { ast, errors } = parseVane(src, 't.vane');
+    return [...errors, ...validateVane(ast)].map(formatVaneError);
+  };
+
+  it('tab indentation', () => {
+    expect(errsOf('command x\n\tsummary a')[0]).toContain('t.vane:2: tab in indentation');
+  });
+  it('unknown declaration keyword', () => {
+    expect(errsOf('comand x\n')[0]).toContain("t.vane:1: unknown declaration 'comand'");
+  });
+  it('unknown flag type', () => {
+    expect(errsOf('command x\n  flag --a strn "d"\n')[0]).toContain('t.vane:2: bad flag line');
+  });
+  it('duplicate names within a kind', () => {
+    const out = errsOf('command x\n  summary s\n  usage u\n  example e\ncommand x\n  summary s\n  usage u\n  example e\n');
+    expect(out[0]).toContain("t.vane:5: duplicate command 'x' (first at line 1)");
+  });
+  it('bad handler ref + missing catalog fields', () => {
+    const out = errsOf('command x\n  handler nope\n');
+    expect(out.some((e) => e.includes('t.vane:2: bad handler ref'))).toBe(true);
+    expect(out.some((e) => e.includes("missing summary"))).toBe(true);
+  });
+  it('bool flag with a default', () => {
+    const out = errsOf('command x\n  summary s\n  usage u\n  example e\n  dir\n  flag --a bool = 1 "d"\n');
+    expect(out[0]).toContain('t.vane:6: bool flag --a cannot take a default');
+  });
+  it('indented line outside any declaration', () => {
+    expect(errsOf('  stray\n')[0]).toContain('t.vane:1: unexpected indented line');
+  });
+});
+
+describe('vane load (via PROBEVANE_ROOT)', () => {
+  const saved = process.env.PROBEVANE_ROOT;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.PROBEVANE_ROOT;
+    else process.env.PROBEVANE_ROOT = saved;
+    clearVaneCache();
+  });
+
+  /** Temp package root with a vane/ dir. */
+  function mkRoot(commands: string): string {
+    const root = mkdtempSync(join(tmpdir(), 'pv-vane-'));
+    mkdirSync(join(root, 'vane', 'adapters'), { recursive: true });
+    writeFileSync(join(root, 'vane', 'commands.vane'), commands);
+    process.env.PROBEVANE_ROOT = root;
+    clearVaneCache();
+    return root;
+  }
+
+  it('loads commands from the resolved root and memoizes', () => {
+    const root = mkRoot('command a\n  summary s\n  usage u\n  example e\n');
+    expect(vaneRoot()).toBe(join(root, 'vane'));
+    expect(loadCommands().map((c) => c.name)).toEqual(['a']);
+    rmSync(root, { recursive: true, force: true });
+    expect(loadCommands().map((c) => c.name)).toEqual(['a']); // memo survives deletion
+  });
+
+  it('hard-throws with file:line on a broken file; missing adapter manifest is null', () => {
+    const root = mkRoot('comand broken\n');
+    expect(() => loadCommands()).toThrow(/vane\/commands\.vane:1: unknown declaration/);
+    expect(loadAdapterManifest('go-test')).toBeNull();
+    writeFileSync(join(root, 'vane', 'adapters', 'go-test.vane'), 'adapter go-test\n  bogus line\n');
+    expect(() => loadAdapterManifest('go-test')).toThrow(/go-test\.vane:2: unknown adapter field/);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('missing vane root names the path it tried', () => {
+    process.env.PROBEVANE_ROOT = '/nonexistent-root';
+    clearVaneCache();
+    expect(() => loadVaneFile('commands.vane')).toThrow(/cannot read \/nonexistent-root\/vane/);
+  });
+});
+
+describe('util/generated', () => {
+  it('detects the @generated first-line marker only', () => {
+    expect(isGeneratedSource('// @generated FROM vane/profiles.vane\nexport {}')).toBe(true);
+    expect(isGeneratedSource('export {} // @generated later is not line 1... actually same line')).toBe(true);
+    expect(isGeneratedSource('// hand-written\n// @generated on line 2 does not count')).toBe(false);
+  });
+});
