@@ -19,6 +19,9 @@ export const OLLAMA_DEFAULT_MODEL = 'kimi-k2.7-code';
 const MAX_RETRIES = 4;
 const TIMEOUT_MS = Number(process.env.PROBEVANE_HTTP_TIMEOUT_MS ?? 120_000);
 
+/** Build the /chat/completions body: tools as OpenAI function specs,
+ *  tool_choice auto, greedy decoding (see inline note) so gate-feedback
+ *  repair replays deterministically. */
 function buildBody(model: string, req: BrainRequest) {
   return {
     model,
@@ -57,6 +60,8 @@ async function attemptComplete(
   return fromApi(await res.json());
 }
 
+/** Full completion with retry: the body is built once (stable across
+ *  attempts), exponential backoff capped at 30s on transient statuses. */
 async function completeWith(baseUrl: string, key: string, model: string, req: BrainRequest): Promise<BrainResponse> {
   const body = buildBody(model, req);
   let lastErr: unknown;
@@ -84,6 +89,9 @@ function openaiWith(baseUrl: string, key: string, model: string): Brain {
   };
 }
 
+/** Brain for `local:`/`openai:` models — the env-configured OpenAI-compatible
+ *  server (default local Ollama). 'sk-local' is a placeholder key: local
+ *  servers usually ignore auth but the header must exist. */
 export function openaiCompatBrain(model: string): Brain {
   const baseUrl = process.env.PROBEVANE_BASE_URL ?? 'http://localhost:11434/v1';
   const key = process.env.PROBEVANE_API_KEY ?? process.env.OPENAI_API_KEY ?? 'sk-local';
@@ -157,6 +165,9 @@ export async function fimComplete(
   return text;
 }
 
+/** Convert the loop transcript to OpenAI chat shape: system message first,
+ *  assistant tool calls as function stubs with stringified args, tool results
+ *  split into individual `tool` messages (the format has no batched results). */
 export function toApiMessages(req: BrainRequest): any[] {
   const out: any[] = [{ role: 'system', content: req.system }];
   for (const m of req.messages) {
@@ -178,6 +189,9 @@ export function toApiMessages(req: BrainRequest): any[] {
   return out;
 }
 
+/** Map a chat-completions response to BrainResponse: tool-call args parsed
+ *  defensively, finish_reason normalized — presence of tool calls wins over a
+ *  'stop' label because some local servers mislabel tool turns. */
 export function fromApi(resp: any): BrainResponse {
   const choice = resp.choices?.[0] ?? {};
   const message = choice.message ?? {};
@@ -203,6 +217,8 @@ export function fromApi(resp: any): BrainResponse {
   };
 }
 
+/** Parse tool-call arguments defensively: local models emit invalid JSON
+ *  often enough that {} (a retryable empty input) beats throwing mid-turn. */
 function safeParse(s: unknown): Record<string, unknown> {
   if (typeof s !== 'string') return (s as any) ?? {};
   try {

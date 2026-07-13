@@ -23,6 +23,10 @@ export interface BrainRequest {
   onDelta?: (text: string) => void;
 }
 
+/** A pluggable LLM driver: `id`/`model` label the backend for the ledger and
+ *  logs; `complete()` turns one BrainRequest into one BrainResponse. Filled by
+ *  the factories in anthropic-sdk / claude-code / openai-compat / bridge /
+ *  replay; select.ts picks one from the --model string. */
 export interface Brain {
   id: string;
   model: string;
