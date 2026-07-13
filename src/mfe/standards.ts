@@ -9,6 +9,8 @@ import type { FederationConfig, SharedDep } from './federation.js';
 
 export const FRAMEWORKS = ['react', 'react-dom', 'vue', 'svelte', '@angular/core', 'solid-js', 'preact'];
 
+/** One standards finding — rule id + severity + message (+ file when it's
+ *  source-located). Emitted by the rule fns and versionAlign; rendered by formatMfe. */
 export interface MfeViolation {
   rule: 'boundary' | 'singleton' | 'shared-missing' | 'resilience' | 'contract' | 'version-align';
   severity: 'error' | 'warn';
@@ -16,6 +18,8 @@ export interface MfeViolation {
   file?: string;
 }
 
+/** Everything the pure audit needs about one repo — the scanner (scan.ts) fills it
+ *  from disk so the rules themselves stay I/O-free and unit-testable. */
 export interface MfeRepoInput {
   config: FederationConfig;
   pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
@@ -23,6 +27,8 @@ export interface MfeRepoInput {
   designSystem?: string; // optional DS package name to enforce non-deep imports
 }
 
+/** The per-repo audit result: violations plus error/warn counts and a 0..100 grade.
+ *  Produced by auditRepo, rolled up by the mfe driver. */
 export interface MfeAudit {
   name: string;
   isHost: boolean;
@@ -59,6 +65,7 @@ function boundaryViolation(i: MfeRepoInput, file: string, spec: string): MfeViol
   return null;
 }
 
+/** Apply the boundary check to every import spec in every source file. */
 function ruleBoundaries(i: MfeRepoInput): MfeViolation[] {
   const v: MfeViolation[] = [];
   for (const { file, source } of i.sources)
@@ -137,6 +144,8 @@ export function auditRepo(input: MfeRepoInput): MfeAudit {
   };
 }
 
+/** One repo's shared map + declared deps, the unit of the cross-repo alignment
+ *  pass. Collected from disk by collectRepoShared (scan.ts). */
 export interface RepoShared {
   name: string;
   shared: Record<string, SharedDep>;
@@ -165,6 +174,7 @@ export function versionAlign(repos: RepoShared[]): MfeViolation[] {
   return v;
 }
 
+/** Violations → one line each, the text block used in reports and fix-task prompts. */
 export function formatMfe(violations: MfeViolation[]): string {
   return violations
     .map((x) => `${x.file ? x.file + ': ' : ''}${x.severity}: [${x.rule}] ${x.message}`)

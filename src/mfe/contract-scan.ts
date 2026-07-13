@@ -18,10 +18,12 @@ import {
 
 const CONTRACT_DIR = join('tests', 'contract'); // where generated tests land
 
+/** kebab/snake key → PascalCase, for contract type names (cart-widget → CartWidget). */
 function pascal(s: string): string {
   return s.replace(/(^|[-_])([a-z])/g, (_, __, c) => c.toUpperCase());
 }
 
+/** stat-based existence check — never throws, a missing path is just false. */
 async function exists(p: string): Promise<boolean> {
   return !!(await stat(p).catch(() => null));
 }
@@ -43,11 +45,15 @@ async function resolveContract(
   return undefined;
 }
 
+/** The planned contract-test output: files to write + human-facing notes (missing
+ *  types, skipped hosts). Filled by planContracts, consumed by the driver/CLI. */
 export interface ContractPlan {
   files: { path: string; content: string; typed: boolean }[];
   notes: string[];
 }
 
+/** Plan the repo's contract tests: one remote-side test per expose, host-side tests
+ *  per remote with @mf-types; null when the repo has no federation config. */
 export async function planContracts(dir: string): Promise<ContractPlan | null> {
   const config = await readFederation(dir);
   if (!config) return null;

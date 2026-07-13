@@ -9,6 +9,9 @@ export interface SharedDep {
   version?: string; // requiredVersion / version if declared
 }
 
+/** The extracted federation shape of one repo — name, remotes it consumes, modules
+ *  it exposes, deps it shares. Filled by parseFederation (text heuristics only),
+ *  consumed by the standards rules + contract planner. */
 export interface FederationConfig {
   name: string;
   remotes: string[]; // remote names the host consumes
@@ -60,6 +63,7 @@ function arrayEntries(block: string): string[] {
   return [...block.matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]);
 }
 
+/** exposes object block → exposed key → source path; non-object forms yield {}. */
 function parseExposes(block: string): Record<string, string> {
   const out: Record<string, string> = {};
   if (!block.startsWith('{')) return out;
@@ -67,6 +71,9 @@ function parseExposes(block: string): Record<string, string> {
   return out;
 }
 
+/** shared block → dep → { singleton, version }. Handles both federation forms:
+ *  array shorthand (shared but never singleton) and object form (nested config
+ *  or a bare version string). */
 function parseShared(block: string): Record<string, SharedDep> {
   const out: Record<string, SharedDep> = {};
   if (!block) return out;
