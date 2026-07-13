@@ -5,8 +5,12 @@
 // a terminal failure leaves the blockers red. Renderer-agnostic (SVG or ANSI).
 
 export type LampState = 'idle' | 'active' | 'ok' | 'err';
+/** rune name → lamp state: the whole light show. Consoles start it empty;
+ *  pipelineReducer() advances it one event at a time. */
 export type PipelineState = Record<string, LampState>;
 
+/** The slice of a run event the reducer reacts to — mapped from loop events by
+ *  the browser console and the terminal TUI. */
 export interface PipelineEvent {
   tool?: string;
   gate?: string; // the rune that BLOCKED this step

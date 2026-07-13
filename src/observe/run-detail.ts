@@ -17,6 +17,8 @@ export function pageRuns(records: RunRecord[], limit = 50, offset = 0): RunsPage
   return { total: sorted.length, runs: sorted.slice(start, end) };
 }
 
+/** One loop step condensed for the run timeline — filled by summarizeEvents()
+ *  from that step's events. */
 export interface TimelineStep {
   step: number;
   tool?: string;
@@ -24,6 +26,8 @@ export interface TimelineStep {
   editedFiles?: string[];
 }
 
+/** A run's event stream rolled up — totals, distinct block reasons, step
+ *  timeline. Built by summarizeEvents() for the detail view. */
 export interface EventsSummary {
   steps: number;
   toolCalls: number;
@@ -61,6 +65,8 @@ export function summarizeEvents(events: LoopEvent[]): EventsSummary {
   return summary;
 }
 
+/** Everything the per-run detail view shows — ledger record, diary, event
+ *  summary. Assembled by mergeRun(); any source may be missing mid-run. */
 export interface RunDetail {
   runId: string;
   record?: RunRecord;

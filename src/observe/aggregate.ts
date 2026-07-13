@@ -16,6 +16,8 @@ export interface DailyBucket {
   errors: number; // runs that stopped on error
 }
 
+/** Headline totals + per-day series over every discovered ledger — built by
+ *  aggregateOverTime(); the daemon serves it, the alerting core reads `daily`. */
 export interface OverTime {
   totals: LedgerSummary;
   daily: DailyBucket[]; // ascending by date

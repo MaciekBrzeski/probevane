@@ -17,16 +17,22 @@ export const LAUNCH_OPS = [
   'coverage',
   'impact',
 ] as const;
+/** An operation the daemon is allowed to spawn — derived from the LAUNCH_OPS allowlist. */
 export type LaunchOp = (typeof LAUNCH_OPS)[number];
 
+/** A validated, spawnable launch request — produced only by validateLaunch();
+ *  the daemon execs exactly this (arg array, no shell). */
 export interface LaunchPlan {
   op: LaunchOp;
   dir: string;
   flags: string[];
 }
 
+/** validateLaunch() outcome: a spawnable plan, or the reason the body was rejected. */
 export type LaunchResult = { ok: true; plan: LaunchPlan } | { ok: false; error: string };
 
+/** Gate a /run body before any spawn: allowlisted op, non-empty dir, no shell
+ *  metachars in flags — defense in depth on top of the shell-free spawn. */
 export function validateLaunch(body: unknown, allowed: readonly string[] = LAUNCH_OPS): LaunchResult {
   if (!body || typeof body !== 'object') return { ok: false, error: 'body must be a JSON object' };
   const b = body as Record<string, unknown>;

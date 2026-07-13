@@ -7,6 +7,8 @@ import type { DailyBucket } from './aggregate.js';
 
 export type AlertKind = 'cost_spike' | 'acceptance_drop' | 'error_burst';
 
+/** One fired alert — computed by computeAlerts() from the daily series; the
+ *  daemon surfaces it (dashboard, webhook, halt decision). */
 export interface Alert {
   kind: AlertKind;
   severity: 'warn' | 'error';
@@ -15,6 +17,7 @@ export interface Alert {
   threshold: number;
 }
 
+/** Alert thresholds — DEFAULT_ALERT_OPTS fills them; the daemon overrides from env. */
 export interface AlertOpts {
   /** Latest-day cost > spikeFactor × trailing-window avg fires a spike. */
   spikeFactor: number;

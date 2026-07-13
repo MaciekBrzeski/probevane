@@ -8,6 +8,7 @@ import { summarize, type RunRecord } from '../cost/ledger.js';
 
 // --- typed attribute values (OTLP wire shape) -----------------------------
 type AttrValue = { stringValue: string } | { intValue: string } | { doubleValue: number } | { boolValue: boolean };
+/** Wrap a JS primitive in the OTLP AnyValue wire shape (ints as strings, per spec). */
 function av(v: string | number | boolean): AttrValue {
   if (typeof v === 'boolean') return { boolValue: v };
   if (typeof v === 'number') return Number.isInteger(v) ? { intValue: String(v) } : { doubleValue: v };

@@ -5,6 +5,8 @@
 // a ranked hub list). One filtering rule, two renderers.
 
 export interface GraphNode { path: string; imports: string[]; fanIn: number; callsNetwork: boolean }
+/** One rendered constellation node — built by constellation() from a GraphNode;
+ *  weight/state drive the lamp styling in both renderers. */
 export interface ConstellationNode {
   id: string; label: string; title: string; deps: string[];
   weight: number; callsNetwork: boolean; state: 'idle' | 'active' | 'err';
@@ -13,6 +15,8 @@ export interface ConstellationNode {
 const POOL = 40, MAX = 24;
 const basename = (p: string): string => p.split('/').pop()!.replace(/\.[tj]sx?$/, '');
 
+/** Select the top fan-in hubs, drop nodes with no edge inside the kept set, and
+ *  grade each by relative fan-in — the one filtering rule both renderers share. */
 export function constellation(nodes: GraphNode[]): ConstellationNode[] {
   const pool = [...nodes].sort((a, b) => b.fanIn - a.fanIn).slice(0, POOL);
   const poolIds = new Set(pool.map((n) => n.path));
