@@ -91,6 +91,10 @@ command graph
   summary Render the module dependency graph (ASCII tree + Mermaid).
   usage probevane graph <dir> [--mermaid <file>]
   example probevane graph ./app --mermaid graph.md
+  dir
+  flag --mermaid str? "write Mermaid to file; bare flag = default path"
+  flag --full bool "disable hub-collapse on big graphs"
+  handler graph#run
 
 command search
   summary Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses); --similar --fns goes one level deeper and ranks FUNCTION pairs by doc-comment similarity (merge candidates — leans on the doc-comment quality rule for coverage; default threshold 0.9, report-only). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Indexes cached at .probevane/search-index.json + search-fn-index.json.
@@ -111,11 +115,15 @@ command coverage
   summary Report coverage via the adapter.
   usage probevane coverage <dir>
   example probevane coverage ./app
+  dir
+  handler coverage#run
 
 command audit
   summary Static quality gate over the spec files (exit 1 on errors).
   usage probevane audit <dir>
   example probevane audit ./app
+  dir
+  handler audit#run
 
 command status
   summary Quick dashboard: adapter, suite result, coverage.
