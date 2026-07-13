@@ -16,6 +16,7 @@ const PRICES: Record<string, { in: number; out: number }> = {
 };
 const CACHE_READ_FACTOR = 0.1;
 
+// Per-Mtoken rates for a model id (substring match); unknown/local/replay price at 0 = free.
 export function rateFor(model: string): { in: number; out: number } {
   for (const [k, v] of Object.entries(PRICES)) if (model.includes(k)) return v;
   return { in: 0, out: 0 }; // local:/replay/unknown → free

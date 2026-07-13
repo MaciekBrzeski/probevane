@@ -9,6 +9,7 @@ import { appendJsonl, readJsonl } from '../util/jsonl.js';
 // concurrent runs); path honors PROBEVANE_STATE for per-repo isolation.
 export const LEDGER_PATH = statePath('runs.jsonl');
 
+/** One ledger line — a finished run's tokens/cost/outcome; recordRun fills and appends it. */
 export interface RunRecord {
   ts: string;
   runId: string;
@@ -29,6 +30,7 @@ export interface RunRecord {
   durationMs?: number;
 }
 
+// Append one run to the ledger; prices from tokens unless the brain reported actual cost.
 export async function recordRun(rec: Omit<RunRecord, 'cost'>): Promise<void> {
   if (process.env.PROBEVANE_LEDGER === '0') return;
   const cost =
@@ -37,10 +39,12 @@ export async function recordRun(rec: Omit<RunRecord, 'cost'>): Promise<void> {
   await appendJsonl(LEDGER_PATH, full).catch(() => {}); // best-effort
 }
 
+// Every ledger line (readJsonl skips malformed ones).
 export async function readRuns(path = LEDGER_PATH): Promise<RunRecord[]> {
   return readJsonl<RunRecord>(path);
 }
 
+/** Headline rollup over ledger lines — summarize() fills it for `probevane history`. */
 export interface LedgerSummary {
   runs: number;
   totalCost: number;

@@ -14,6 +14,7 @@ import { stripToCode } from '../quality/analyze-detect.js';
 // are scanned line-by-line sequentially, so a one-slot memo strips each file once.
 let memoSrc = '';
 let memoStripped: string[] = [];
+// Stripped view of the current file, recomputed only when the source changes (one-slot memo).
 function strippedLines(full: string): string[] {
   if (full !== memoSrc) {
     memoSrc = full;
@@ -22,6 +23,7 @@ function strippedLines(full: string): string[] {
   return memoStripped;
 }
 
+// Every JS/TS rule the adapters contribute, grouped by concern (hygiene, presence, quality).
 export function jsAuditRules(): AuditRule[] {
   return [...importHygieneRules(), ...assertionPresenceRules(), ...assertionQualityRules()];
 }
@@ -205,6 +207,7 @@ function blockBody(full: string, fromLine1: number): string {
   return out.join('\n');
 }
 
+// Escape a literal for safe embedding in a RegExp.
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

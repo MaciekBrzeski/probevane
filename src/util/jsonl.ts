@@ -10,6 +10,7 @@ import { dirname } from 'node:path';
 
 const chains = new Map<string, Promise<void>>();
 
+// Append one object as a JSON line; the per-path promise chain serializes concurrent appends.
 export async function appendJsonl(path: string, obj: unknown): Promise<void> {
   const line = JSON.stringify(obj) + '\n';
   const prev = chains.get(path) ?? Promise.resolve();

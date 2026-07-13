@@ -12,6 +12,7 @@ export const PALETTE = {
   bg: '#04070f', panel: '#0b1220', line: '#1b2a44', fg: '#cfe3f5', dim: '#7d93ad',
   ok: '#2fe6a8', warn: '#ffb454', err: '#ff5d6c', acc: '#4fd6ff', mag: '#c792ea',
 } as const;
+/** A palette key — themed surfaces name colours by this, never by raw hex. */
 export type ColorName = keyof typeof PALETTE;
 
 /** Packed 0xRRGGBB for the terminal renderer (draw.ts). */
@@ -53,6 +54,7 @@ export const TERMINAL_TABS: TabDef[] = TABS.filter((t) => t.terminal);
 
 // --- telemetry gauges -------------------------------------------------------
 export interface GaugeSpec { id: string; label: string; value: number; raw: string; accent: ColorName }
+// The telemetry gauge row (acceptance %, run count vs budget) both renderers draw.
 export function gauges(totals: { acceptRate?: number; runs?: number }): GaugeSpec[] {
   const acc = totals.acceptRate ?? 0, runs = totals.runs ?? 0;
   return [
@@ -69,6 +71,7 @@ export interface RunView {
   ts?: string; label?: string; runId?: string; model?: string;
   accepted?: boolean; stopReason?: string; cost?: number; steps?: number;
 }
+/** One run-list column: header, width/grow, and the cell accessor — shared by both renderers. */
 export interface RunColumn {
   id: string; header: string; w: number; // w = fixed width (min width for the grow column)
   grow?: boolean; align?: 'l' | 'r'; muted?: boolean; get: (r: RunView) => string;
@@ -128,6 +131,7 @@ export const LAYOUTS: Record<string, PaneDef[]> = {
 /** The browser console grid consumes this (the one layout that's a grid in both renderers). */
 export const CONSOLE_PANES: PaneDef[] = LAYOUTS.console;
 
+/** A concrete cell/pixel rect — spanToBox's output, consumed by both renderers. */
 export interface Box { x: number; y: number; w: number; h: number }
 /** Map a fractional span into a concrete box inside `area` (both renderers use this). */
 export function spanToBox(span: [number, number, number, number], area: Box): Box {

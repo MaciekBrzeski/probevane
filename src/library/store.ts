@@ -10,6 +10,7 @@ import { appendJsonl, readJsonl } from '../util/jsonl.js';
 
 export const LIB_ROOT = process.env.PROBEVANE_LIB ?? stateRoot();
 
+/** Metadata for one saved example — written beside the body and into every index row. */
 export interface ExampleMeta {
   slug: string;
   stack: string; // adapter id, e.g. "react-vitest-playwright"
@@ -22,14 +23,17 @@ export interface ExampleMeta {
   savedAt: string;
 }
 
+/** ExampleMeta plus where the body lives — one line of index.jsonl. */
 export interface IndexRow extends ExampleMeta {
   path: string; // relative to LIB_ROOT
 }
 
+// quality/stack/category layout keeps good vs bad separable and stacks browsable.
 function exampleDir(m: ExampleMeta): string {
   return join(m.quality, m.stack, m.category);
 }
 
+// Write body + meta files, append the index row; returns the body's library-relative path.
 export async function saveExample(m: ExampleMeta, contents: string): Promise<string> {
   const relDir = exampleDir(m);
   const absDir = join(LIB_ROOT, relDir);
@@ -43,10 +47,12 @@ export async function saveExample(m: ExampleMeta, contents: string): Promise<str
   return mdRel;
 }
 
+// Every index row ([] when the library was never written).
 export async function readIndex(): Promise<IndexRow[]> {
   return readJsonl<IndexRow>(join(LIB_ROOT, 'index.jsonl'));
 }
 
+// Body of one example by its index path ('' when missing).
 export async function readExample(relPath: string): Promise<string> {
   return readFile(join(LIB_ROOT, relPath), 'utf8').catch(() => '');
 }

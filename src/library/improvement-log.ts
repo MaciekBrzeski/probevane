@@ -25,10 +25,12 @@ export const LOG_COLUMNS = [
   'tokens_out',
 ] as const;
 
+/** One log row — any subset of LOG_COLUMNS (rows from older schema eras carry fewer cells). */
 export type LogRow = Partial<Record<(typeof LOG_COLUMNS)[number], string | number>>;
 
 const HEADER = LOG_COLUMNS.join(',');
 
+// Append one row; emits the current header first when the file's last schema is older.
 export async function appendLog(logPath: string, row: LogRow): Promise<void> {
   await mkdir(dirname(logPath), { recursive: true });
   const txt = await readFile(logPath, 'utf8').catch(() => '');
@@ -44,6 +46,7 @@ export async function appendLog(logPath: string, row: LogRow): Promise<void> {
   await appendFile(logPath, out);
 }
 
+// Parse all eras: each header line switches the active column mapping for the rows below it.
 export async function readLog(logPath: string): Promise<Record<string, string>[]> {
   const txt = await readFile(logPath, 'utf8').catch(() => '');
   if (!txt.trim()) return [];
@@ -63,6 +66,7 @@ export async function readLog(logPath: string): Promise<Record<string, string>[]
   return rows;
 }
 
+// CSV-escape one cell (quote + double the quotes when it holds comma/quote/newline).
 function csv(v: string | number | undefined): string {
   if (v === undefined || v === null) return '';
   const s = String(v);

@@ -27,10 +27,10 @@ const positiveTabindexRule: AuditRule = {
     /\btab[Ii]ndex\s*=\s*["{]?\s*[1-9]/.test(line) ? 'positive tabindex disrupts focus order — use 0 or -1' : null,
 };
 
+// onClick on a non-interactive element with no role → not keyboard-accessible.
 const clickNoRoleRule: AuditRule = {
   id: 'a11y-click-no-role',
   severity: 'warn',
-  // onClick on a non-interactive element with no role → not keyboard-accessible.
   check: (line) => {
     const m = line.match(/<(div|span|li|p)\b[^>]*\son[Cc]lick/);
     if (!m) return null;
@@ -38,10 +38,10 @@ const clickNoRoleRule: AuditRule = {
   },
 };
 
+// An <input>/<select>/<textarea> needs an accessible name (aria-label or id+label).
 const inputLabelRule: AuditRule = {
   id: 'a11y-input-label',
   severity: 'warn',
-  // an <input>/<select>/<textarea> needs an accessible name (aria-label or id+label).
   check: (line, lineNo, _f, full) => {
     const m = line.match(/<(input|select|textarea)\b/);
     if (!m) return null;
@@ -51,6 +51,7 @@ const inputLabelRule: AuditRule = {
   },
 };
 
+// <a> without href is invisible to keyboard/AT link navigation — actions belong on <button>.
 const anchorHrefRule: AuditRule = {
   id: 'a11y-anchor-href',
   severity: 'warn',
@@ -67,6 +68,7 @@ const autofocusRule: AuditRule = {
   check: (line) => (/\bauto[Ff]ocus\b/.test(line) ? 'autoFocus can disorient screen-reader / keyboard users — avoid' : null),
 };
 
+// The full static a11y rule set — one list so the audit and a11y gates stay in sync.
 export function a11yRules(): AuditRule[] {
   return [imgAltRule, positiveTabindexRule, clickNoRoleRule, inputLabelRule, anchorHrefRule, autofocusRule];
 }

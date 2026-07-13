@@ -9,11 +9,13 @@ export interface RetrieveQuery {
   topK?: number;
 }
 
+/** A retrieved few-shot example — index metadata plus the markdown body to inline. */
 export interface Example {
   meta: IndexRow;
   body: string;
 }
 
+// Top-K good examples for stack+kind (category match, then score, then recency), bodies loaded.
 export async function retrieveFewShot(q: RetrieveQuery): Promise<Example[]> {
   const topK = q.topK ?? 3;
   const index = await readIndex().catch(() => [] as IndexRow[]);

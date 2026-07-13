@@ -18,10 +18,12 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
 }
 
+// Chars one tool call adds to the transcript (name + serialized input).
 function callChars(c: ToolCall): number {
   return c.name.length + JSON.stringify(c.input ?? {}).length;
 }
 
+// Chars one message adds (text + tool calls + tool results).
 function msgChars(m: Msg): number {
   let n = (m.text ?? '').length;
   for (const c of m.toolCalls ?? []) n += callChars(c);
@@ -29,6 +31,7 @@ function msgChars(m: Msg): number {
   return n;
 }
 
+// Chars one tool schema adds to the request (name + description + JSON schema).
 function toolChars(t: ToolSpec): number {
   return t.name.length + t.description.length + JSON.stringify(t.inputSchema ?? {}).length;
 }
