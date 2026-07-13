@@ -24,6 +24,8 @@ export interface MfeDriverOpts {
   log: (l: string) => void;
 }
 
+/** Spawn a child probevane command, piping tagged output to the fleet log; resolves
+ *  to the exit code — never rejects, a failed stage is data, not a crash. */
 function spawnCmd(bin: string, args: string[], tag: string, log: (l: string) => void): Promise<number> {
   return new Promise((res) => {
     const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -35,6 +37,8 @@ function spawnCmd(bin: string, args: string[], tag: string, log: (l: string) => 
   });
 }
 
+/** Write the planned contract tests to disk; false when there's nothing to plan
+ *  (the stage is skipped, not failed). */
 async function writeContracts(dir: string, log: (l: string) => void): Promise<boolean> {
   const plan = await planContracts(dir).catch(() => null);
   if (!plan || !plan.files.length) return false;
@@ -46,6 +50,9 @@ async function writeContracts(dir: string, log: (l: string) => void): Promise<bo
   return true;
 }
 
+/** One repo through the pipeline: audit always, then contract/generate/fix per
+ *  flags. Stage failures are collected, not thrown — one bad repo must not kill
+ *  the fleet; fix re-audits so the report shows before/after error counts. */
 async function processRepo(repo: string, opts: MfeDriverOpts): Promise<MfeDriverResult> {
   const dir = resolve(repo);
   const tag = `[${basename(repo)}]`;
@@ -97,6 +104,8 @@ async function processRepo(repo: string, opts: MfeDriverOpts): Promise<MfeDriver
   };
 }
 
+/** Run the MFE pipeline over the fleet in a bounded pool, then the cross-repo
+ *  version-align pass — alignment only means anything with ≥2 federation repos. */
 export async function runMfe(opts: MfeDriverOpts): Promise<MfeDriverReport> {
   const results = await runPool(
     opts.repos,

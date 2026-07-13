@@ -13,6 +13,8 @@ const TEST = /\.(test|spec|d)\.[tj]sx?$/;
 // Config files that may carry a Module Federation block.
 const CONFIG = /^(webpack|rspack|vite|rollup)\.config\.[cm]?[jt]s$|^module-federation\.config\.[cm]?[jt]s$/;
 
+/** Depth-capped recursive file finder, skipping generated dirs — read errors count
+ *  as empty so a missing/unreadable dir never aborts a scan. */
 async function walk(dir: string, match: RegExp, depth = 6): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
@@ -48,6 +50,8 @@ export async function collectRepoShared(repos: string[]): Promise<RepoShared[]> 
   return feds;
 }
 
+/** One repo's scan result: dir + the pure-audit input (config/pkg/sources) + the
+ *  audit itself. Filled by scanMfe, consumed by the mfe CLI and driver. */
 export interface MfeScan {
   dir: string;
   input: MfeRepoInput;

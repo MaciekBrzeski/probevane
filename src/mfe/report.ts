@@ -15,6 +15,8 @@ export interface MfeDriverResult {
   stageErrors?: string[]; // stages that failed (e.g. 'generate: exit 1')
 }
 
+/** The fleet-level rollup the `mfe` command prints/persists. Filled by aggregateMfe
+ *  from the per-repo results + the cross-repo version-align pass. */
 export interface MfeDriverReport {
   ts: string;
   repos: number;
@@ -32,6 +34,9 @@ function currentErrors(r: MfeDriverResult): number {
   return r.errorsAfter ?? r.errorsBefore ?? 0;
 }
 
+/** Fold per-repo results into the fleet report: stage counts, improved (a fix
+ *  lowered the error count), avg grade over MFE repos only — non-MFE repos are
+ *  counted but excluded from grading so skips don't drag the average. */
 export function aggregateMfe(
   results: MfeDriverResult[],
   versionAlign: MfeViolation[],

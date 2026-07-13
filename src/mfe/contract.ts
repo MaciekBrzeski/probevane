@@ -14,6 +14,8 @@ export interface ContractType {
   from: string; // import specifier for the type, e.g. '@mf-types/cart/Cart'
 }
 
+/** One generated contract test — filename + full content; typed=false marks the
+ *  structural fallback. Emitted by the templaters, written by the scanner/driver. */
 export interface ContractFile {
   file: string; // suggested filename (relative)
   content: string;
