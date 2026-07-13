@@ -15,10 +15,13 @@ const SYSTEM =
 
 // An asserting test across stacks (js/ts expect/toBe, python/rust assert*, go t.Fatal/Error).
 const ASSERTS = /expect|assert|toBe|toEqual|toHaveNoViolations|t\.(Fatal|Error)/;
+// A trace worth training on: the spec actually asserts something and isn't trivially short.
 function isQuality(t: Trace): boolean {
   return ASSERTS.test(t.spec) && t.spec.length > 40;
 }
 
+/** Traces → deduped chat examples: drop non-asserting specs, hash away identical
+ *  ones, and fold each run's gate-block history into the prompt as constraints. */
 export function buildExamples(traces: Trace[]): ChatExample[] {
   const seen = new Set<string>();
   const out: ChatExample[] = [];
@@ -51,6 +54,7 @@ export function splitExamples(ex: ChatExample[]): { train: ChatExample[]; val: C
   return { train, val };
 }
 
+/** Trace count per stack — the dataset-balance readout. */
 export function statsByStack(traces: Trace[]): Record<string, number> {
   const s: Record<string, number> = {};
   for (const t of traces) s[t.stack] = (s[t.stack] ?? 0) + 1;

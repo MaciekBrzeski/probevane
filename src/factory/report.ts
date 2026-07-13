@@ -3,6 +3,8 @@
 // counts toward coverage; run.ts is excluded like the other I/O glue.
 import type { MfeViolation } from '../mfe/standards.js';
 
+/** One repo's outcome row — filled by processRepo (or carried over from a prior
+ *  report when --resume skips the repo). */
 export interface FactoryRepoResult {
   repo: string;
   accepted: boolean;
@@ -19,6 +21,8 @@ export interface FactoryRepoResult {
   error?: string;
 }
 
+/** The fleet rollup aggregate() builds from the per-repo rows — the factory's
+ *  headline report (persisted + printed). */
 export interface FactoryReport {
   ts: string;
   repos: number;

@@ -29,6 +29,9 @@ For EACH finding decide if it is a REAL, actionable problem in THIS diff. Be adv
 is speculative, already handled, a style nit dressed up as a bug, or you are not sure — mark it NOT real.
 Reply with ONLY a JSON array: [{ "index": number, "real": boolean, "reason": string }]. No prose.`;
 
+/** Gate 2 (adversarial refute): an independent skeptic judges each finding; only
+ *  confirmed ones survive. An unreachable/unparseable verifier keeps everything —
+ *  better noisy than silently dropping real findings. */
 export async function verifyFindings(findings: Finding[], diff: string, brain: Brain): Promise<Finding[]> {
   if (findings.length === 0) return [];
   const list = findings.map((f, i) => `${i}. [${f.severity}] ${f.file}${f.line ? ':' + f.line : ''} — ${f.issue}`).join('\n');
@@ -44,6 +47,7 @@ export async function verifyFindings(findings: Finding[], diff: string, brain: B
   return findings.filter((_, i) => verdicts.get(i) === true);
 }
 
+/** Verifier text → index→real map; entries without a numeric index are skipped. */
 export function parseVerdicts(text: string): Map<number, boolean> {
   const out = new Map<number, boolean>();
   const arr = extractJsonStrict(text, (x): x is any[] => Array.isArray(x));

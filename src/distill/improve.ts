@@ -15,6 +15,8 @@ export interface EvalResult {
   cost?: number; // USD per run (lower better on ties)
 }
 
+/** The persisted promotion decision at <state>/model.json — written by
+ *  writeModelPointer, read back as the loop's default model. */
 export interface ModelPointer {
   model: string;
   chosenAt: string;
@@ -44,6 +46,7 @@ export async function readModelPointer(path = POINTER_PATH): Promise<string | un
     .catch(() => undefined);
 }
 
+/** Persist a promotion so future runs default to `model` (reason kept for the audit trail). */
 export async function writeModelPointer(model: string, reason: string, path = POINTER_PATH): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const ptr: ModelPointer = { model, chosenAt: new Date().toISOString(), reason };

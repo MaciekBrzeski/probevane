@@ -7,14 +7,18 @@ import { fimComplete } from '../brain/openai-compat.js';
 import { brainFor } from '../brain/select.js';
 import { CHAT_SYSTEM, chatUser, fimPrefix, fimSuffix, parseSteps, type PlanStep } from './prompts.js';
 
+/** Which fill mechanism to use — 'auto' tries FIM first, then falls back to chat. */
 export type PlanMode = 'auto' | 'fim' | 'chat';
 
+/** Caller knobs for planFeature — filled from the plan CLI's flags. */
 export interface PlanOpts {
   model: string; // e.g. 'local:mk-coder:lora-v8' or 'ollama:kimi-k2.7-code'
   mode?: PlanMode; // default 'auto' — try FIM, fall back to chat
   steps?: number; // soft target step count (chat only)
 }
 
+/** The finished plan: both states, the mechanism that actually produced the steps,
+ *  and the parsed steps. Rendered by renderMarkdown; emitted verbatim under --json. */
 export interface FeaturePlan {
   from: string;
   to: string;
@@ -63,6 +67,8 @@ export async function planFeature(from: string, to: string, opts: PlanOpts): Pro
   return { from, to, model: opts.model, mode: 'chat', steps, raw: stepsToText(steps) };
 }
 
+// Parsed steps back to canonical numbered text — feeds `raw` so both mechanisms
+// report the same shape (the FIM middle alone isn't the full list).
 function stepsToText(steps: PlanStep[]): string {
   return steps.map((s) => `${s.n}. ${s.title}${s.detail ? '\n   ' + s.detail.replace(/\n/g, '\n   ') : ''}`).join('\n');
 }

@@ -9,6 +9,8 @@ import { resolve } from 'node:path';
 
 export type UnitStatus = 'accepted' | 'parked' | 'pending';
 
+/** One unit's line in the dark report — derived from its newest ledger record
+ *  (pending when none has landed yet). */
 export interface ReportRow {
   id: string;
   target: string; // the --only file, or the repo
@@ -17,6 +19,8 @@ export interface ReportRow {
   tookOver?: boolean;
 }
 
+/** The batch rollup buildDarkReport returns: per-unit rows, headline counts, and
+ *  a one-line summary for the CLI. */
 export interface DarkReport {
   rows: ReportRow[];
   accepted: number;

@@ -37,6 +37,8 @@ export function redact(text: string): string {
 // RAG/context per the RAG-beats-distill lesson). Opt-in via PROBEVANE_TRACES=1.
 export const TRACES_PATH = statePath('traces', 'traces.jsonl');
 
+/** One distillation record: the run's input context (stack + task) paired with the
+ *  accepted spec it produced. Written by recordTrace, read back by the dataset builder. */
 export interface Trace {
   ts: string;
   stack: string;
@@ -66,6 +68,7 @@ export async function recordTrace(ctx: RunCtx, now: string): Promise<number> {
   return n;
 }
 
+/** Every stored trace (missing file → []) — the dataset builder's input. */
 export async function readTraces(path = TRACES_PATH): Promise<Trace[]> {
   return readJsonl<Trace>(path);
 }

@@ -18,11 +18,13 @@ Skip style nits unless they change meaning. Reply with ONLY a JSON array of find
 { "file": string, "line": number|null, "severity": "error"|"warn"|"nit", "issue": string, "fix": string }
 No prose, no markdown fences — just the JSON array (or [] if the diff is clean).`;
 
+/** The unified diff vs `base`, noise paths excluded, capped at 60k chars to fit context. */
 export async function getDiff(dir: string, base: string): Promise<string> {
   const d = await sh(`git diff ${base} -- . ':(exclude)node_modules' ':(exclude)*.lock' ':(exclude)package-lock.json'`, dir);
   return (d.stdout || '').slice(0, 60_000);
 }
 
+/** One brain call over raw diff text → parsed findings ([] on empty diff or brain failure). */
 export async function reviewDiffText(diff: string, brain: Brain): Promise<Finding[]> {
   if (!diff.trim()) return [];
   const resp = await brain
@@ -31,10 +33,13 @@ export async function reviewDiffText(diff: string, brain: Brain): Promise<Findin
   return parseFindings(resp?.text ?? '');
 }
 
+/** Convenience wrapper: diff the repo against `base`, then review the text. */
 export async function reviewDiff(dir: string, base: string, brain: Brain): Promise<Finding[]> {
   return reviewDiffText(await getDiff(dir, base), brain);
 }
 
+/** Model text → validated findings: keep only entries with file+issue, coerce
+ *  unknown severities to 'warn' (never trust the model's schema discipline). */
 export function parseFindings(text: string): Finding[] {
   const arr = extractJsonStrict(text, (x): x is any[] => Array.isArray(x));
   if (!arr) return [];
@@ -49,6 +54,7 @@ export function parseFindings(text: string): Finding[] {
     }));
 }
 
+/** Findings → the PR-comment markdown block (explicit all-clear when empty). */
 export function findingsMarkdown(findings: Finding[]): string {
   if (!findings.length) return '### 🔍 probevane review\n\n✅ No issues found in the diff.\n';
   const icon = { error: '🛑', warn: '⚠️', nit: '💡' };
@@ -57,6 +63,7 @@ export function findingsMarkdown(findings: Finding[]): string {
   return lines.join('\n') + '\n';
 }
 
+/** Findings → the task prompt the `fix` path consumes for auto-remediation. */
 export function findingsTask(findings: Finding[]): string {
   return [
     `A code review found the following issues. Fix each in the source (or tests where the test is wrong).`,

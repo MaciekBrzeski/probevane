@@ -14,8 +14,12 @@ export interface Question {
   def: string; // default answer (used in non-interactive / policy mode)
 }
 
+/** A partial RunSpec with the path already inferred — what classification yields
+ *  before the question round (resolveSpec) fills the rest. */
 export type DraftSpec = Partial<RunSpec> & { path: SpecPath };
 
+/** Intake output: the draft spec, how unambiguous the keyword match was, and the
+ *  questions still worth asking a human or policy file. */
 export interface Classification {
   draft: DraftSpec;
   confidence: number; // 0..1 for the inferred path

@@ -32,11 +32,13 @@ export const CHAT_SYSTEM =
   'on the same or following lines; be detailed and self-contained; no preamble, no summary, ' +
   'no fluff — output the numbered list only.';
 
+/** The chat-mode user message: both states + the ask, with an optional soft step budget. */
 export function chatUser(from: string, to: string, steps?: number): string {
   const budget = steps ? `\nAim for about ${steps} steps.` : '';
   return `CURRENT STATE:\n${from.trim()}\n\nDESIRED STATE:\n${to.trim()}\n\nWrite the numbered implementation steps from current to desired.${budget}`;
 }
 
+/** One ordered plan step — produced by parseSteps from either mechanism's output. */
 export interface PlanStep {
   n: number;
   title: string;
