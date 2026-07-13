@@ -88,6 +88,7 @@ export interface AdapterDecl {
   guidance: Record<string, string>; // kind → dedented prose block
 }
 
+/** Any top-level declaration a .vane file can contain. */
 export type Decl = CommandDecl | ProfileDecl | AliasDecl | AdapterDecl;
 
 /** One parsed .vane file. */

@@ -17,6 +17,7 @@ interface P {
 
 const at = (p: P): LexLine => p.lines[p.i];
 const posOf = (p: P, l: LexLine): Pos => ({ file: p.file, line: l.line });
+/** Record a positioned error against a line. */
 const err = (p: P, l: LexLine, message: string): void => {
   p.errors.push({ message, pos: posOf(p, l) });
 };
@@ -34,35 +35,39 @@ function parseFlag(p: P, l: LexLine, rest: string): FlagSpec | null {
   return { name: m[1], type: m[2] as FlagType, def: m[3], doc: m[4] ?? '', pos: posOf(p, l) };
 }
 
-/** Body-line handlers for a `command` declaration. */
+/** Parse one `arg …` body line onto the command. */
+function parseArg(p: P, d: CommandDecl, l: LexLine, rest: string): void {
+  const m = rest.match(/^(\w+)\s+str(?:\s+"([^"]*)")?$/);
+  if (m) d.args.push({ name: m[1], doc: m[2] ?? '', pos: posOf(p, l) });
+  else err(p, l, 'bad arg line — expected: arg <name> str ["doc"]');
+}
+
+/** Parse one `handler …` body line onto the command. */
+function parseHandler(p: P, d: CommandDecl, l: LexLine, rest: string): void {
+  const m = rest.match(HANDLER_RE);
+  if (m) d.handler = { module: m[1], export: m[2] };
+  else err(p, l, 'bad handler ref — expected: handler <module>#<export>');
+}
+
+/** Body-line handlers for a `command` declaration, one per field keyword. */
+const COMMAND_FIELDS: Record<string, (p: P, d: CommandDecl, l: LexLine, rest: string) => void> = {
+  summary: (_p, d, _l, rest) => { d.summary = rest; },
+  usage: (_p, d, _l, rest) => { d.usage = rest; },
+  example: (_p, d, _l, rest) => { d.example = rest; },
+  dir: (_p, d) => { d.dir = true; },
+  arg: parseArg,
+  flag: (p, d, l, rest) => { const f = parseFlag(p, l, rest); if (f) d.flags.push(f); },
+  handler: parseHandler,
+};
+
+/** Dispatch one command body line to its field handler. */
 function commandBodyLine(p: P, d: CommandDecl, l: LexLine): void {
   const sp = l.text.indexOf(' ');
   const kw = sp === -1 ? l.text : l.text.slice(0, sp);
   const rest = sp === -1 ? '' : l.text.slice(sp + 1).trim();
-  switch (kw) {
-    case 'summary': d.summary = rest; return;
-    case 'usage': d.usage = rest; return;
-    case 'example': d.example = rest; return;
-    case 'dir': d.dir = true; return;
-    case 'arg': {
-      const m = rest.match(/^(\w+)\s+str(?:\s+"([^"]*)")?$/);
-      if (m) d.args.push({ name: m[1], doc: m[2] ?? '', pos: posOf(p, l) });
-      else err(p, l, 'bad arg line — expected: arg <name> str ["doc"]');
-      return;
-    }
-    case 'flag': {
-      const f = parseFlag(p, l, rest);
-      if (f) d.flags.push(f);
-      return;
-    }
-    case 'handler': {
-      const m = rest.match(HANDLER_RE);
-      if (m) d.handler = { module: m[1], export: m[2] };
-      else err(p, l, 'bad handler ref — expected: handler <module>#<export>');
-      return;
-    }
-    default: err(p, l, `unknown command field '${kw}'`);
-  }
+  const handle = COMMAND_FIELDS[kw];
+  if (handle) handle(p, d, l, rest);
+  else err(p, l, `unknown command field '${kw}'`);
 }
 
 /** Body-line handler for a `profile` declaration (`[if key:] id token*`). */

@@ -19,7 +19,20 @@ function dupErrors(decls: Decl[]): VaneError[] {
   return out;
 }
 
-/** Command-specific checks: catalog fields present, spec shape coherent. */
+/** Flag-level checks: dup names, bool-with-default. */
+function flagErrors(d: CommandDecl): VaneError[] {
+  const out: VaneError[] = [];
+  const seen = new Set<string>();
+  for (const f of d.flags) {
+    if (seen.has(f.name)) out.push({ message: `duplicate flag --${f.name}`, pos: f.pos });
+    seen.add(f.name);
+    if (f.type === 'bool' && f.def !== undefined)
+      out.push({ message: `bool flag --${f.name} cannot take a default (presence IS the value)`, pos: f.pos });
+  }
+  return out;
+}
+
+/** Command-level checks: catalog fields present, spec shape coherent. */
 function commandErrors(d: CommandDecl): VaneError[] {
   const out: VaneError[] = [];
   for (const field of ['summary', 'usage', 'example'] as const) {
@@ -28,14 +41,7 @@ function commandErrors(d: CommandDecl): VaneError[] {
   if (d.handler && !d.dir && d.args.length === 0 && d.flags.length === 0) {
     out.push({ message: `command '${d.name}' has a handler but no dir/arg/flag spec`, pos: d.pos });
   }
-  const flagNames = new Set<string>();
-  for (const f of d.flags) {
-    if (flagNames.has(f.name)) out.push({ message: `duplicate flag --${f.name}`, pos: f.pos });
-    flagNames.add(f.name);
-    if (f.type === 'bool' && f.def !== undefined)
-      out.push({ message: `bool flag --${f.name} cannot take a default (presence IS the value)`, pos: f.pos });
-  }
-  return out;
+  return [...out, ...flagErrors(d)];
 }
 
 /** Alias targets must name a declared profile. */
