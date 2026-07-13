@@ -26,6 +26,7 @@ export interface ProbevaneConfig {
   arch?: ArchRoles; // declared pyramid-model roles for `arch --pyramid` (flags override)
 }
 
+/** Declared pyramid-model roles for `arch --pyramid` — authored in the target repo's config. */
 export interface ArchRoles {
   glue?: string[]; // connection-layer dirs (composition root, wiring, I/O)
   shared?: string[]; // common-base dirs every pyramid may import
@@ -82,6 +83,7 @@ export function validateConfig(cfg: unknown): string[] {
   return errs;
 }
 
+// Load + validate the first probevane.config.* found in `dir`; issues warn, never block.
 export async function loadConfig(dir: string): Promise<ProbevaneConfig> {
   for (const name of NAMES) {
     const file = join(dir, name);

@@ -12,6 +12,7 @@ export interface CaptureOpts {
   settleMs?: number;
 }
 
+// Launch chromium, shoot the page (or one element via opts.selector), save to `out`.
 export async function capture(url: string, out: string, opts: CaptureOpts = {}): Promise<string> {
   const browser = await chromium.launch();
   try {

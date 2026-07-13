@@ -14,6 +14,7 @@ export interface Violation {
   message: string;
 }
 
+/** Rolled-up result of one audit pass — what auditFiles hands the audit gate. */
 export interface AuditReport {
   violations: Violation[];
   errors: number;
@@ -23,6 +24,7 @@ export interface AuditReport {
   score: number;
 }
 
+// Scan one file line-by-line against the rules; returns every unsuppressed violation.
 export function auditSource(file: string, source: string, rules: AuditRule[]): Violation[] {
   const lines = source.split('\n');
   const viols: Violation[] = [];
@@ -38,6 +40,7 @@ export function auditSource(file: string, source: string, rules: AuditRule[]): V
   return viols;
 }
 
+// Audit many files and roll violations into a scored report — the audit gate's input.
 export async function auditFiles(files: string[], rules: AuditRule[]): Promise<AuditReport> {
   const violations: Violation[] = [];
   for (const f of files) {
@@ -61,11 +64,13 @@ function scoreFrom(errors: number, warns: number): number {
   return Math.max(0, Math.round(s * 10) / 10);
 }
 
+// "probevane-allow: <rule-id>" on the line (or the one above) silences that rule there.
 function suppressed(line: string, prev: string, ruleId: string): boolean {
   const needle = `probevane-allow: ${ruleId}`;
   return line.includes(needle) || prev.includes(needle);
 }
 
+// One grep-able line per violation — the feedback text logs and gate messages show.
 export function formatViolations(v: Violation[]): string {
   return v.map((x) => `${x.file}:${x.line}: ${x.severity}: [${x.rule}] ${x.message}`).join('\n');
 }

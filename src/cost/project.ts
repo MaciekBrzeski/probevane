@@ -8,6 +8,7 @@ import { costOf, rateFor } from './pricing.js';
 
 export const PROJECTION_MODELS = ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'] as const;
 
+/** projectLedger's answer — the metered-but-unbilled token volume, repriced per model. */
 export interface Projection {
   /** Runs that were billed $0 and therefore contribute metered-but-free volume. */
   freeRuns: number;
@@ -39,6 +40,7 @@ export function projectLedger(
   return { freeRuns, tokensIn, tokensOut, byModel };
 }
 
+// Render the projection as a terminal block, clearly labelled as estimates.
 export function formatProjection(p: Projection): string {
   const k = (n: number) => `${(n / 1000).toFixed(1)}k`;
   const lines = [

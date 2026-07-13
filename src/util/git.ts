@@ -15,6 +15,7 @@ function git(dir: string, args: string[]): Promise<{ ok: boolean; out: string }>
   });
 }
 
+// True when `dir` is inside a git work tree — the checkpoint/revert net needs one.
 export async function isGitRepo(dir: string): Promise<boolean> {
   return (await git(dir, ['rev-parse', '--is-inside-work-tree'])).ok;
 }
@@ -138,6 +139,7 @@ export async function changedFiles(dir: string, ref = 'HEAD'): Promise<string[]>
   return [...files];
 }
 
+// Is `f` user source worth testing? Excludes tests, configs, generated/setup/entry files.
 export function isSourceFile(f: string): boolean {
   if (!/\.(tsx?|jsx?|vue|svelte|py|go)$/.test(f)) return false;
   if (/\.(test|spec|d)\.[tj]sx?$/.test(f) || /(^|\/)(test_\w+|conftest)/.test(f) || /_test\.go$/.test(f)) return false;

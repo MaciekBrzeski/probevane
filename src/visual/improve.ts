@@ -22,11 +22,13 @@ export interface ImproveOpts {
 const SYSTEM =
   'You are a UI reviewer improving a rendered page toward a goal. You see a screenshot and the source file that controls it. Make ONE focused, incremental change per turn. Keep all existing functionality. Reply EXACTLY "DONE" if the goal is already met; otherwise reply with ONLY the complete revised file inside a single fenced code block — no prose.';
 
+// First fenced code block of a reply (the rewritten file), or null when the model didn't comply.
 export function extractFence(text: string): string | null {
   const m = text.match(/```[a-z]*\n([\s\S]*?)```/);
   return m ? m[1].trim() : null;
 }
 
+// The capture→judge→rewrite loop: one focused edit per iteration until DONE or maxIters.
 export async function improveLoop(opts: ImproveOpts): Promise<{ iterations: number; done: boolean; shots: string[] }> {
   const log = opts.log ?? (() => {});
   const max = opts.maxIters ?? 4;

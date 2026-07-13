@@ -11,11 +11,13 @@ export const MEASURED = {
   free: 0,
 };
 
+/** Module counts for the target repo, split by the band that decides model routing. */
 export interface Codebase {
   easy: number; // pure, low-fact modules (local-draftable)
   hard: number; // fact-heavy / IO / component modules
 }
 
+/** One strategy's simulated price tag — produced by simulateCost, compared by savings(). */
 export interface StrategyCost {
   name: string;
   cost: number; // USD (API), rounded to cents-ish
@@ -48,6 +50,7 @@ export function savings(strategies: StrategyCost[]): Array<StrategyCost & { save
   }));
 }
 
+// Render the simulation as an aligned terminal table (strategies + savings vs baseline).
 export function formatReport(cb: Codebase, localHitRate = 0.5): string {
   const rows = savings(simulateCost(cb, localHitRate));
   const lines = [

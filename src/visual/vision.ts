@@ -22,6 +22,7 @@ export function usesOpenAiVision(model = VISION_MODEL, base = VISION_BASE): bool
   return !!base || !model.startsWith('claude');
 }
 
+// Resolve the vision API key: env vars first, then the ollama key file (same as the ollama brain).
 function visionKey(): string {
   const env = process.env.PROBEVANE_VISION_KEY ?? process.env.PROBEVANE_API_KEY ?? process.env.OPENAI_API_KEY;
   if (env) return env;
@@ -33,6 +34,7 @@ function visionKey(): string {
   }
 }
 
+// Anthropic backend — base64 PNG + question in one user message.
 async function anthropicVision(pngPath: string, system: string, userText: string): Promise<string> {
   const client = new Anthropic();
   const b64 = (await readFile(pngPath)).toString('base64');
@@ -53,6 +55,7 @@ async function anthropicVision(pngPath: string, system: string, userText: string
   return (resp.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
 }
 
+// OpenAI-compatible backend (ollama cloud) — data-URL image via chat/completions.
 async function openaiVision(pngPath: string, system: string, userText: string): Promise<string> {
   const b64 = (await readFile(pngPath)).toString('base64');
   const base = (VISION_BASE ?? 'https://ollama.com/v1').replace(/\/$/, '');
@@ -82,6 +85,7 @@ async function openaiVision(pngPath: string, system: string, userText: string): 
   return m?.content || m?.reasoning || '';
 }
 
+// Public entry — routes to whichever backend the env selects.
 export async function visionAsk(pngPath: string, system: string, userText: string): Promise<string> {
   return usesOpenAiVision() ? openaiVision(pngPath, system, userText) : anthropicVision(pngPath, system, userText);
 }

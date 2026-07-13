@@ -12,6 +12,7 @@ export function capOutput(s: string, headLines = 40, tailLines = 60): string {
   return `${head}\n… [${elided} lines elided] …\n${tail}`;
 }
 
+/** What sh() resolves with — exit code + captured output (ok = exit 0; never a throw). */
 export interface ExecResult {
   code: number;
   stdout: string;

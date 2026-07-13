@@ -11,6 +11,7 @@ const STOP = new Set([
   'any', 'not', 'must', 'from', 'each', 'one', 'when', 'these', 'their', 'they',
 ]);
 
+// Keyword set of a task string (lowercased, stopwords dropped) — similarity()'s input.
 export function tokenize(s: string): Set<string> {
   return new Set((s.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w)));
 }

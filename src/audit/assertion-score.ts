@@ -12,6 +12,7 @@ export interface WeakAssertion {
   kind: string;
   snippet: string;
 }
+/** One file's assertion grade — totals plus the weak spots; filled by scoreAssertions. */
 export interface AssertionScore {
   total: number; // expect() statements seen
   strong: number;
