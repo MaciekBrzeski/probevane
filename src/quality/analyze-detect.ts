@@ -159,7 +159,7 @@ export function stripToCode(lines: string[], keepStrings = false): string[] {
 // --- function detection (AST-based, ts-morph) -----------------------------
 
 // Reused across calls: in-memory, no type resolution → fast (~200 files < 1s).
-const detectProject = new Project({
+export const detectProject = new Project({
   useInMemoryFileSystem: true,
   compilerOptions: { allowJs: true, skipLibCheck: true, noResolve: true },
   skipFileDependencyResolution: true,
@@ -181,7 +181,7 @@ const NEST_KINDS = new Set<SyntaxKind>([
 ]);
 
 /** Any function-shaped node — the boundary at which body measurement stops descending. */
-function isFnLike(n: Node): boolean {
+export function isFnLike(n: Node): boolean {
   return FN_KINDS.has(n.getKind());
 }
 
@@ -193,7 +193,7 @@ function isLogicalBinary(n: Node): boolean {
 }
 
 /** Display name: declaration/method name, or the var/property the function is assigned to. */
-function fnName(n: Node): string {
+export function fnName(n: Node): string {
   if (Node.isConstructorDeclaration(n)) return 'constructor';
   const named = n as { getName?: () => string | undefined };
   if (typeof named.getName === 'function') {
@@ -244,7 +244,7 @@ function measureBody(body: Node): BodyMetrics {
 /** Reportable: named decls/methods/accessors/ctor, plus block-body arrows/fn-exprs
  *  with a derivable name. Anonymous + expression-body arrows are skipped (too small
  *  to gate, and they would flood the report). */
-function isReportable(n: Node): boolean {
+export function isReportable(n: Node): boolean {
   const k = n.getKind();
   if (
     k === SyntaxKind.FunctionDeclaration ||
@@ -257,16 +257,23 @@ function isReportable(n: Node): boolean {
   return (k === SyntaxKind.ArrowFunction || k === SyntaxKind.FunctionExpression) && fnName(n) !== '(anonymous)';
 }
 
-/** Does a doc comment precede this node? Arrows/fn-exprs sit inside a variable
- *  statement — the comment belongs to that statement, so judge from the outermost
- *  declaration statement, not the function node itself. */
-function hasLeadingDoc(n: Node): boolean {
-  const stmt =
+/** The node whose leading trivia carries a function's doc: arrows/fn-exprs sit
+ *  inside a variable statement — the comment belongs to that statement, so judge
+ *  from the outermost declaration statement, not the function node itself.
+ *  Shared by the boolean doc gate and the doc-text extractor so they can't drift. */
+export function docCarrier(n: Node): Node {
+  return (
     n.getFirstAncestorByKind(SyntaxKind.VariableStatement) ??
     n.getFirstAncestorByKind(SyntaxKind.ExportAssignment) ??
-    n;
-  return stmt.getLeadingCommentRanges().length > 0;
+    n
+  );
 }
+
+/** Does a doc comment precede this node (judged from its doc carrier)? */
+function hasLeadingDoc(n: Node): boolean {
+  return docCarrier(n).getLeadingCommentRanges().length > 0;
+}
+
 
 /** Per-function size/complexity metrics via AST. Each function is measured on its
  *  own body; nested functions are separate nodes, never folded into the parent. */
@@ -297,6 +304,9 @@ export function detectFunctions(source: string): FnMetric[] {
   });
   return out;
 }
+
+
+
 
 /** One interface/type-alias declaration in a file: where it is, whether it's
  *  exported, and whether a shape comment precedes it. Filled by detectTypeDecls;

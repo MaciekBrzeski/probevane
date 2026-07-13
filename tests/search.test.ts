@@ -80,3 +80,90 @@ describe('search/index buildSearchIndex', () => {
     expect(cached.map((i) => i.path)).toEqual(index.map((i) => i.path));
   });
 });
+
+// ---------------------------------------------------------------------------
+// function-level similarity — doc-comment embeddings (search --similar --fns)
+// ---------------------------------------------------------------------------
+import { buildFnIndex } from '../src/commands/search/fn-similar.js';
+import { detectFunctionDocs } from '../src/quality/detect-docs.js';
+
+describe('detectFunctionDocs', () => {
+  it('extracts marker-stripped prose from block and line comments', () => {
+    const src = [
+      '/** Walks the tree.',
+      ' *  Prunes vendored dirs. */',
+      'export function walk(d: string) {',
+      '  return d;',
+      '}',
+      '// Reads one file into memory — small files only.',
+      'const readOne = (f: string) => {',
+      '  return f;',
+      '};',
+    ].join('\n');
+    expect(detectFunctionDocs(src)).toEqual([
+      { name: 'walk', startLine: 3, doc: 'Walks the tree. Prunes vendored dirs.' },
+      { name: 'readOne', startLine: 7, doc: 'Reads one file into memory — small files only.' },
+    ]);
+  });
+
+  it('skips undocumented and nested functions', () => {
+    const src = [
+      'function bare() {',
+      '  return 1;',
+      '}',
+      '/** Outer doc covers the closure. */',
+      'function outer() {',
+      '  const inner = () => {',
+      '    return 2;',
+      '  };',
+      '  return inner();',
+      '}',
+    ].join('\n');
+    const docs = detectFunctionDocs(src);
+    expect(docs.map((d) => d.name)).toEqual(['outer']);
+  });
+});
+
+describe('buildFnIndex', () => {
+  function mkFnProject(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'pv-fnsim-'));
+    mkdirSync(join(dir, 'src', 'a'), { recursive: true });
+    mkdirSync(join(dir, 'src', 'b'), { recursive: true });
+    writeFileSync(join(dir, 'src', 'a', 'x.ts'),
+      '/** Recursively collect file paths under dir, pruning vendored dirs. */\nexport function walk(d: string) {\n  return d;\n}\n// tiny\nconst t = () => {\n  return 1;\n};\n');
+    writeFileSync(join(dir, 'src', 'b', 'y.ts'),
+      '/** Recursively collect file paths under dir, pruning vendored dirs. */\nexport function walkTree(d: string) {\n  return d;\n}\n');
+    writeFileSync(join(dir, 'src', 'a', 'x.test.ts'),
+      '/** Recursively collect file paths — test copy must be excluded. */\nexport function walkT(d: string) {\n  return d;\n}\n');
+    return dir;
+  }
+
+  it('indexes documented fns (tests + short docs excluded), caches, and pairs identical docs at 1.0', async () => {
+    const dir = mkFnProject();
+    let calls = 0;
+    // Deterministic embed: identical text → identical vec (hash the doc into 2 dims).
+    const fakeEmbed = async (t: string) => {
+      calls++;
+      const doc = t.split('\n')[1] ?? '';
+      return [doc.length, doc.includes('vendored') ? 1 : 0];
+    };
+    const index = await buildFnIndex(dir, { embed: fakeEmbed });
+    // walk + walkTree only: the test file and the <20-char "tiny" doc are excluded
+    expect(index.map((i) => i.path).sort()).toEqual([
+      'src/a/x.ts:2 walk()',
+      'src/b/y.ts:2 walkTree()',
+    ]);
+    expect(calls).toBe(2);
+
+    const pairs = similarPairs(index, 0.9, 20);
+    expect(pairs.length).toBe(1);
+    expect(pairs[0].score).toBeCloseTo(1.0, 5);
+
+    // cache hit: same content → zero embed calls
+    calls = 0;
+    await buildFnIndex(dir, { embed: fakeEmbed });
+    expect(calls).toBe(0);
+    expect(existsSync(join(dir, '.probevane', 'search-fn-index.json'))).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

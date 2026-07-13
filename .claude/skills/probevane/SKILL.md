@@ -43,7 +43,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `ci` | PR helper: report changed-untested files + coverage; --generate adds tests; --review-fix reviews the diff (gated) and auto-fixes. |
 | `mock` | Synthesize the mock boundary (MSW handlers, fixtures, contracts) from the module graph. |
 | `graph` | Render the module dependency graph (ASCII tree + Mermaid). |
-| `search` | Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Index cached at .probevane/search-index.json. |
+| `search` | Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses); --similar --fns goes one level deeper and ranks FUNCTION pairs by doc-comment similarity (merge candidates — leans on the doc-comment quality rule for coverage; default threshold 0.9, report-only). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Indexes cached at .probevane/search-index.json + search-fn-index.json. |
 | `spec` | Generate a project SPEC.md (graph, modules, API surface, coverage); --narrate adds LLM descriptions; --wiki publishes. |
 | `run` | Execute the test suite via the detected adapter. |
 | `coverage` | Report coverage via the adapter. |
@@ -249,12 +249,12 @@ probevane graph ./app --mermaid graph.md
 ```
 
 ### search
-Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Index cached at .probevane/search-index.json.
+Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses); --similar --fns goes one level deeper and ranks FUNCTION pairs by doc-comment similarity (merge candidates — leans on the doc-comment quality rule for coverage; default threshold 0.9, report-only). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Indexes cached at .probevane/search-index.json + search-fn-index.json.
 
 ```
-probevane search <dir> "<concept>" [--top N] [--fresh] | probevane search <dir> --similar [--threshold 0.85] [--top N]
+probevane search <dir> "<concept>" [--top N] [--fresh] | probevane search <dir> --similar [--fns] [--threshold 0.85] [--top N]
 # e.g.
-probevane search . "retry with backoff"
+probevane search . --similar --fns
 ```
 
 ### spec
