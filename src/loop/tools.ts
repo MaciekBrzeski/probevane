@@ -231,8 +231,6 @@ export async function execTool(call: ToolCall, ctx: RunCtx): Promise<string> {
   }
 }
 
-/** stat-based existence check that never throws. */
-export async function pathExists(p: string): Promise<boolean> {
-  return stat(p).then(() => true).catch(() => false);
-}
+// pathExists lives in util/fs now (consolidated); re-exported to keep the tool API stable.
+export { pathExists } from '../util/fs.js';
 export { join };

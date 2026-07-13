@@ -1,5 +1,6 @@
 import { join, relative } from 'node:path';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { pathExists } from '../util/fs.js';
+import { readFile, readdir } from 'node:fs/promises';
 import { readFederation } from './scan.js';
 import {
   remoteContractTest,
@@ -23,11 +24,6 @@ function pascal(s: string): string {
   return s.replace(/(^|[-_])([a-z])/g, (_, __, c) => c.toUpperCase());
 }
 
-/** stat-based existence check — never throws, a missing path is just false. */
-async function exists(p: string): Promise<boolean> {
-  return !!(await stat(p).catch(() => null));
-}
-
 /** Resolve a typed contract for an exposed key, or undefined (→ structural test). */
 async function resolveContract(
   dir: string,
@@ -40,7 +36,7 @@ async function resolveContract(
   if (contractsPkg) return { name: `${pascal(nm)}Contract`, from: contractsPkg };
   // A sibling contract file under src/, e.g. src/Cart.contract.ts.
   const base = key.replace(/^\.\//, '').replace(/\.[tj]sx?$/, '');
-  if (await exists(join(dir, 'src', `${base.split('/').pop()}.contract.ts`)))
+  if (await pathExists(join(dir, 'src', `${base.split('/').pop()}.contract.ts`)))
     return { name: `${pascal(nm)}Contract`, from: `../../src/${base.split('/').pop()}.contract` };
   return undefined;
 }
@@ -73,7 +69,7 @@ export async function planContracts(dir: string): Promise<ContractPlan | null> {
   // Host side: only when generated remote types are present to enumerate exposes.
   for (const remote of config.remotes) {
     const candidates = [join(dir, '@mf-types', remote), join(dir, 'node_modules', '@mf-types', remote)];
-    const real = (await Promise.all(candidates.map(async (p) => ((await exists(p)) ? p : null)))).find(Boolean);
+    const real = (await Promise.all(candidates.map(async (p) => ((await pathExists(p)) ? p : null)))).find(Boolean);
     if (!real) {
       out.notes.push(`host remote "${remote}": no @mf-types found — run @module-federation/typescript (or add a contracts pkg) to generate host contract tests`);
       continue;

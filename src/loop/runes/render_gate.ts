@@ -1,4 +1,5 @@
 import type { Rune, RuneDecision } from '../rune.js';
+import { tail } from '../../util/text.js';
 import { ALLOW, block } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
 import { join } from 'node:path';
@@ -69,7 +70,7 @@ async function renderShouldStop(ctx: RunCtx, opts: RenderGateOpts): Promise<Rune
   const cap = opts.capture ?? defaultCapture;
   if (opts.reloadCmd) {
     const r = await run(opts.reloadCmd, ctx.workdir);
-    if (!r.ok) return block('render_gate: reload command failed', tail(r.stdout + r.stderr));
+    if (!r.ok) return block('render_gate: reload command failed', tail(r.stdout + r.stderr, 2000));
   }
   const dir = opts.outDir ?? join(ctx.workdir, '.probevane', 'shots');
   await mkdir(dir, { recursive: true });
@@ -85,7 +86,7 @@ async function renderShouldStop(ctx: RunCtx, opts: RenderGateOpts): Promise<Rune
   }
   if (opts.perfCmd) {
     const r = await run(opts.perfCmd, ctx.workdir);
-    if (!r.ok) return block('render_gate: perf budget exceeded', tail(r.stdout + r.stderr));
+    if (!r.ok) return block('render_gate: perf budget exceeded', tail(r.stdout + r.stderr, 2000));
   }
   const { pass, reasons } = await judge(opts, shot);
   if (!pass) {
@@ -110,7 +111,3 @@ export function renderGate(opts: RenderGateOpts): Rune {
   };
 }
 
-/** Last n chars — enough failure output to act on without flooding the transcript. */
-function tail(s: string, n = 2000): string {
-  return s.length > n ? s.slice(-n) : s;
-}

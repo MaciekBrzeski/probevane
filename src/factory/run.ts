@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { latestDiary } from '../commands/ship/ship.js';
 import { resolve, join, basename } from 'node:path';
 import { readFile, readdir, stat, mkdir } from 'node:fs/promises';
 import { readRuns, summarize, type RunRecord } from '../cost/ledger.js';
@@ -55,25 +56,6 @@ function runChild(opts: FactoryOpts, repo: string, stateDir: string, reportPath:
     child.on('close', (code) => res(code ?? 1));
     child.on('error', () => res(1));
   });
-}
-
-/** The most recent diary record in a repo (checkpoint sha + edited files). */
-async function latestDiary(
-  dir: string,
-): Promise<{ checkpointSha?: string; editedFiles?: string[] } | null> {
-  const dd = join(dir, '.probevane', 'diary');
-  const files = (await readdir(dd).catch(() => [] as string[])).filter((f) => f.endsWith('.json'));
-  if (!files.length) return null;
-  let newest = '',
-    mt = -1;
-  for (const f of files) {
-    const s = await stat(join(dd, f)).catch(() => null);
-    if (s && s.mtimeMs > mt) {
-      mt = s.mtimeMs;
-      newest = f;
-    }
-  }
-  return newest ? readFile(join(dd, newest), 'utf8').then(JSON.parse).catch(() => null) : null;
 }
 
 /** Newest stopReason in a ledger (the just-finished child's outcome). */

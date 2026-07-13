@@ -1,5 +1,7 @@
 import { join } from 'node:path';
-import { access, appendFile, readFile } from 'node:fs/promises';
+import { emitSummary } from '../util/gha.js';
+import { pathExists } from '../util/fs.js';
+import { readFile } from 'node:fs/promises';
 import { selectAdapter } from '../adapters/registry.js';
 import { isEasyTarget } from '../loop/triage.js';
 import { simulateCost } from '../cost/simulate.js';
@@ -25,7 +27,7 @@ async function findUntested(dir: string, changed: string[]): Promise<string[]> {
   const untested: string[] = [];
   for (const f of changed) {
     let hasSpec = false;
-    for (const cand of specCandidatesFor(f)) if (await exists(join(dir, cand))) hasSpec = true;
+    for (const cand of specCandidatesFor(f)) if (await pathExists(join(dir, cand))) hasSpec = true;
     if (!hasSpec) untested.push(f);
   }
   return untested;
@@ -118,7 +120,7 @@ async function main() {
 
   const adapter = await selectAdapter(dir);
   if (!adapter) {
-    await emit(`### probevane\nNo supported stack detected.\n`);
+    await emitSummary(`### probevane\nNo supported stack detected.\n`);
     return;
   }
 
@@ -143,18 +145,11 @@ async function main() {
     '',
   ].join('\n');
 
-  await emit(md);
+  await emitSummary(md);
   // CI signal: fail if untested changed files remain and we weren't asked to generate.
   if (!doGenerate && untested.length && args.includes('--strict')) process.exit(1);
 }
 
-/** Print the summary and mirror it to $GITHUB_STEP_SUMMARY when in Actions. */
-async function emit(md: string): Promise<void> {
-  console.log(md);
-  const summary = process.env.GITHUB_STEP_SUMMARY;
-  if (summary) await appendFile(summary, md + '\n').catch(() => {});
-}
-const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
 main().catch((e) => {
   console.error(String(e));

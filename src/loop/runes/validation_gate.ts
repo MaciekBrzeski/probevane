@@ -1,4 +1,5 @@
 import type { Rune, RuneDecision } from '../rune.js';
+import { tail } from '../../util/text.js';
 import { ALLOW, block } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
 import type { RunScope } from '../../adapters/adapter.js';
@@ -97,11 +98,6 @@ export function validationGate(scope: RunScope = 'unit', full = false): Rune {
     prepare: (ctx) => validationPrepare(ctx, state),
     shouldStop: (ctx) => validationShouldStop(ctx, scope, full, state),
   };
-}
-
-/** Last n chars — enough failure output to act on without flooding the transcript. */
-function tail(s: string, n = 2500): string {
-  return s.length > n ? s.slice(-n) : s;
 }
 
 // cross/×/✕/✗ marks via \u escapes (avoid glyph copy ambiguity).

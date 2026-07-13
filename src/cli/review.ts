@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { appendFile } from 'node:fs/promises';
+import { emitSummary } from '../util/gha.js';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { auditFiles } from '../audit/core.js';
 import { flag, dirArg } from '../util/args.js';
@@ -17,7 +17,7 @@ async function main() {
 
   const specs = await adapter.specFiles(dir);
   if (specs.length === 0) {
-    await emit(`### probevane review — ${adapter.id}\n\n**No test files found.** Grade: 0/100 — run \`probevane generate\` first.\n`);
+    await emitSummary(`### probevane review — ${adapter.id}\n\n**No test files found.** Grade: 0/100 — run \`probevane generate\` first.\n`);
     process.exit(0);
   }
 
@@ -57,15 +57,9 @@ async function main() {
     audit.errors ? `\n**Audit issues:**\n${audit.violations.filter((v) => v.severity === 'error').slice(0, 10).map((v) => `- ${v.file}:${v.line} [${v.rule}] ${v.message}`).join('\n')}` : '',
     '',
   ].join('\n');
-  await emit(md);
+  await emitSummary(md);
 }
 
-/** Print the report and mirror it to $GITHUB_STEP_SUMMARY when in Actions. */
-async function emit(md: string): Promise<void> {
-  console.log(md);
-  const s = process.env.GITHUB_STEP_SUMMARY;
-  if (s) await appendFile(s, md + '\n').catch(() => {});
-}
 
 main().catch((e) => {
   console.error(String(e));

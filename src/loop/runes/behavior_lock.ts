@@ -1,4 +1,5 @@
 import type { Rune, RuneDecision } from '../rune.js';
+import { tail } from '../../util/text.js';
 import { ALLOW, block } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
 import type { ToolCall } from '../types.js';
@@ -75,7 +76,3 @@ export function behaviorLock(): Rune {
   };
 }
 
-/** Last n chars — enough failure output to act on without flooding the transcript. */
-function tail(s: string, n = 2500): string {
-  return s.length > n ? s.slice(-n) : s;
-}
