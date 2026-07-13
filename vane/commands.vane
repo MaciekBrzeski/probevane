@@ -1,0 +1,287 @@
+# probevane command surface — the Vane source of truth.
+# Data-only entries feed the skill catalog (SKILL.md + wiki, drift-gated);
+# entries that grow a dir/arg/flag/handler spec become runtime-interpreted.
+
+command init
+  summary Detect the stack and install test deps + config.
+  usage probevane init <dir>
+  example probevane init ./my-app
+
+command plan
+  summary Read-only action plan ($0, no LLM) — untested targets + coverage gaps + source-quality errors + MFE standards errors → a prioritized generate/refactor/fix/mfe-fix to-do list. The map before pointing the loop at a repo.
+  usage probevane plan <dir> [--kind unit|e2e] [--json]
+  example probevane plan ./app
+
+command plan-feature
+  summary Feature planner — a LOCAL model fills in the middle: give it the CURRENT state and DESIRED state and it writes the detailed, ordered steps between them. Fill-in-the-middle (prefix=current, suffix=desired) when the model supports it, chat framing otherwise.
+  usage probevane plan-feature --from "<current>" --to "<desired>" [--from-file f] [--to-file f] [--model local:<id>|ollama:<id>] [--mode auto|fim|chat] [--steps N] [--json] [--out file]
+  example probevane plan-feature --from "empty repo" --to "REST API with auth"
+
+command generate
+  summary Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).
+  usage probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec] [--ship]
+  example probevane generate ./my-app --kind unit --mock
+
+command refactor
+  summary Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress).
+  usage probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+  example probevane refactor ./app --task "extract helpers into utils.ts" --quality
+
+command feature
+  summary TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.
+  usage probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+  example probevane feature ./app --task "add a discount field to cartTotal"
+
+command repair
+  summary After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality.
+  usage probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+  example probevane repair ./app --since HEAD~1
+
+command fix
+  summary Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality.
+  usage probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+  example probevane fix ./app --task "handle the null case in parse()"
+
+command migrate
+  summary Codemod / framework-version migration: change source to the new API/version while every existing test stays green (behavior_lock). --quality/--mfe gates optional; run repair after if expectations legitimately change.
+  usage probevane migrate <dir> --task "<migration>" | --to <pkg@version> [--only <path>] [--model …] [--quality] [--mfe] [--force-stop-after N] [--worktree [--worktree-merge|--worktree-review]]
+  example probevane migrate ./app --to react@19
+
+command document
+  summary Add documentation only — JSDoc/TSDoc on exported APIs + comments on non-obvious logic; no behavior change (tests + typecheck stay green). --only focuses one area.
+  usage probevane document <dir> [--only <path>] [--task "<focus>"] [--model …] [--force-stop-after N] [--worktree [--worktree-merge|--worktree-review]]
+  example probevane document ./app --only src/api.ts
+
+command visual
+  summary The VISUAL/graphics path: edit render/shader/material/geometry source to hit a visual goal. The existing test suite stays green (behavior_lock); the acceptance oracle is render_gate, NOT a test count — a running app is screenshotted and a vision model judges whether it renders cleanly AND matches the goal (+ optional perf budget), feeding its critique back into the loop until it passes. Start the dev server first and pass its URL. $0 vision via PROBEVANE_VISION_BASE (ollama) or claude with credits.
+  usage probevane visual <dir> --url <running-app-url> --goal "<what to achieve>" [--reload "<cmd>"] [--perf-cmd "<cmd>"] [--selector <css>] [--vision-votes N] [--settle <ms>] [--task "<hint>"] [--model …] [--only <path>] [--budget N]
+  example probevane visual packages/render --url http://localhost:5173 --goal "creatures have visibly dense fur"
+
+command review
+  summary Read-only quality grade (0–100) of a suite: green, coverage, audit, flake.
+  usage probevane review <dir> [--flake N]
+  example probevane review ./app
+
+command a11y
+  summary Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade.
+  usage probevane a11y <dir>
+  example probevane a11y ./app
+
+command bench
+  summary Measure a suite: coverage, audit, and mutation score (does it catch bugs?).
+  usage probevane bench <dir> [--mutants N]
+  example probevane bench ./app --mutants 6
+
+command mutation
+  summary Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --budget caps mutants (sampled evenly); string/comment literals skipped.
+  usage probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--all] [--json]
+  example probevane mutation . --budget 60 --min-score 0.6
+
+command ci
+  summary PR helper: report changed-untested files + coverage; --generate adds tests; --review-fix reviews the diff (gated) and auto-fixes.
+  usage probevane ci <dir> [--base <ref>] [--generate] [--review-fix] [--strict]
+  example probevane ci . --base origin/main --review-fix
+
+command mock
+  summary Synthesize the mock boundary (MSW handlers, fixtures, contracts) from the module graph.
+  usage probevane mock <dir>
+  example probevane mock ./app
+
+command graph
+  summary Render the module dependency graph (ASCII tree + Mermaid).
+  usage probevane graph <dir> [--mermaid <file>]
+  example probevane graph ./app --mermaid graph.md
+
+command search
+  summary Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses); --similar --fns goes one level deeper and ranks FUNCTION pairs by doc-comment similarity (merge candidates — leans on the doc-comment quality rule for coverage; default threshold 0.9, report-only). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Indexes cached at .probevane/search-index.json + search-fn-index.json.
+  usage probevane search <dir> "<concept>" [--top N] [--fresh] | probevane search <dir> --similar [--fns] [--threshold 0.85] [--top N]
+  example probevane search . --similar --fns
+
+command spec
+  summary Generate a project SPEC.md (graph, modules, API surface, coverage); --narrate adds LLM descriptions; --wiki publishes.
+  usage probevane spec <dir> [--narrate] [--out <file>] [--wiki]
+  example probevane spec ./app --narrate
+
+command run
+  summary Execute the test suite via the detected adapter.
+  usage probevane run <dir> [--scope unit|e2e|all]
+  example probevane run ./app --scope unit
+
+command coverage
+  summary Report coverage via the adapter.
+  usage probevane coverage <dir>
+  example probevane coverage ./app
+
+command audit
+  summary Static quality gate over the spec files (exit 1 on errors).
+  usage probevane audit <dir>
+  example probevane audit ./app
+
+command status
+  summary Quick dashboard: adapter, suite result, coverage.
+  usage probevane status <dir>
+  example probevane status ./app
+
+command learn
+  summary Save a spec to the cross-project learning library.
+  usage probevane learn <dir> --file <spec> --category <c> [--kind] [--bad]
+  example probevane learn ./app --file src/x.test.ts --category crud
+
+command eval
+  summary Run probevane's fixture eval (self-test of the harness); --live regenerates; --paths replays the refactor/feature/repair cassettes (--record --model bridge re-records for $0).
+  usage probevane eval [--live] [--flake N] [--paths [--record] [--model <m>]]
+  example probevane eval
+
+command watch
+  summary Watch src/ and on each save map the file → repair (has a test) or generate (none); --run triggers the loop.
+  usage probevane watch <dir> [--run] [--debounce ms]
+  example probevane watch ./app --run
+
+command skill
+  summary Generate/check the probevane control skill (this doc). --check fails on drift.
+  usage probevane skill [--check]
+  example probevane skill --check
+
+command improve-cycle
+  summary Close the self-improvement loop — promote a model as the loop default (writes <state>/model.json, which generate reads when no --model/config given), or --compare two eval results and promote the better (higher acceptance, then lower cost). LoRA training stays distill train --execute; this auto-measures/auto-promotes.
+  usage probevane improve-cycle [--promote <model>] [--compare <a.json> <b.json>] [--status]
+  example probevane improve-cycle --status
+
+command distill
+  summary Build a fine-tuning dataset from accepted-test traces (PROBEVANE_TRACES=1) and print the LoRA training plan; serve the result via --model local:.
+  usage probevane distill <build|stats|train|bases> [--execute] [--models a,b]
+  example probevane distill build
+
+command serve
+  summary Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs.
+  usage probevane serve [dir] [--port N]
+  example probevane serve ./app
+
+command improve
+  summary Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop).
+  usage probevane improve --url <u> --target <file> --goal "<g>" [--selector <css>] [--reload <cmd>] [--max N]
+  example probevane improve --url http://localhost:4173/x --target src/ui/loop.html --goal "make the header prominent"
+
+command arch
+  summary Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits. --snapshot persists the coupling metrics (docs/arch-snapshot.json) and prints drift vs the previous snapshot — commit it to make coupling regressions visible over time. --pyramid scores the tree against the pyramid structure model (isolated feature pyramids on a glue base, shared dirs as the common floor): dir roles inferred from coupling, declared durably in probevane.config (arch: { glue, shared, feature }) or per-run via --glue/--shared/--feature (flag > config > heuristic); flags feature→feature, feature→glue, shared→feature and glue deep-reach imports with per-violation fix cost, 0-100 score; appends the folder-crowding check — dirs over --max-files (config arch.maxFiles, default 15) get subfolder candidates (>=3 same-prefix files) and move suggestions for zero-cohesion files (index/barrel + registry patterns suppressed).
+  usage probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d] [--feature e,f] [--max-files N]] [--snapshot [--out <file>]]
+  example probevane arch . --pyramid
+
+command design
+  summary Combined design loop — write a Playwright spec that screenshots each page/tab, a vision model judges each shot for design practice, then rewrite the target html's <style> to address findings, and repeat. Leaves the spec as a visual-regression test. $0 vision via PROBEVANE_VISION_BASE (ollama cloud minimax-m3).
+  usage probevane design --url <u> --target <file> [--tabs a,b,c] [--goal "<g>"] [--rounds N] [--spec <file>]
+  example probevane design --url http://localhost:7766/ --target src/ui/control.html --tabs projects,runs,docs --spec e2e-dash/control-shots.spec.ts
+
+command enqueue
+  summary Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake.
+  usage probevane enqueue <op> <dir> [--root <stateDir>] [...op flags]
+  example probevane enqueue generate ./app --kind unit
+
+command scan
+  summary Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon).
+  usage probevane scan <repos.txt | dir...> [--op generate] [--root <stateDir>]
+  example probevane scan repos.txt --op generate
+
+command otel
+  summary Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans — one per run — + metrics: token usage, runs, acceptance, cost by model) → write a file, POST to a collector (--endpoint / OTEL_EXPORTER_OTLP_ENDPOINT), or emit Prometheus text (--prometheus). $0, reads runs.jsonl.
+  usage probevane otel [--root <stateDir>] [--out <file>] [--endpoint <url>] [--prometheus]
+  example probevane otel --prometheus
+
+command doctor
+  summary Health checks distilled from real field failures — detect (and with --fix repair) broken toolchains (bootstraps e.g. a python .venv), coverage blind spots (source never loaded by any test, respecting deliberate config excludes), git-tracked test artifacts (untrack + gitignore), package.json "files" entries that don't exist, CI steps swallowing failures (|| true), and stale replay cassettes; also missing node_modules/Playwright browsers, invalid probevane.config, absent live credentials, eval case↔fixture↔baseline bijection, and stale coverage reports. --full appends a read-only grader scorecard (audit/assertions/coverage/quality/arch). Exit 1 on unfixed errors.
+  usage probevane doctor <dir> [--fix] [--full] [--json]
+  example probevane doctor . --fix
+
+command history
+  summary Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown; --trend adds the daily time-series + the daemon’s cost/acceptance alerts.
+  usage probevane history [--limit N] [--json] [--trend [--days N]]
+  example probevane history --trend
+
+command peek
+  summary Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console.
+  usage probevane peek [dir]
+  example probevane peek ./app
+
+command revert
+  summary Undo a run — restore the files a run edited to its pre-run checkpoint (or remove ones it created), from the diary record. Safety net for a crashed/bad run.
+  usage probevane revert <runId> [dir]
+  example probevane revert run-abc123 ./app
+
+command impact
+  summary Test-impact analysis — which specs are affected by the diff since <base> (transitive import graph); --run executes only those to speed CI.
+  usage probevane impact <dir> [--base <ref>] [--run] [--json]
+  example probevane impact . --base origin/main --run
+
+command assert-score
+  summary Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation).
+  usage probevane assert-score <dir> [--json]
+  example probevane assert-score ./app
+
+command simcost
+  summary Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger.
+  usage probevane simcost [dir] [--easy N --hard M] [--local-hit R] [--json]
+  example probevane simcost ./app --local-hit 0.6
+
+command factory
+  summary Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted + retried once — into one cost/coverage/quality rollup (report.json, with an error-mode breakdown). --resume skips repos already accepted in a prior report. Unrecognized flags forward to generate per-repo.
+  usage probevane factory <repos.txt | dir...> [--concurrency N] [--kind unit|e2e] [--report <path>] [--state-root <dir>] [--resume] [--no-retry] [--no-checkpoint] [--ship] [--emit-matrix [--out <file>]] [...generate flags]
+  example probevane factory repos.txt --concurrency 4 --model auto
+
+command quality
+  summary Project source-quality gate — file size, function length/cyclomatic+cognitive complexity/nesting/params, long lines, debt markers (TODO/FIXME, comment-scoped), import fan-out, (maximal-block) duplication, and doc coverage (doc-comment: a function should say what it does and why; type-doc: an exported interface/type should carry a shape comment) → a 0–100 health grade. Size rules count CODE lines only — comment-only lines never push a file/function over the bar, so the gate rewards documenting instead of punishing it. --strict exits 1 on error-severity violations (CI); --sarif emits GitHub code-scanning output; --write-baseline ratchets (gate only NEW violations on a messy repo, --no-baseline ignores it); --since <ref> scans only changed files; --no-docs disables the doc rules. Complements audit (test specs), assert-score (assertions), bench (mutation).
+  usage probevane quality <dir> [--strict] [--json] [--sarif] [--write-baseline] [--no-baseline] [--since <ref>] [--max-file N] [--max-fn N] [--max-complexity N] [--max-cognitive N] [--max-nesting N] [--max-params N] [--max-width N] [--max-imports N] [--no-debt] [--no-docs]
+  example probevane quality ./app --strict
+
+command mfe-audit
+  summary Micro-frontend (Module Federation) standards gate — per repo: boundaries (no deep cross-remote imports), shared singletons, runtime resilience (Suspense + error boundary), typed contracts; across repos: shared version alignment. Pure analysis ($0, no LLM) → grade + violations; --strict exits 1 (CI). The fitness function the refactor loop enforces.
+  usage probevane mfe-audit <dir | repos.txt> [--repos <file>] [--json] [--strict] [--design-system <pkg>]
+  example probevane mfe-audit ./host --strict
+
+command mfe-contract
+  summary Generate Module Federation contract tests (deterministic, $0) — remote-side compile-time conformance (exposed module satisfies its published contract) + host-side mocked tests (consume each federated remote against its contract). Auto-detects the type source (*-contracts pkg / sibling .contract.ts / @mf-types) and falls back to a structural smoke with a publish-types note. Dry-run by default; --write emits.
+  usage probevane mfe-contract <dir> [--write] [--json]
+  example probevane mfe-contract ./cart --write
+
+command mfe
+  summary Drive the micro-frontend (Module Federation) refactor pipeline over a polyrepo fleet — per repo: audit → (contract tests) → (generate) → (fix standards via refactor --mfe --quality), then cross-repo shared-version alignment + a combined report. Default (no LLM flags) = a $0 fleet standards report; --contract adds deterministic contract tests; --generate/--fix run the loop.
+  usage probevane mfe <repos.txt | dir...> [--contract] [--generate] [--fix] [--model …] [--concurrency N] [--report <path>] [--strict] [--json]
+  example probevane mfe repos.txt --contract
+
+command tui
+  summary The control center IN THE TERMINAL. Auto-launches the daemon (if not already up), then renders panes — cost sparkline, rune-pipeline light show, active jobs, alerts — on a diff-flushed screen (no flicker). Keys: q quit · r refresh · s drop to a shell (run generate/claude, then come back) · ↑↓ select a run · enter to replay its light show. $0 (pure client of the daemon; Ctrl-C restores the terminal).
+  usage probevane tui [--port N] [--root <stateDir>]
+  example probevane tui
+
+command daemon
+  summary Long-running OPERATE/OBSERVE + control-center service — the LCARS control center (/) — Projects/Runs/Docs/Launch/Cost/Quality/Console tabs; the Console renders the rune pipeline as a live node graph (gate blocks flash red during watched runs, accept cascades green), telemetry gauges/sparks, the module constellation, and THEATER replay of any captured run’s light show (no loop, ␤0). Routes: /health, /aggregate, /alerts, /audit, /jobs, /queue, /metrics (Prometheus), /otel/{traces,metrics}, /pipeline, /graph, /events?runId (theater), POST /run + /enqueue + /cancel?id=. PROBEVANE_UI_DEV=1 recompiles the TSX sources per request (edit → refresh); PROBEVANE_TERMINAL=1 arms a Terminal tab — a live browser shell over a PTY (run claude/any CLI in-console) via /term/{start,stream,input,resize,kill,sessions} (opt-in; it bypasses the launch allowlist, loopback bind is the only auth). With PROBEVANE_QUEUE=1 it becomes a SUPERVISOR — pulls <state>/queue.jsonl on a tick and dispatches runs (+ships on accept with PROBEVANE_SHIP=1), lights-out. Launched jobs persist to jobs.jsonl (restart-safe); structured log rotates; periodic alert re-eval + optional webhook. Binds 127.0.0.1; read-only over ledgers.
+  usage probevane daemon [--port N] [--root <stateDir>] [--interval SEC]
+  example probevane daemon --port 7766
+
+command ado
+  summary Azure DevOps board integration — `ado run` polls the board for tagged work items, runs the loop per item, and reports progress back as state moves + comments; `ado create` files a task. Auth via AZURE_DEVOPS_PAT.
+  usage probevane ado <run|create> [--project P] [--org O] [--tag probevane] [--title "<t>"] [--type Issue]
+  example probevane ado run --project probevane
+
+command docs
+  summary Stack-agnostic narrative documentation loop — grounds a model on a language-agnostic project digest and writes a comprehensive long-form Markdown guide, gated so it cites only real paths (anti-hallucination). Unlike `document` (JSDoc on source) and `spec` (TS-import structured dump), works on any language.
+  usage probevane docs <dir> [--out <path>] [--sections a,b,c] [--model …] [--max-steps N] [--budget N]
+  example probevane docs ./app --model bridge
+
+command pipeline
+  summary Describe the loop pipeline a config assembles, WITHOUT running it — profile() is a pure (config) to Rune[] function, so the runes/hooks/phases are derivable. Prints a phase-grouped listing + Mermaid; powers the wiki "Loop pipeline" interactive demo.
+  usage probevane pipeline [--profile feature] [--kind unit|e2e] [--quality --mutation --flake --a11y --visual --mfe --min-tests N --min-coverage P] [--json | --mermaid <out> | --emit-model <file>]
+  example probevane pipeline --profile feature --quality --json
+
+command intake
+  summary Turn a simple NL prompt into a frozen, machine-checkable RunSpec ($0, no LLM required): classify the task path, ask the few clarifying questions (interactive TTY) or read a policy file (--answers), and persist <state>/specs/<id>.json — the specification a dark run executes. One spec object, two fill-modes.
+  usage probevane intake "<prompt>" <dir> [--answers f.json | --interactive] [--model m] [--takeover t] [--strict] [--json] [--root <state>]
+  example probevane intake "add unit tests" ./app --answers policy.json
+
+command factory-dark
+  summary The dark factory: prompt → RunSpec (intake) → per-file decomposition (buildPlan) → enqueue each single-file unit onto the supervisor queue. A daemon with PROBEVANE_QUEUE=1 runs them unattended, ships accepted units, and PARKS deterministic give-ups (difficulty/max_steps/stuck) with the stop reason instead of blind-retrying. --dry-run previews units; --report <batchId> rolls the ledger up per unit (accepted/parked/pending).
+  usage probevane factory-dark "<prompt>" <dir> [--answers f.json | --interactive] [--model m] [--dry-run] [--root <state>] [--json] | probevane factory-dark --report <batchId> [--root <state>]
+  example probevane factory-dark "add tests" ./app --answers policy.json --model ollama
+command vane
+  summary Lint the .vane declarative sources (command specs, profiles, adapter manifests) — parse + structural validation with tsc-style file:line errors. --check is the CI consistency gate (grows the profiles.gen.ts byte-compare when the profiles codegen lands).
+  usage probevane vane [--check]
+  example probevane vane --check

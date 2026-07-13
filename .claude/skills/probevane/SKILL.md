@@ -81,6 +81,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `pipeline` | Describe the loop pipeline a config assembles, WITHOUT running it — profile() is a pure (config) to Rune[] function, so the runes/hooks/phases are derivable. Prints a phase-grouped listing + Mermaid; powers the wiki "Loop pipeline" interactive demo. |
 | `intake` | Turn a simple NL prompt into a frozen, machine-checkable RunSpec ($0, no LLM required): classify the task path, ask the few clarifying questions (interactive TTY) or read a policy file (--answers), and persist <state>/specs/<id>.json — the specification a dark run executes. One spec object, two fill-modes. |
 | `factory-dark` | The dark factory: prompt → RunSpec (intake) → per-file decomposition (buildPlan) → enqueue each single-file unit onto the supervisor queue. A daemon with PROBEVANE_QUEUE=1 runs them unattended, ships accepted units, and PARKS deterministic give-ups (difficulty/max_steps/stuck) with the stop reason instead of blind-retrying. --dry-run previews units; --report <batchId> rolls the ledger up per unit (accepted/parked/pending). |
+| `vane` | Lint the .vane declarative sources (command specs, profiles, adapter manifests) — parse + structural validation with tsc-style file:line errors. --check is the CI consistency gate (grows the profiles.gen.ts byte-compare when the profiles codegen lands). |
 
 ## Reference
 
@@ -586,6 +587,15 @@ The dark factory: prompt → RunSpec (intake) → per-file decomposition (buildP
 probevane factory-dark "<prompt>" <dir> [--answers f.json | --interactive] [--model m] [--dry-run] [--root <state>] [--json] | probevane factory-dark --report <batchId> [--root <state>]
 # e.g.
 probevane factory-dark "add tests" ./app --answers policy.json --model ollama
+```
+
+### vane
+Lint the .vane declarative sources (command specs, profiles, adapter manifests) — parse + structural validation with tsc-style file:line errors. --check is the CI consistency gate (grows the profiles.gen.ts byte-compare when the profiles codegen lands).
+
+```
+probevane vane [--check]
+# e.g.
+probevane vane --check
 ```
 
 ## Safety + cost

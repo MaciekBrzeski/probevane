@@ -184,3 +184,18 @@ describe('util/generated', () => {
     expect(isGeneratedSource('// hand-written\n// @generated on line 2 does not count')).toBe(false);
   });
 });
+
+describe('vane catalog (the real shipped commands.vane)', () => {
+  it('loads, validates, and matches the catalog shim', async () => {
+    // No PROBEVANE_ROOT here — exercises the moduleDir fallback on the repo itself.
+    delete process.env.PROBEVANE_ROOT;
+    clearVaneCache();
+    const { COMMANDS } = await import('../src/commands/skill/catalog.js');
+    expect(COMMANDS.length).toBeGreaterThanOrEqual(56);
+    const names = COMMANDS.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length); // the dup bug class, gated forever
+    expect(names).toContain('vane');
+    const mutation = COMMANDS.find((c) => c.name === 'mutation')!;
+    expect(mutation.usage).toContain('[--min-score P]');
+  });
+});

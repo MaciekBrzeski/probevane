@@ -18,6 +18,8 @@
   "files": [
     "bin/",
     "dist/",
+    "vane/",
+    "prompts/",
     "scripts/train_lora.py",
     "action.yml",
     "README.md"
