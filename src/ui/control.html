@@ -254,7 +254,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-region { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:8px; overflow-y:auto; }
 .chat-convo { min-height:240px; max-height:44vh; display:flex; flex-direction:column; gap:8px; }
 .chat-signals { min-height:240px; max-height:44vh; display:flex; flex-direction:column; gap:8px; }
-.chat-tools { min-height:130px; max-height:28vh; }
+.chat-tools { min-height:160px; max-height:42vh; }
 
 .chat-msg { border-left:3px solid var(--line); padding:5px 10px; }
 .chat-msg.user { border-left-color:var(--acc); }
@@ -276,6 +276,20 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-live { display:flex; align-items:center; font-size:12px; color:var(--warn); }
 .chat-live.chat-live-off { color:var(--ok); }
 .chat-live.chat-live-off .chat-live-dot { animation:none; background:var(--ok); }
+
+/* tool region: rune-pipeline strip + live status line + chain-of-thought turns */
+.chat-pipeline { display:flex; flex-wrap:wrap; gap:4px; margin:2px 0 6px; }
+.chat-rune { font-size:10px; font-family:var(--num); letter-spacing:.03em; padding:2px 6px; border-radius:3px; border:1px solid var(--line); color:var(--dim); background:var(--bg); white-space:nowrap; transition:color .2s, border-color .2s, background .2s; }
+.chat-rune.s-active { color:var(--warn); border-color:var(--warn); background:rgba(210,153,34,.12); }
+.chat-rune.s-ok { color:var(--ok); border-color:var(--ok); background:rgba(63,185,80,.12); }
+.chat-rune.s-err { color:var(--err); border-color:var(--err); background:rgba(248,81,73,.14); }
+.chat-status { display:flex; align-items:center; font-size:12px; color:var(--warn); margin-bottom:6px; }
+.chat-status.chat-live-off { color:var(--ok); }
+.chat-status.chat-live-off .chat-live-dot { animation:none; background:var(--ok); }
+.chat-status .chat-tok { color:var(--dim); font-family:var(--num); font-size:11px; margin-left:8px; }
+.chat-status .chat-err { color:var(--err); }
+.chat-turns { max-height:26vh; overflow-y:auto; }
+.chat-turns .turn { font-size:12px; }
 
 .chat-input { display:flex; gap:8px; margin-top:12px; }
 .chat-input input { flex:1; }
@@ -838,6 +852,26 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     );
   }
 
+  // src/observe/pipeline.ts
+  function promote(state, from, to) {
+    for (const k of Object.keys(state)) if (state[k] === from) state[k] = to;
+  }
+  function setAll(state, runes, value) {
+    for (const r of runes) state[r] = value;
+  }
+  function pipelineReducer(state, ev, runeNames) {
+    const next = { ...state };
+    if (ev.gate) next[ev.gate] = "err";
+    else if (ev.tool) promote(next, "err", "active");
+    if (ev.accepted) setAll(next, runeNames, "ok");
+    else if (ev.stopReason && ev.stopReason !== "accepted") promote(next, "active", "err");
+    return next;
+  }
+  function replayDelayMs(prevTs, ts) {
+    const gap = prevTs && ts ? Date.parse(ts) - Date.parse(prevTs) : NaN;
+    return Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
+  }
+
   // src/ui/app/chat-tab.tsx
   var MODELS = [
     "auto",
@@ -906,58 +940,127 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     el.appendChild(/* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "proposed next (pick a model + run)"));
     for (const p of proposals) el.appendChild(proposalSignal(dir, p));
   }
+  function profileFor(op) {
+    switch (op) {
+      case "feature":
+        return "feature";
+      case "refactor":
+        return "refactor";
+      case "repair":
+      case "fix":
+        return op;
+      case "document":
+        return "document";
+      default:
+        return "write_tests";
+    }
+  }
+  async function pipelineRunes(op) {
+    try {
+      const p = await j("/pipeline?profile=" + encodeURIComponent(profileFor(op)));
+      return p.runes.map((r) => ({ name: r.name, phase: r.phase, summary: r.summary }));
+    } catch {
+      return [];
+    }
+  }
+  function renderPipeline(host, runes, state) {
+    if (!runes.length) {
+      host.replaceChildren(empty("pipeline unavailable"));
+      return;
+    }
+    host.replaceChildren(...runes.map((r) => {
+      const s = state[r.name] ?? "idle";
+      return /* @__PURE__ */ h("span", { class: `chat-rune s-${s}`, title: `${r.phase}: ${r.summary}` }, r.name);
+    }));
+  }
+  function statusMsg(e) {
+    if (e.accepted) return "accepted \u2014 all gates green";
+    if (e.stopReason) return `\u2014 ${e.stopReason} \u2014`;
+    if (e.gate) {
+      const why = e.gateBlockReasons?.[0];
+      return `blocked at ${e.gate}${why ? ` \xB7 ${why}` : ""}`;
+    }
+    if (e.tool) return `step ${e.step ?? "?"} \xB7 ${e.tool}`;
+    if (e.step != null) return `step ${e.step}`;
+    return "working\u2026";
+  }
+  function statusLine(e) {
+    const spent = (e.tokensOut ?? 0) || (e.tokensIn ?? 0);
+    const tok = spent ? /* @__PURE__ */ h("span", { class: "chat-tok" }, "\u2191", e.tokensOut ?? 0, " \u2193", e.tokensIn ?? 0) : null;
+    return /* @__PURE__ */ h("span", null, /* @__PURE__ */ h("span", { class: "chat-live-dot" }), statusMsg(e), " ", tok);
+  }
   async function runLaunch(dir, op, flags, label) {
     setRunning(true);
     const model = flags[flags.indexOf("--model") + 1] ?? "auto";
     convo("assistant", "asst", /* @__PURE__ */ h("span", null, "running ", /* @__PURE__ */ h("b", null, op), " with model ", /* @__PURE__ */ h("b", null, model), "\u2026"));
-    const pre = /* @__PURE__ */ h("pre", { class: "chat-stream" });
-    setTools(/* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-live" }, /* @__PURE__ */ h("span", { class: "chat-live-dot" }), label), pre));
+    const pipe = /* @__PURE__ */ h("div", { class: "chat-pipeline" });
+    const status = /* @__PURE__ */ h("div", { class: "chat-status" }, statusLine({}));
+    const turns = /* @__PURE__ */ h("div", { class: "chat-turns" }, /* @__PURE__ */ h("div", { class: "chat-empty" }, "waiting for the model\u2026"));
+    setTools(
+      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "pipeline \xB7 ", profileFor(op)), pipe, status, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "chain of thought"), turns)
+    );
+    const runes = await pipelineRunes(op);
+    let state = {};
+    renderPipeline(pipe, runes, state);
     const body = JSON.stringify({ op, dir, flags });
     const r = await j("/run", { method: "POST", headers: { "content-type": "application/json" }, body });
     if (r.error) {
-      pre.textContent = "\u2717 " + r.error;
+      status.replaceChildren(/* @__PURE__ */ h("span", { class: "chat-err" }, "\u2717 ", r.error));
       convo("assistant", "asst err", /* @__PURE__ */ h("span", null, "\u2717 ", r.error));
       setRunning(false);
       return;
     }
-    pre.textContent = `\u25B6 job ${r.id}
-`;
-    streamRun(dir, pre, (stop) => {
-      setRunning(false);
-      convo("assistant", "asst", /* @__PURE__ */ h("span", null, "run finished \u2014 ", /* @__PURE__ */ h("b", null, stop ?? "done")));
-      $("chat-tools").querySelector(".chat-live")?.classList.add("chat-live-off");
-      void showProposals(dir);
+    streamRun(dir, {
+      onEvent: (e) => {
+        state = pipelineReducer(state, e, runes.map((x) => x.name));
+        renderPipeline(pipe, runes, state);
+        status.replaceChildren(statusLine(e));
+      },
+      onTurn: (t) => {
+        turns.querySelector(".chat-empty")?.remove();
+        turns.appendChild(/* @__PURE__ */ h(Turn, { t }));
+        turns.scrollTop = turns.scrollHeight;
+      },
+      onDone: (stop) => {
+        setRunning(false);
+        status.classList.add("chat-live-off");
+        convo("assistant", "asst", /* @__PURE__ */ h("span", null, "run finished \u2014 ", /* @__PURE__ */ h("b", null, stop ?? "done")));
+        void showProposals(dir);
+      }
     });
   }
-  function streamRun(dir, pre, onDone) {
+  function streamRun(dir, cb) {
     const es2 = new EventSource("/stream?dir=" + encodeURIComponent(dir));
-    let last = "";
+    let followES2 = null;
     let done = false;
     const finish = (stop) => {
       if (done) return;
       done = true;
       es2.close();
-      onDone(stop);
+      followES2?.close();
+      cb.onDone(stop);
     };
     es2.onmessage = (ev) => {
       try {
         const e = JSON.parse(ev.data);
-        const line = `${e.kind ?? "event"}${e.step != null ? ` step ${e.step}` : ""}${e.tool ? ` \xB7 ${e.tool}` : ""}`;
-        if (line !== last) {
-          pre.textContent += line + "\n";
-          last = line;
-          pre.scrollTop = pre.scrollHeight;
-        }
-        if (e.stopReason) {
-          pre.textContent += `
-\u2014 ${e.stopReason} \u2014
-`;
-          finish(e.stopReason);
-        }
+        if (e.runId && !followES2) followES2 = followTranscript(dir, e.runId, cb.onTurn);
+        if (e.delta !== void 0) return;
+        cb.onEvent(e);
+        if (e.stopReason) finish(e.stopReason);
       } catch {
       }
     };
     es2.onerror = () => finish();
+  }
+  function followTranscript(dir, runId, onTurn) {
+    const es2 = new EventSource("/transcript?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(runId) + "&follow=1");
+    es2.onmessage = (ev) => {
+      try {
+        onTurn(JSON.parse(ev.data));
+      } catch {
+      }
+    };
+    return es2;
   }
   async function send() {
     if (running) return;
@@ -1048,29 +1151,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     });
   }
 
-  // src/observe/pipeline.ts
-  function promote(state, from, to) {
-    for (const k of Object.keys(state)) if (state[k] === from) state[k] = to;
-  }
-  function setAll(state, runes, value) {
-    for (const r of runes) state[r] = value;
-  }
-  function pipelineReducer(state, ev, runeNames) {
-    const next = { ...state };
-    if (ev.gate) next[ev.gate] = "err";
-    else if (ev.tool) promote(next, "err", "active");
-    if (ev.accepted) setAll(next, runeNames, "ok");
-    else if (ev.stopReason && ev.stopReason !== "accepted") promote(next, "active", "err");
-    return next;
-  }
-  function replayDelayMs(prevTs, ts) {
-    const gap = prevTs && ts ? Date.parse(ts) - Date.parse(prevTs) : NaN;
-    return Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
-  }
-
   // src/ui/app/console.tsx
   var PIPE_RUNES = [];
-  function renderPipeline(states = {}) {
+  function renderPipeline2(states = {}) {
     if (!PIPE_RUNES.length) return;
     const nodes = PIPE_RUNES.map((r, i) => ({
       id: r.name,
@@ -1087,7 +1170,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     try {
       const p = await j("/pipeline");
       PIPE_RUNES = p.runes.map((r) => ({ name: r.name, phase: r.phase, summary: r.summary }));
-      renderPipeline();
+      renderPipeline2();
     } catch {
       $("pipelineGraph").textContent = "pipeline unavailable";
     }
@@ -1124,11 +1207,11 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   function consolePipelineEvent(ev) {
     if (!PIPE_RUNES.length) return;
     PIPE_STATE = pipelineReducer(PIPE_STATE, ev, PIPE_RUNES.map((r) => r.name));
-    renderPipeline(PIPE_STATE);
+    renderPipeline2(PIPE_STATE);
   }
   function consolePipelineReset() {
     PIPE_STATE = {};
-    renderPipeline(PIPE_STATE);
+    renderPipeline2(PIPE_STATE);
   }
   var THEATER_TIMER = null;
   async function startTheater(runId) {
@@ -1491,14 +1574,14 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
         const e = JSON.parse(ev.data);
         if (e.runId) {
           es2.removeEventListener("message", once);
-          followTranscript(dir, e.runId, tbox);
+          followTranscript2(dir, e.runId, tbox);
         }
       } catch {
       }
     };
     es2.addEventListener("message", once);
   }
-  function followTranscript(dir, runId, tbox) {
+  function followTranscript2(dir, runId, tbox) {
     stopFollow();
     followES = new EventSource("/transcript?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(runId) + "&follow=1");
     followES.onmessage = (ev) => {

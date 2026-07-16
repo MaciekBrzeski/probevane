@@ -1,4 +1,5 @@
-import { $, j } from './lib.ts';
+import { $, j, type TurnData } from './lib.ts';
+import { pipelineReducer, type PipelineState } from '../../observe/pipeline.ts';
 import type { Interpretation, Proposal } from '../../util/assistant-shape.ts';
 
 // Chat tab renderer — three regions, deterministic and non-deterministic kept
@@ -7,8 +8,11 @@ import type { Interpretation, Proposal } from '../../util/assistant-shape.ts';
 //     lifecycle. The "talking to the model" thread.
 //   • signals (#chat-signals): the DETERMINISTIC $0 output — the interpreted plan
 //     (op/flags), the plan context, and post-run proposals. Replaced per request.
-//   • tool output (#chat-tools): the run's streamed loop events (the model's
-//     actual work), with a live indicator.
+//   • tool output (#chat-tools): the run's live detail — the rune-pipeline strip
+//     (which phase/gate is running, lit by the same reducer the console uses), a
+//     status line (active step · tool, or blocked-at gate, + tokens), and the
+//     chain-of-thought turn stream (the model's text + tool calls/results,
+//     followed live from the transcript).
 // Each region animates its loading / empty / unavailable state.
 //
 // Bridge is NOT offered here (a daemon run has no servicer for it → hangs), and
@@ -128,43 +132,150 @@ async function showProposals(dir: string): Promise<void> {
   for (const p of proposals) el.appendChild(proposalSignal(dir, p));
 }
 
+// --- pipeline strip ---------------------------------------------------------
+
+/** One rune as the strip renders it (from GET /pipeline). */
+interface PipeRune { name: string; phase: string; summary: string }
+
+/** The full loop-event shape the strip + status line read (superset of the
+ *  reducer's slice). All optional — a given event carries only some. */
+interface RunEvent {
+  runId?: string; step?: number; tool?: string; gate?: string;
+  gateBlockReasons?: string[]; tokensIn?: number; tokensOut?: number;
+  accepted?: boolean; stopReason?: string; delta?: string;
+}
+
+/** Map a launch op to the loop profile whose pipeline the strip should show. */
+function profileFor(op: string): string {
+  switch (op) {
+    case 'feature': return 'feature';
+    case 'refactor': return 'refactor';
+    case 'repair': case 'fix': return op;
+    case 'document': return 'document';
+    default: return 'write_tests';
+  }
+}
+
+/** Fetch the ordered runes for a profile ($0); [] if the endpoint is down. */
+async function pipelineRunes(op: string): Promise<PipeRune[]> {
+  try {
+    const p = (await j('/pipeline?profile=' + encodeURIComponent(profileFor(op)))) as { runes: PipeRune[] };
+    return p.runes.map((r) => ({ name: r.name, phase: r.phase, summary: r.summary }));
+  } catch { return []; }
+}
+
+/** Paint the rune lamps — same idle/active/ok/err states the console light-show uses. */
+function renderPipeline(host: HTMLElement, runes: PipeRune[], state: PipelineState): void {
+  if (!runes.length) { host.replaceChildren(empty('pipeline unavailable')); return; }
+  host.replaceChildren(...runes.map((r) => {
+    const s = state[r.name] ?? 'idle';
+    return <span class={`chat-rune s-${s}`} title={`${r.phase}: ${r.summary}`}>{r.name}</span>;
+  }));
+}
+
+/** The status message for one event: which step/tool runs, or which gate blocked. */
+function statusMsg(e: RunEvent): string {
+  if (e.accepted) return 'accepted — all gates green';
+  if (e.stopReason) return `— ${e.stopReason} —`;
+  if (e.gate) {
+    const why = e.gateBlockReasons?.[0];
+    return `blocked at ${e.gate}${why ? ` · ${why}` : ''}`;
+  }
+  if (e.tool) return `step ${e.step ?? '?'} · ${e.tool}`;
+  if (e.step != null) return `step ${e.step}`;
+  return 'working…';
+}
+
+/** The live one-liner node: pulsing dot + status message + a token counter. */
+function statusLine(e: RunEvent): Node {
+  const spent = (e.tokensOut ?? 0) || (e.tokensIn ?? 0);
+  const tok = spent ? <span class="chat-tok">↑{e.tokensOut ?? 0} ↓{e.tokensIn ?? 0}</span> : null;
+  return <span><span class="chat-live-dot"></span>{statusMsg(e)} {tok}</span>;
+}
+
 // --- run + stream -----------------------------------------------------------
 
-/** Launch a run, stream its tool events into the tool region, narrate lifecycle
- *  in the conversation, then show proposals in signals. */
+/** Launch a run; wire the tool region (pipeline strip + status + chain-of-thought
+ *  turns), narrate lifecycle in the conversation, then show proposals in signals. */
 async function runLaunch(dir: string, op: string, flags: string[], label: string): Promise<void> {
   setRunning(true);
   const model = flags[flags.indexOf('--model') + 1] ?? 'auto';
   convo('assistant', 'asst', <span>running <b>{op}</b> with model <b>{model}</b>…</span>);
-  const pre = <pre class="chat-stream"></pre> as HTMLElement;
-  setTools(<div><div class="chat-live"><span class="chat-live-dot"></span>{label}</div>{pre}</div>);
+
+  const pipe = <div class="chat-pipeline"></div> as HTMLElement;
+  const status = <div class="chat-status">{statusLine({})}</div> as HTMLElement;
+  const turns = <div class="chat-turns"><div class="chat-empty">waiting for the model…</div></div> as HTMLElement;
+  setTools(
+    <div>
+      <div class="chat-signal-sub">pipeline · {profileFor(op)}</div>
+      {pipe}
+      {status}
+      <div class="chat-signal-sub">chain of thought</div>
+      {turns}
+    </div>,
+  );
+
+  const runes = await pipelineRunes(op);
+  let state: PipelineState = {};
+  renderPipeline(pipe, runes, state);
+
   const body = JSON.stringify({ op, dir, flags });
   const r = (await j('/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body })) as { id?: string; error?: string };
-  if (r.error) { pre.textContent = '✗ ' + r.error; convo('assistant', 'asst err', <span>✗ {r.error}</span>); setRunning(false); return; }
-  pre.textContent = `▶ job ${r.id}\n`;
-  streamRun(dir, pre, (stop) => {
+  if (r.error) {
+    status.replaceChildren(<span class="chat-err">✗ {r.error}</span>);
+    convo('assistant', 'asst err', <span>✗ {r.error}</span>);
     setRunning(false);
-    convo('assistant', 'asst', <span>run finished — <b>{stop ?? 'done'}</b></span>);
-    $('chat-tools').querySelector('.chat-live')?.classList.add('chat-live-off');
-    void showProposals(dir);
+    return;
+  }
+
+  streamRun(dir, {
+    onEvent: (e) => {
+      state = pipelineReducer(state, e, runes.map((x) => x.name));
+      renderPipeline(pipe, runes, state);
+      status.replaceChildren(statusLine(e));
+    },
+    onTurn: (t) => {
+      turns.querySelector('.chat-empty')?.remove();
+      turns.appendChild(<Turn t={t} />);
+      turns.scrollTop = turns.scrollHeight;
+    },
+    onDone: (stop) => {
+      setRunning(false);
+      status.classList.add('chat-live-off');
+      convo('assistant', 'asst', <span>run finished — <b>{stop ?? 'done'}</b></span>);
+      void showProposals(dir);
+    },
   });
 }
 
-/** Tail SSE tool events into `pre`; onDone(stopReason) when the stream ends. */
-function streamRun(dir: string, pre: HTMLElement, onDone: (stop?: string) => void): void {
+/** Tail the run: SSE events drive the pipeline + status; the first event's runId
+ *  starts a transcript follow feeding chain-of-thought turns. */
+function streamRun(
+  dir: string,
+  cb: { onEvent: (e: RunEvent) => void; onTurn: (t: TurnData) => void; onDone: (stop?: string) => void },
+): void {
   const es = new EventSource('/stream?dir=' + encodeURIComponent(dir));
-  let last = '';
+  let followES: EventSource | null = null;
   let done = false;
-  const finish = (stop?: string) => { if (done) return; done = true; es.close(); onDone(stop); };
+  const finish = (stop?: string) => { if (done) return; done = true; es.close(); followES?.close(); cb.onDone(stop); };
   es.onmessage = (ev: MessageEvent) => {
     try {
-      const e = JSON.parse(ev.data) as { kind?: string; step?: number; tool?: string; stopReason?: string };
-      const line = `${e.kind ?? 'event'}${e.step != null ? ` step ${e.step}` : ''}${e.tool ? ` · ${e.tool}` : ''}`;
-      if (line !== last) { pre.textContent += line + '\n'; last = line; pre.scrollTop = pre.scrollHeight; }
-      if (e.stopReason) { pre.textContent += `\n— ${e.stopReason} —\n`; finish(e.stopReason); }
+      const e = JSON.parse(ev.data) as RunEvent;
+      // runId only surfaces on events; grab the first one to follow the transcript.
+      if (e.runId && !followES) followES = followTranscript(dir, e.runId, cb.onTurn);
+      if (e.delta !== undefined) return; // streamed token chunk — the transcript carries the text
+      cb.onEvent(e);
+      if (e.stopReason) finish(e.stopReason);
     } catch { /* keepalive / partial frame */ }
   };
   es.onerror = () => finish(); // stream dropped → re-enable, don't wedge
+}
+
+/** Follow a run's transcript over SSE, handing each turn to onTurn as it appends. */
+function followTranscript(dir: string, runId: string, onTurn: (t: TurnData) => void): EventSource {
+  const es = new EventSource('/transcript?dir=' + encodeURIComponent(dir) + '&runId=' + encodeURIComponent(runId) + '&follow=1');
+  es.onmessage = (ev: MessageEvent) => { try { onTurn(JSON.parse(ev.data)); } catch { /* partial frame */ } };
+  return es;
 }
 
 // --- interpret --------------------------------------------------------------

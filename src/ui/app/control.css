@@ -245,7 +245,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-region { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:8px; overflow-y:auto; }
 .chat-convo { min-height:240px; max-height:44vh; display:flex; flex-direction:column; gap:8px; }
 .chat-signals { min-height:240px; max-height:44vh; display:flex; flex-direction:column; gap:8px; }
-.chat-tools { min-height:130px; max-height:28vh; }
+.chat-tools { min-height:160px; max-height:42vh; }
 
 .chat-msg { border-left:3px solid var(--line); padding:5px 10px; }
 .chat-msg.user { border-left-color:var(--acc); }
@@ -267,6 +267,20 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-live { display:flex; align-items:center; font-size:12px; color:var(--warn); }
 .chat-live.chat-live-off { color:var(--ok); }
 .chat-live.chat-live-off .chat-live-dot { animation:none; background:var(--ok); }
+
+/* tool region: rune-pipeline strip + live status line + chain-of-thought turns */
+.chat-pipeline { display:flex; flex-wrap:wrap; gap:4px; margin:2px 0 6px; }
+.chat-rune { font-size:10px; font-family:var(--num); letter-spacing:.03em; padding:2px 6px; border-radius:3px; border:1px solid var(--line); color:var(--dim); background:var(--bg); white-space:nowrap; transition:color .2s, border-color .2s, background .2s; }
+.chat-rune.s-active { color:var(--warn); border-color:var(--warn); background:rgba(210,153,34,.12); }
+.chat-rune.s-ok { color:var(--ok); border-color:var(--ok); background:rgba(63,185,80,.12); }
+.chat-rune.s-err { color:var(--err); border-color:var(--err); background:rgba(248,81,73,.14); }
+.chat-status { display:flex; align-items:center; font-size:12px; color:var(--warn); margin-bottom:6px; }
+.chat-status.chat-live-off { color:var(--ok); }
+.chat-status.chat-live-off .chat-live-dot { animation:none; background:var(--ok); }
+.chat-status .chat-tok { color:var(--dim); font-family:var(--num); font-size:11px; margin-left:8px; }
+.chat-status .chat-err { color:var(--err); }
+.chat-turns { max-height:26vh; overflow-y:auto; }
+.chat-turns .turn { font-size:12px; }
 
 .chat-input { display:flex; gap:8px; margin-top:12px; }
 .chat-input input { flex:1; }
