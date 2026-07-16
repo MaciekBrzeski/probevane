@@ -1,20 +1,23 @@
-import { $, j, type TurnData } from './lib.ts';
+import { j, type TurnData } from './lib.ts';
 import { pipelineReducer, type PipelineState } from '../../observe/pipeline.ts';
+import { convo, convoTurn, empty, setSignals, setTools, spinner } from './chat-ui.tsx';
+import { dirVal, fillDirs, rememberDir, showHistory } from './chat-history.tsx';
 import type { Interpretation, Proposal } from '../../util/assistant-shape.ts';
 
 // Chat tab renderer — three regions, deterministic and non-deterministic kept
 // apart per the layout:
 //   • conversation (#chat-convo): the durable, append-only history — your request,
-//     the assistant's narration + run lifecycle, AND the full transcript (every
-//     turn: the model's text + tool calls/results, followed live from the
-//     transcript file). Never wiped, so runs accumulate as scrollable history.
+//     the assistant's narration + run lifecycle, the full transcript (every turn:
+//     model text + tool calls/results, followed live), and past runs reloaded
+//     from disk. Never wiped, so runs accumulate as scrollable history.
 //   • signals (#chat-signals): the DETERMINISTIC $0 output — the interpreted plan
-//     (op/flags), the plan context, and post-run proposals. Replaced per request.
+//     (op/flags), the plan context, post-run proposals, or a project's past-run
+//     list (⟲ history). Replaced per request. See chat-history.tsx.
 //   • tool output (#chat-tools): the run's LIVE status — the rune-pipeline strip
 //     (which phase/gate is running, lit by the same reducer the console uses) and
 //     a status line (active step · tool, or blocked-at gate, + tokens). Ephemeral;
 //     the durable record is the transcript in the conversation window.
-// Each region animates its loading / empty / unavailable state.
+// Region primitives live in chat-ui.tsx; recent dirs + past runs in chat-history.tsx.
 //
 // Bridge is NOT offered here (a daemon run has no servicer for it → hangs), and
 // the run row ALWAYS sends an explicit --model so the repo config default (which
@@ -36,48 +39,6 @@ function setRunning(on: boolean): void {
   document.querySelectorAll('.chat-run-btn, #chat-send').forEach((b) => {
     (b as HTMLButtonElement).disabled = on;
   });
-}
-
-// --- region helpers ---------------------------------------------------------
-
-/** A spinner + label, for a region computing/awaiting. */
-function spinner(label: string): Node {
-  return <div class="chat-loading"><span class="chat-spinner"></span> {label}</div>;
-}
-
-/** A muted, softly-pulsing empty/unavailable state. */
-function empty(label: string): Node {
-  return <div class="chat-empty">{label}</div>;
-}
-
-/** Append a node to the conversation (dropping the placeholder) and keep it scrolled. */
-function convoAppend(node: Node): void {
-  const el = $('chat-convo');
-  el.querySelector('.chat-empty')?.remove();
-  el.appendChild(node);
-  el.scrollTop = el.scrollHeight;
-}
-
-/** Append a message to the conversation and keep it scrolled. */
-function convo(role: string, cls: string, body: Node): void {
-  convoAppend(<div class={`chat-msg ${cls}`}><span class="chat-role">{role}</span> {body}</div>);
-}
-
-/** Append a full transcript turn (model text + tool calls/results) to the
- *  conversation — the durable, append-only history in the main window. */
-function convoTurn(t: TurnData): void {
-  convoAppend(<Turn t={t} />);
-}
-
-/** Replace the signals region wholesale (deterministic content is per-request). */
-function setSignals(node: Node): void {
-  const el = $('chat-signals');
-  el.replaceChildren(node);
-}
-
-/** Replace the tool-output region. */
-function setTools(node: Node): void {
-  $('chat-tools').replaceChildren(node);
 }
 
 // --- run row (shared by plan + proposal cards) ------------------------------
@@ -135,7 +96,7 @@ function proposalSignal(dir: string, p: Proposal): Node {
 
 /** After a run: fetch $0 proposals ($0) and append them under the signals region. */
 async function showProposals(dir: string): Promise<void> {
-  const el = $('chat-signals');
+  const el = document.getElementById('chat-signals')!;
   el.appendChild(spinner('computing proposals…'));
   const { proposals } = (await j(`/assistant/propose?dir=${encodeURIComponent(dir)}`)) as { proposals: Proposal[] };
   el.querySelector('.chat-loading')?.remove();
@@ -185,6 +146,18 @@ function renderPipeline(host: HTMLElement, runes: PipeRune[], state: PipelineSta
   }));
 }
 
+/** A one-line key for the rune-lamp colors, so the strip is self-explanatory. */
+function pipelineLegend(): Node {
+  return (
+    <span class="chat-legend">
+      <span><i class="lg lg-ok"></i>done</span>
+      <span><i class="lg lg-active"></i>running</span>
+      <span><i class="lg lg-err"></i>blocked</span>
+      <span><i class="lg lg-idle"></i>pending</span>
+    </span>
+  );
+}
+
 /** The status message for one event: which step/tool runs, or which gate blocked. */
 function statusMsg(e: RunEvent): string {
   if (e.accepted) return 'accepted — all gates green';
@@ -212,6 +185,7 @@ function statusLine(e: RunEvent): Node {
  *  as durable history, and proposals land in signals on completion. */
 async function runLaunch(dir: string, op: string, flags: string[], label: string): Promise<void> {
   setRunning(true);
+  rememberDir(dir);
   const model = flags[flags.indexOf('--model') + 1] ?? 'auto';
   convo('assistant', 'asst', <span>running <b>{op}</b> with model <b>{model}</b>…</span>);
 
@@ -219,7 +193,7 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
   const status = <div class="chat-status">{statusLine({})}</div> as HTMLElement;
   setTools(
     <div>
-      <div class="chat-signal-sub">pipeline · {profileFor(op)}</div>
+      <div class="chat-signal-sub">pipeline · {profileFor(op)} {pipelineLegend()}</div>
       {pipe}
       {status}
     </div>,
@@ -250,6 +224,7 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
       status.classList.add('chat-live-off');
       convo('assistant', 'asst', <span>run finished — <b>{stop ?? 'done'}</b></span>);
       void showProposals(dir);
+      void fillDirs(); // the ledger just gained this run's dir
     },
   });
 }
@@ -289,11 +264,13 @@ function followTranscript(dir: string, runId: string, onTurn: (t: TurnData) => v
 /** Send the current request: narrate it, interpret it ($0), fill the signals. */
 async function send(): Promise<void> {
   if (running) return;
-  const dir = ($('chat-dir') as HTMLInputElement).value.trim();
-  const prompt = ($('chat-prompt') as HTMLInputElement).value.trim();
+  const dir = dirVal();
+  const promptEl = document.getElementById('chat-prompt') as HTMLInputElement;
+  const prompt = promptEl.value.trim();
   if (!dir || !prompt) return;
+  rememberDir(dir);
   convo('you', 'user', <span>{prompt}</span>);
-  ($('chat-prompt') as HTMLInputElement).value = '';
+  promptEl.value = '';
   setSignals(spinner('interpreting…'));
   const r = (await j('/assistant/interpret', {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -308,13 +285,15 @@ async function send(): Promise<void> {
   setSignals(planSignal(r));
 }
 
-/** Bind the input once when the Chat tab first opens. */
+/** Bind the inputs once when the Chat tab first opens (and fill the dir history). */
 export function loadChat(): void {
-  const btn = $('chat-send') as HTMLButtonElement;
+  const btn = document.getElementById('chat-send') as HTMLButtonElement;
   if (btn.dataset.wired) return;
   btn.dataset.wired = '1';
   btn.onclick = () => void send();
-  ($('chat-prompt') as HTMLInputElement).addEventListener('keydown', (e: KeyboardEvent) => {
+  (document.getElementById('chat-history') as HTMLButtonElement).onclick = () => void showHistory();
+  (document.getElementById('chat-prompt') as HTMLInputElement).addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Enter') void send();
   });
+  void fillDirs();
 }

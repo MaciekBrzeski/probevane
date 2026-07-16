@@ -291,6 +291,27 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 /* full transcript turns rendered inline in the conversation history */
 .chat-convo .turn { font-size:12px; align-self:stretch; }
 
+/* labelled dividers bracketing a loaded past run */
+.chat-divider { align-self:stretch; font-family:var(--num); font-size:11px; letter-spacing:.06em; color:var(--dim); border-top:1px dashed var(--line); padding-top:6px; margin-top:4px; }
+
+/* pipeline colour legend */
+.chat-legend { font-size:10px; color:var(--dim); font-weight:normal; letter-spacing:.02em; text-transform:none; }
+.chat-legend span { margin-left:10px; }
+.chat-legend .lg { display:inline-block; width:7px; height:7px; border-radius:2px; margin-right:3px; vertical-align:0; }
+.lg-ok { background:var(--ok); } .lg-active { background:var(--warn); } .lg-err { background:var(--err); } .lg-idle { background:var(--line); }
+
+/* past-run history cards in the signals region */
+.chat-hrun { display:flex; align-items:center; gap:8px; padding:5px 8px; border-left:2px solid var(--line); background:var(--bg); cursor:pointer; }
+.chat-hrun:hover { border-left-color:var(--acc); background:rgba(88,166,255,.06); }
+.chat-hrun .chat-op { font-family:var(--num); font-size:12px; color:var(--acc); min-width:64px; }
+.chat-hrun .chat-verdict { font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.chat-hrun .chat-verdict.ok { color:var(--ok); } .chat-hrun .chat-verdict.err { color:var(--warn); }
+.chat-hrun .chat-hmeta { font-size:11px; margin-left:auto; }
+
+/* secondary (ghost) button — history vs the primary SEND */
+.act.ghost { background:transparent; border:1px solid var(--line); color:var(--dim); }
+.act.ghost:hover { border-color:var(--acc); color:var(--acc); }
+
 .chat-input { display:flex; gap:8px; margin-top:12px; }
 .chat-input input { flex:1; }
 .chat-input .chat-dir { flex:0 0 220px; }
@@ -331,11 +352,19 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       node.className = String(v);
     } else if (k === "dataset" && typeof v === "object") {
       Object.assign(node.dataset, v);
-    } else if (k in node && k !== "style") {
-      node[k] = v;
     } else {
-      node.setAttribute(k, String(v));
+      setPropOrAttr(node, k, v);
     }
+  }
+  function setPropOrAttr(node, k, v) {
+    if (k in node && k !== "style") {
+      try {
+        node[k] = v;
+        return;
+      } catch {
+      }
+    }
+    node.setAttribute(k, String(v));
   }
   function Fragment(props) {
     const frag = document.createDocumentFragment();
@@ -595,7 +624,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 
   // src/ui/app/components/panels/ChatPanel.tsx
   function ChatPanel() {
-    return /* @__PURE__ */ h("section", { "data-tab": "chat" }, /* @__PURE__ */ h("div", { class: "panel wide chat" }, /* @__PURE__ */ h("h2", null, "assistant ", /* @__PURE__ */ h("span", { class: "muted" }, "\u2014 describe what you want; probevane plans it, runs it, proposes next")), /* @__PURE__ */ h("div", { class: "chat-grid" }, /* @__PURE__ */ h("div", { class: "chat-col" }, /* @__PURE__ */ h("div", { class: "chat-region-label" }, "conversation"), /* @__PURE__ */ h("div", { id: "chat-convo", class: "chat-region chat-convo" }, /* @__PURE__ */ h("div", { class: "chat-empty" }, "say what you want built, tested, or refactored\u2026"))), /* @__PURE__ */ h("div", { class: "chat-col" }, /* @__PURE__ */ h("div", { class: "chat-region-label" }, "signals ", /* @__PURE__ */ h("span", { class: "muted" }, "\xB7 deterministic \xB7 $0")), /* @__PURE__ */ h("div", { id: "chat-signals", class: "chat-region chat-signals" }, /* @__PURE__ */ h("div", { class: "chat-empty" }, "the plan + proposals appear here")))), /* @__PURE__ */ h("div", { class: "chat-region-label" }, "tool calls \xB7 run output"), /* @__PURE__ */ h("div", { id: "chat-tools", class: "chat-region chat-tools" }, /* @__PURE__ */ h("div", { class: "chat-empty" }, "idle \u2014 confirm a plan to watch the loop work")), /* @__PURE__ */ h("div", { class: "chat-input" }, /* @__PURE__ */ h("input", { type: "text", id: "chat-dir", placeholder: "/path/to/project", class: "chat-dir" }), /* @__PURE__ */ h("input", { type: "text", id: "chat-prompt", placeholder: "e.g. add unit tests for the parser, or refactor the giant App component" }), /* @__PURE__ */ h("button", { class: "act", id: "chat-send" }, "SEND \u25B6"))));
+    return /* @__PURE__ */ h("section", { "data-tab": "chat" }, /* @__PURE__ */ h("div", { class: "panel wide chat" }, /* @__PURE__ */ h("h2", null, "assistant", /* @__PURE__ */ h("span", { class: "muted" }, "\u2014 describe \u2192 plan ($0) \u2192 run \u2192 transcript here \xB7 \u27F2 history reloads past runs")), /* @__PURE__ */ h("div", { class: "chat-grid" }, /* @__PURE__ */ h("div", { class: "chat-col" }, /* @__PURE__ */ h("div", { class: "chat-region-label" }, "conversation & transcript"), /* @__PURE__ */ h("div", { id: "chat-convo", class: "chat-region chat-convo" }, /* @__PURE__ */ h("div", { class: "chat-empty" }, "say what to build/test/refactor \u2014 or pick a path + \u27F2 HISTORY to reload a past run"))), /* @__PURE__ */ h("div", { class: "chat-col" }, /* @__PURE__ */ h("div", { class: "chat-region-label" }, "plan & proposals ", /* @__PURE__ */ h("span", { class: "muted" }, "\xB7 $0 \xB7 no model call")), /* @__PURE__ */ h("div", { id: "chat-signals", class: "chat-region chat-signals" }, /* @__PURE__ */ h("div", { class: "chat-empty" }, "the $0 plan appears here after you SEND; past runs appear after \u27F2 HISTORY")))), /* @__PURE__ */ h("div", { class: "chat-region-label" }, "live pipeline ", /* @__PURE__ */ h("span", { class: "muted" }, "\xB7 what's running right now")), /* @__PURE__ */ h("div", { id: "chat-tools", class: "chat-region chat-tools" }, /* @__PURE__ */ h("div", { class: "chat-empty" }, "idle \u2014 the rune pipeline lights up here while a run works")), /* @__PURE__ */ h("div", { class: "chat-input" }, /* @__PURE__ */ h("input", { type: "text", id: "chat-dir", placeholder: "/path/to/project", class: "chat-dir", list: "chat-dirs", autocomplete: "off" }), /* @__PURE__ */ h("datalist", { id: "chat-dirs" }), /* @__PURE__ */ h("input", { type: "text", id: "chat-prompt", placeholder: "e.g. add unit tests for the parser, or refactor the giant App component" }), /* @__PURE__ */ h("button", { class: "act ghost", id: "chat-history", title: "load this project's past runs" }, "\u27F2 HISTORY"), /* @__PURE__ */ h("button", { class: "act", id: "chat-send" }, "SEND \u25B6"))));
   }
 
   // src/ui/app/components/chrome/ScanFrame.tsx
@@ -872,25 +901,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
   }
 
-  // src/ui/app/chat-tab.tsx
-  var MODELS = [
-    "auto",
-    "haiku",
-    "sonnet",
-    "opus",
-    "ollama",
-    "ollama:qwen3.5:397b",
-    "ollama:deepseek-v4-pro",
-    "ollama:glm-5.2",
-    "ollama:gpt-oss:120b"
-  ];
-  var running = false;
-  function setRunning(on) {
-    running = on;
-    document.querySelectorAll(".chat-run-btn, #chat-send").forEach((b) => {
-      b.disabled = on;
-    });
-  }
+  // src/ui/app/chat-ui.tsx
   function spinner2(label) {
     return /* @__PURE__ */ h("div", { class: "chat-loading" }, /* @__PURE__ */ h("span", { class: "chat-spinner" }), " ", label);
   }
@@ -909,12 +920,130 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   function convoTurn(t) {
     convoAppend(/* @__PURE__ */ h(Turn, { t }));
   }
+  function convoDivider(text) {
+    convoAppend(/* @__PURE__ */ h("div", { class: "chat-divider" }, text));
+  }
   function setSignals(node) {
-    const el = $("chat-signals");
-    el.replaceChildren(node);
+    $("chat-signals").replaceChildren(node);
   }
   function setTools(node) {
     $("chat-tools").replaceChildren(node);
+  }
+
+  // src/ui/app/chat-history.tsx
+  var DIRS_KEY = "pv-chat-dirs";
+  function dirVal() {
+    return $("chat-dir").value.trim();
+  }
+  function recentDirs() {
+    try {
+      return JSON.parse(localStorage.getItem(DIRS_KEY) ?? "[]");
+    } catch {
+      return [];
+    }
+  }
+  function rememberDir(dir) {
+    if (!dir) return;
+    const next = [dir, ...recentDirs().filter((d) => d !== dir)].slice(0, 12);
+    try {
+      localStorage.setItem(DIRS_KEY, JSON.stringify(next));
+    } catch {
+    }
+  }
+  async function fillDirs() {
+    let server = [];
+    try {
+      const { runs } = await j("/runs?limit=300");
+      server = runs.map((r) => r.dir).filter((d) => !!d && !d.includes("probevane-wt"));
+    } catch {
+    }
+    const all = [.../* @__PURE__ */ new Set([...recentDirs(), ...server])];
+    $("chat-dirs").replaceChildren(...all.map((d) => /* @__PURE__ */ h("option", { value: d })));
+  }
+  function opOf(label) {
+    return (label ?? "").split(":")[0] || "run";
+  }
+  function baseName(p) {
+    return p.replace(/\/+$/, "").split("/").pop() || p;
+  }
+  function labelPath(label) {
+    return (label ?? "").split(":").slice(1).join(":");
+  }
+  function fmtDate(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    const opts = { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
+    return isNaN(d.getTime()) ? ts : d.toLocaleString(void 0, opts);
+  }
+  function runsForDir(runs, dir) {
+    const base = baseName(dir);
+    return runs.filter((r) => r.dir === dir || !r.dir && baseName(labelPath(r.label)) === base);
+  }
+  function runMeta(r) {
+    const parts = [r.steps != null ? `${r.steps} steps` : "", r.model ?? "", fmtDate(r.ts)];
+    return parts.filter(Boolean).join(" \xB7 ");
+  }
+  function runHistoryCard(dir, r) {
+    const ok = r.accepted;
+    return /* @__PURE__ */ h("div", { class: "chat-hrun", onClick: () => void loadPastRun(dir, r) }, /* @__PURE__ */ h("span", { class: "chat-op" }, opOf(r.label)), /* @__PURE__ */ h("span", { class: `chat-verdict ${ok ? "ok" : "err"}` }, ok ? "accepted" : r.stopReason ?? "stopped"), /* @__PURE__ */ h("span", { class: "muted chat-hmeta" }, runMeta(r)));
+  }
+  async function loadPastRun(dir, r) {
+    convoDivider(`\u25BE past run \xB7 ${opOf(r.label)} \xB7 ${fmtDate(r.ts)} \xB7 ${r.runId}`);
+    try {
+      const q = `/transcript?dir=${encodeURIComponent(dir)}&runId=${encodeURIComponent(r.runId)}`;
+      const { turns } = await j(q);
+      if (!turns.length) {
+        convo("assistant", "asst", /* @__PURE__ */ h("span", { class: "muted" }, "no transcript on disk (workdir cleaned or older run)"));
+        return;
+      }
+      for (const t of turns) convoTurn(t);
+      convoDivider(`\u25B4 end \xB7 ${r.accepted ? "accepted" : r.stopReason ?? "stopped"}`);
+    } catch {
+      convo("assistant", "asst err", /* @__PURE__ */ h("span", null, "\u2717 could not load transcript"));
+    }
+  }
+  async function showHistory() {
+    const dir = dirVal();
+    if (!dir) {
+      setSignals(empty("enter a project path first, then \u27F2 HISTORY"));
+      return;
+    }
+    rememberDir(dir);
+    setSignals(spinner2("loading past runs\u2026"));
+    let runs = [];
+    try {
+      runs = (await j("/runs?limit=300")).runs;
+    } catch {
+    }
+    const mine = runsForDir(runs, dir);
+    if (!mine.length) {
+      setSignals(empty(`no past runs recorded for ${baseName(dir)}`));
+      return;
+    }
+    const box = /* @__PURE__ */ h("div", null);
+    box.appendChild(/* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "past runs \xB7 ", baseName(dir), " (", mine.length, ")"));
+    for (const r of mine.slice(0, 30)) box.appendChild(runHistoryCard(dir, r));
+    setSignals(box);
+  }
+
+  // src/ui/app/chat-tab.tsx
+  var MODELS = [
+    "auto",
+    "haiku",
+    "sonnet",
+    "opus",
+    "ollama",
+    "ollama:qwen3.5:397b",
+    "ollama:deepseek-v4-pro",
+    "ollama:glm-5.2",
+    "ollama:gpt-oss:120b"
+  ];
+  var running = false;
+  function setRunning(on) {
+    running = on;
+    document.querySelectorAll(".chat-run-btn, #chat-send").forEach((b) => {
+      b.disabled = on;
+    });
   }
   function runRow(dir, op, baseFlags, label) {
     const modelSel = /* @__PURE__ */ h("select", { class: "chat-model" }, MODELS.map((m) => /* @__PURE__ */ h("option", { value: m }, m)));
@@ -935,7 +1064,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "chat-signal chat-prop" }, /* @__PURE__ */ h("div", { class: "chat-signal-head" }, p.title, " ", /* @__PURE__ */ h("span", { class: "muted" }, "(", p.source, ")")), /* @__PURE__ */ h("div", { class: "muted" }, p.why), runRow(dir, p.op, p.flags, `${p.op} ${p.flags.join(" ")}`));
   }
   async function showProposals(dir) {
-    const el = $("chat-signals");
+    const el = document.getElementById("chat-signals");
     el.appendChild(spinner2("computing proposals\u2026"));
     const { proposals } = await j(`/assistant/propose?dir=${encodeURIComponent(dir)}`);
     el.querySelector(".chat-loading")?.remove();
@@ -979,6 +1108,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       return /* @__PURE__ */ h("span", { class: `chat-rune s-${s}`, title: `${r.phase}: ${r.summary}` }, r.name);
     }));
   }
+  function pipelineLegend() {
+    return /* @__PURE__ */ h("span", { class: "chat-legend" }, /* @__PURE__ */ h("span", null, /* @__PURE__ */ h("i", { class: "lg lg-ok" }), "done"), /* @__PURE__ */ h("span", null, /* @__PURE__ */ h("i", { class: "lg lg-active" }), "running"), /* @__PURE__ */ h("span", null, /* @__PURE__ */ h("i", { class: "lg lg-err" }), "blocked"), /* @__PURE__ */ h("span", null, /* @__PURE__ */ h("i", { class: "lg lg-idle" }), "pending"));
+  }
   function statusMsg(e) {
     if (e.accepted) return "accepted \u2014 all gates green";
     if (e.stopReason) return `\u2014 ${e.stopReason} \u2014`;
@@ -997,12 +1129,13 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   }
   async function runLaunch(dir, op, flags, label) {
     setRunning(true);
+    rememberDir(dir);
     const model = flags[flags.indexOf("--model") + 1] ?? "auto";
     convo("assistant", "asst", /* @__PURE__ */ h("span", null, "running ", /* @__PURE__ */ h("b", null, op), " with model ", /* @__PURE__ */ h("b", null, model), "\u2026"));
     const pipe = /* @__PURE__ */ h("div", { class: "chat-pipeline" });
     const status = /* @__PURE__ */ h("div", { class: "chat-status" }, statusLine({}));
     setTools(
-      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "pipeline \xB7 ", profileFor(op)), pipe, status)
+      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "pipeline \xB7 ", profileFor(op), " ", pipelineLegend()), pipe, status)
     );
     const runes = await pipelineRunes(op);
     let state = {};
@@ -1027,6 +1160,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
         status.classList.add("chat-live-off");
         convo("assistant", "asst", /* @__PURE__ */ h("span", null, "run finished \u2014 ", /* @__PURE__ */ h("b", null, stop ?? "done")));
         void showProposals(dir);
+        void fillDirs();
       }
     });
   }
@@ -1065,11 +1199,13 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   }
   async function send() {
     if (running) return;
-    const dir = $("chat-dir").value.trim();
-    const prompt = $("chat-prompt").value.trim();
+    const dir = dirVal();
+    const promptEl = document.getElementById("chat-prompt");
+    const prompt = promptEl.value.trim();
     if (!dir || !prompt) return;
+    rememberDir(dir);
     convo("you", "user", /* @__PURE__ */ h("span", null, prompt));
-    $("chat-prompt").value = "";
+    promptEl.value = "";
     setSignals(spinner2("interpreting\u2026"));
     const r = await j("/assistant/interpret", {
       method: "POST",
@@ -1085,13 +1221,15 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     setSignals(planSignal(r));
   }
   function loadChat() {
-    const btn = $("chat-send");
+    const btn = document.getElementById("chat-send");
     if (btn.dataset.wired) return;
     btn.dataset.wired = "1";
     btn.onclick = () => void send();
-    $("chat-prompt").addEventListener("keydown", (e) => {
+    document.getElementById("chat-history").onclick = () => void showHistory();
+    document.getElementById("chat-prompt").addEventListener("keydown", (e) => {
       if (e.key === "Enter") void send();
     });
+    void fillDirs();
   }
 
   // src/ui/app/components/viz/NodeGraph.tsx

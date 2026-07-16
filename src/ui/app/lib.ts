@@ -30,6 +30,7 @@ export interface RunRecord {
   ts?: string;
   runId: string;
   label?: string;
+  dir?: string; // full workdir — the ledger carries it; used to scope past runs to a project
   model?: string;
   accepted?: boolean;
   stopReason?: string;

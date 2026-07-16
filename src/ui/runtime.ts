@@ -34,12 +34,18 @@ function applyProp(node: HTMLElement, k: string, v: unknown): void {
     node.className = String(v);
   } else if (k === 'dataset' && typeof v === 'object') {
     Object.assign(node.dataset, v as Record<string, string>);
-  } else if (k in node && k !== 'style') {
-    // property assignment (value, checked, htmlFor …)
-    (node as unknown as Record<string, unknown>)[k] = v;
   } else {
-    node.setAttribute(k, String(v));
+    setPropOrAttr(node, k, v);
   }
+}
+
+// Known DOM property → assign it (value, checked, htmlFor …); read-only reflected
+// props (e.g. `list` on <input>) and unknown keys → setAttribute.
+function setPropOrAttr(node: HTMLElement, k: string, v: unknown): void {
+  if (k in node && k !== 'style') {
+    try { (node as unknown as Record<string, unknown>)[k] = v; return; } catch { /* read-only getter */ }
+  }
+  node.setAttribute(k, String(v));
 }
 
 // JSX fragment: children into a DocumentFragment — grouping without a wrapper.
