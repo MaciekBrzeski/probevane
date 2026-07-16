@@ -814,7 +814,14 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   }
 
   // src/ui/app/chat-tab.tsx
-  var MODELS = ["auto", "haiku", "sonnet", "opus", "bridge", "ollama"];
+  var MODELS = ["auto", "haiku", "sonnet", "opus", "ollama"];
+  var running = false;
+  function setRunning(on) {
+    running = on;
+    document.querySelectorAll(".chat-run-btn, #chat-send").forEach((b) => {
+      b.disabled = on;
+    });
+  }
   function push(node) {
     const log = $("chat-log");
     log.appendChild(node);
@@ -824,32 +831,51 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   function userTurn(prompt) {
     push(/* @__PURE__ */ h("div", { class: "chat-turn user" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "you"), " ", prompt));
   }
+  function runRow(dir, op, baseFlags, label) {
+    const modelSel = /* @__PURE__ */ h("select", { class: "chat-model" }, MODELS.map((m) => /* @__PURE__ */ h("option", { value: m }, m)));
+    return /* @__PURE__ */ h("div", { class: "chat-run-row" }, "model ", modelSel, /* @__PURE__ */ h("button", { class: "act chat-run-btn", onClick: () => {
+      if (running) return;
+      runLaunch(dir, op, withModel(baseFlags, modelSel.value), label);
+    } }, "run \u25B6"));
+  }
   function proposalCard(dir, p) {
-    return /* @__PURE__ */ h("div", { class: "chat-prop" }, /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("b", null, p.title), " ", /* @__PURE__ */ h("span", { class: "muted" }, "(", p.source, ")")), /* @__PURE__ */ h("div", { class: "muted" }, p.why), /* @__PURE__ */ h("button", { class: "ghost", onClick: () => runLaunch(dir, p.op, p.flags, `${p.op} ${p.flags.join(" ")}`) }, "run this \u25B6"));
+    return /* @__PURE__ */ h("div", { class: "chat-prop" }, /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("b", null, p.title), " ", /* @__PURE__ */ h("span", { class: "muted" }, "(", p.source, ")")), /* @__PURE__ */ h("div", { class: "muted" }, p.why), runRow(dir, p.op, p.flags, `${p.op} ${p.flags.join(" ")}`));
   }
   async function showProposals(dir) {
     const { proposals } = await j(`/assistant/propose?dir=${encodeURIComponent(dir)}`);
     if (!proposals.length) return;
     push(
-      /* @__PURE__ */ h("div", { class: "chat-turn asst" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "assistant"), " proposed next steps:", proposals.map((p) => proposalCard(dir, p)))
+      /* @__PURE__ */ h("div", { class: "chat-turn asst" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "assistant"), " proposed next steps (pick a model + run one):", proposals.map((p) => proposalCard(dir, p)))
     );
   }
   async function runLaunch(dir, op, flags, label) {
+    setRunning(true);
     const turn = push(/* @__PURE__ */ h("div", { class: "chat-turn run" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "run"), " ", label, /* @__PURE__ */ h("pre", { class: "chat-stream muted" }, "launching\u2026")));
     const pre = turn.querySelector(".chat-stream");
     const body = JSON.stringify({ op, dir, flags });
     const r = await j("/run", { method: "POST", headers: { "content-type": "application/json" }, body });
     if (r.error) {
       pre.textContent = "\u2717 " + r.error;
+      setRunning(false);
       return;
     }
     pre.textContent = `\u25B6 job ${r.id}
 `;
-    streamRun(dir, pre, () => showProposals(dir));
+    streamRun(dir, pre, () => {
+      setRunning(false);
+      void showProposals(dir);
+    });
   }
   function streamRun(dir, pre, onDone) {
     const es2 = new EventSource("/stream?dir=" + encodeURIComponent(dir));
     let last = "";
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      es2.close();
+      onDone();
+    };
     es2.onmessage = (ev) => {
       try {
         const e = JSON.parse(ev.data);
@@ -863,31 +889,23 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
           pre.textContent += `
 \u2014 ${e.stopReason} \u2014
 `;
-          es2.close();
-          onDone();
+          finish();
         }
       } catch {
       }
     };
-    es2.onerror = () => {
-      es2.close();
-    };
+    es2.onerror = () => finish();
   }
   function planCard(r) {
-    const dir = r.launch.dir;
-    const modelSel = /* @__PURE__ */ h("select", { class: "chat-model" }, MODELS.map((m) => /* @__PURE__ */ h("option", { value: m }, m)));
-    const confirm = /* @__PURE__ */ h("button", { class: "act", onClick: () => {
-      const flags = withModel(r.launch.flags, modelSel.value);
-      runLaunch(dir, r.launch.op, flags, r.summary);
-    } }, "run \u25B6");
-    return /* @__PURE__ */ h("div", { class: "chat-turn asst" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "assistant"), " ", r.summary, r.assumptions.length ? /* @__PURE__ */ h("ul", { class: "chat-assume" }, r.assumptions.map((a) => /* @__PURE__ */ h("li", null, a))) : null, r.planContext.length ? /* @__PURE__ */ h("div", { class: "muted chat-ctx" }, "context: ", r.planContext.slice(0, 3).map((i) => `${i.action} ${i.target}`).join(" \xB7 ")) : null, /* @__PURE__ */ h("div", { class: "chat-run-row" }, "model ", modelSel, " ", confirm));
+    return /* @__PURE__ */ h("div", { class: "chat-turn asst" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "assistant"), " ", r.summary, r.assumptions.length ? /* @__PURE__ */ h("ul", { class: "chat-assume" }, r.assumptions.map((a) => /* @__PURE__ */ h("li", null, a))) : null, r.planContext.length ? /* @__PURE__ */ h("div", { class: "muted chat-ctx" }, "context: ", r.planContext.slice(0, 3).map((i) => `${i.action} ${i.target}`).join(" \xB7 ")) : null, runRow(r.launch.dir, r.launch.op, r.launch.flags, r.summary));
   }
   function withModel(flags, model) {
     const out = flags.filter((f, i) => f !== "--model" && flags[i - 1] !== "--model");
-    if (model !== "auto") out.push("--model", model);
+    out.push("--model", model);
     return out;
   }
   async function send() {
+    if (running) return;
     const dir = $("chat-dir").value.trim();
     const prompt = $("chat-prompt").value.trim();
     if (!dir || !prompt) return;
