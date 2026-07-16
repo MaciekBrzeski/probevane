@@ -65,18 +65,23 @@ export function parseArgv(decl: CommandDecl, argv: string[]): CommandCtx {
   return { dir, args, flags, argv };
 }
 
-/** Entry used by every migrated shell: load the spec, parse argv, dispatch to
- *  the handler, keep the classic main().catch exit-1 contract. */
+/** Load the spec, parse argv, resolve + call the handler. Throws (rather than
+ *  exiting) so it's unit-testable; runVaneCommand wraps it with the process
+ *  argv + exit-1 contract. */
+export async function dispatchCommand(name: string, argv: string[]): Promise<void> {
+  const decl = loadCommands().find((c) => c.name === name);
+  if (!decl?.handler) throw new Error(`vane: command '${name}' has no handler spec in vane/commands.vane`);
+  const ctx = parseArgv(decl, argv);
+  const mod = await import(`../commands/${decl.handler.module}.js`);
+  const handler = mod[decl.handler.export] as CommandHandler | undefined;
+  if (!handler) throw new Error(`vane: handler ${decl.handler.module}#${decl.handler.export} not found`);
+  await handler(ctx);
+}
+
+/** Entry used by every migrated shell: dispatch this command with the classic
+ *  main().catch exit-1 contract over process.argv. */
 export function runVaneCommand(name: string): void {
-  void (async () => {
-    const decl = loadCommands().find((c) => c.name === name);
-    if (!decl?.handler) throw new Error(`vane: command '${name}' has no handler spec in vane/commands.vane`);
-    const ctx = parseArgv(decl, process.argv.slice(2));
-    const mod = await import(`../commands/${decl.handler.module}.js`);
-    const handler = mod[decl.handler.export] as CommandHandler | undefined;
-    if (!handler) throw new Error(`vane: handler ${decl.handler.module}#${decl.handler.export} not found`);
-    await handler(ctx);
-  })().catch((e) => {
+  dispatchCommand(name, process.argv.slice(2)).catch((e) => {
     console.error(String(e));
     process.exit(1);
   });

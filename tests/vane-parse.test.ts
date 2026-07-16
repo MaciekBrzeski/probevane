@@ -230,3 +230,43 @@ describe('adapter manifest fields (go-test pilot)', () => {
     expect(manifestFields('rust-cargo')).toBeNull(); // no manifest yet — TS-only
   });
 });
+
+describe('adapter manifest — error branches + partial spread', () => {
+  const saved2 = process.env.PROBEVANE_ROOT;
+  afterEach(() => {
+    if (saved2 === undefined) delete process.env.PROBEVANE_ROOT;
+    else process.env.PROBEVANE_ROOT = saved2;
+    clearVaneCache();
+  });
+
+  function mkManifest(id: string, body: string): void {
+    const root = mkdtempSync(join(tmpdir(), 'pv-am-'));
+    mkdirSync(join(root, 'vane', 'adapters'), { recursive: true });
+    writeFileSync(join(root, 'vane', 'adapters', `${id}.vane`), body);
+    process.env.PROBEVANE_ROOT = root;
+    clearVaneCache();
+  }
+
+  it('unknown command key throws at load', async () => {
+    mkManifest('x', 'adapter x\n  command bogus-key = echo hi\n');
+    const { manifestFields } = await import('../src/vane/adapter-manifest.js');
+    expect(() => manifestFields('x')).toThrow(/unknown command key 'bogus-key'/);
+  });
+
+  it('unknown audit-rules ref throws at load', async () => {
+    mkManifest('x', 'adapter x\n  audit-rules = watstack\n');
+    const { manifestFields } = await import('../src/vane/adapter-manifest.js');
+    expect(() => manifestFields('x')).toThrow(/unknown audit-rules ref 'watstack'/);
+  });
+
+  it('absent fields → absent methods (guidance-only manifest)', async () => {
+    mkManifest('x', 'adapter x\n  guidance unit:\n    write good tests\n');
+    const { manifestFields } = await import('../src/vane/adapter-manifest.js');
+    const f = manifestFields('x')!;
+    expect(f.commands).toBeUndefined();
+    expect(f.patternsDoc).toBeUndefined();
+    expect(f.auditRules).toBeUndefined();
+    expect(f.guidance!('unit')).toBe('write good tests');
+    expect(f.guidance!('e2e')).toBe(''); // unknown kind → empty, not undefined
+  });
+});

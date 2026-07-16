@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
@@ -85,5 +85,24 @@ describe('vane pilot commands — golden outputs (bin → tsx → interpreter)',
   // keep it in the suite — it's the exit-1 path's only end-to-end proof.
   it('coverage matches its P0 golden byte-for-byte', () => {
     expect(runPilot('coverage')).toBe(readFileSync(join(ROOT, 'tests', 'golden', 'coverage.txt'), 'utf8'));
+  });
+});
+
+describe('vane dispatchCommand — spec load + handler resolution', () => {
+  const saved = process.env.PROBEVANE_ROOT;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.PROBEVANE_ROOT;
+    else process.env.PROBEVANE_ROOT = saved;
+  });
+
+  // The happy dispatch path (spec → parseArgv → dynamic-import handler → call)
+  // is proven end-to-end by the bin golden tests above; the variable dynamic
+  // import isn't statically resolvable under vitest, so unit tests cover the
+  // pre-import guards only.
+  it('throws for a catalog-only command (no handler spec)', async () => {
+    delete process.env.PROBEVANE_ROOT;
+    const { dispatchCommand } = await import('../src/vane/run-command.js');
+    await expect(dispatchCommand('tui', [])).rejects.toThrow(/no handler spec/);
+    await expect(dispatchCommand('does-not-exist', [])).rejects.toThrow(/no handler spec/);
   });
 });
