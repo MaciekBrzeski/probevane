@@ -1,0 +1,45 @@
+# Rune-profile pipelines — the declarative top layer. Each line is one
+# labelled segment; the conditional assembly (flag-toggled runes) lives in
+# src/loop/profile-subs.ts. Tokens resolve against the codegen's CLOSED
+# tables (src/vane/gen-profiles.ts) — an unknown token fails generation.
+# Regenerate src/loop/profiles.gen.ts with: probevane vane --write
+
+profile write_tests
+  preamble kind noRegression
+  green-gates scope acceptance(scope, minTests, minCoverage, shellChecks)
+  opt-in scope extras
+  harvest full
+
+profile feature
+  preamble unit redFirst noRegression
+  green-gates unit acceptance(unit, minTests ?? 1)
+  opt-in unit mfe
+  harvest full
+
+profile repair
+  preamble unit
+  green-gates unit fullSuite
+  opt-in unit mfe
+  harvest full
+
+profile refactor
+  preamble unit
+  safety-net behavior_lock
+  opt-in unit mfe
+  harvest
+
+profile document
+  preamble unit
+  safety-net behavior_lock
+  harvest
+
+profile visual
+  preamble unit
+  safety-net behavior_lock
+  if render: green-gates render_gate(render)
+  harvest
+
+profile bare
+
+alias fix = repair
+alias migrate = refactor

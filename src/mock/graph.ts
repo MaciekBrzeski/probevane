@@ -1,5 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, dirname, resolve } from 'node:path';
+import { isGeneratedSource } from '../util/generated.js';
 
 // Module dependency graph of src/ — the backbone for mock synthesis (what a
 // module depends on) and for chaining (topological order so an upstream
@@ -67,6 +68,7 @@ export async function buildGraph(dir: string): Promise<ModuleGraph> {
   for (const abs of files) {
     const rel = relative(dir, abs);
     const src = await readFile(abs, 'utf8').catch(() => '');
+    if (isGeneratedSource(src)) continue; // @generated (profiles.gen.ts) — not graphed, not counted
     const imports = IS_PY.test(abs)
       ? resolvePyImports(src, abs, dir, files)
       : [...resolveLocalImports(src, abs, dir, files), ...resolveWorkspaceImports(src, dir, files, workspaces)];

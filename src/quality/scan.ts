@@ -2,6 +2,7 @@ import { join, relative } from 'node:path';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { analyzeProject, DEFAULT_QUALITY, type QualityConfig, type QualityReport } from './analyze.js';
 import { detectPythonFunctions } from './py-detect.js';
+import { isGeneratedSource } from '../util/generated.js';
 
 // I/O wrapper around the pure analyzer: walk a project's source tree, read the files,
 // and analyze. Shared by the `quality` CLI and the daemon's /quality. Vendored /
@@ -58,9 +59,12 @@ export async function scanProject(
   );
   // Python files: get per-function metrics from the ast-based detector (subprocess),
   // then attach them so analyzeProject uses them instead of the TS/JS parser.
-  const pyInputs = inputs.filter((x) => IS_PY.test(x.file));
+  // Machine-generated sources (profiles.gen.ts) are never graded — grading
+  // them would gate on the GENERATOR's style, which no human can fix in place.
+  const humanInputs = inputs.filter((x) => !isGeneratedSource(x.source));
+  const pyInputs = humanInputs.filter((x) => IS_PY.test(x.file));
   const pyFns = pyInputs.length ? await detectPythonFunctions(pyInputs) : null;
-  const enriched = inputs.map((x) =>
+  const enriched = humanInputs.map((x) =>
     pyFns && IS_PY.test(x.file) ? { ...x, functions: pyFns.get(x.file) ?? [] } : x,
   );
   return analyzeProject(enriched, cfg);
