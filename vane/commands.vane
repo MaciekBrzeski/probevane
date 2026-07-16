@@ -75,6 +75,8 @@ command a11y
   summary Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade.
   usage probevane a11y <dir>
   example probevane a11y ./app
+  dir
+  handler a11y#run
 
 command bench
   summary Measure a suite: coverage, audit, and mutation score (does it catch bugs?).
@@ -88,6 +90,13 @@ command mutation
   summary Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --budget caps mutants (sampled evenly); string/comment literals skipped.
   usage probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--all] [--json]
   example probevane mutation . --budget 60 --min-score 0.6
+  dir
+  flag --budget int = 50 "max mutants to run (sampled evenly across sites)"
+  flag --only str "comma-separated file list to mutate"
+  flag --min-score num "exit 1 when the score falls below (CI gate)"
+  flag --all bool "include glue files normally skipped"
+  flag --json bool "machine output"
+  handler mutation#run
 
 command ci
   summary PR helper: report changed-untested files + coverage; --generate adds tests; --review-fix reviews the diff (gated) and auto-fixes.
@@ -114,6 +123,13 @@ command search
   summary Semantic code search — embeds each module (path + probe digest) and ranks by cosine similarity to a CONCEPT query; --similar finds semantically-duplicate module PAIRS (consolidation candidates the textual duplication detector misses); --similar --fns goes one level deeper and ranks FUNCTION pairs by doc-comment similarity (merge candidates — leans on the doc-comment quality rule for coverage; default threshold 0.9, report-only). Embeds via local ollama by default ($0); PROBEVANE_EMBED_URL/_MODEL override. Indexes cached at .probevane/search-index.json + search-fn-index.json.
   usage probevane search <dir> "<concept>" [--top N] [--fresh] | probevane search <dir> --similar [--fns] [--threshold 0.85] [--top N]
   example probevane search . --similar --fns
+  flag --top int "results/pairs to list (per-mode default: 8 query, 20 --similar)"
+  flag --fresh bool "rebuild the embedding index"
+  flag --similar bool "list semantically-duplicate module pairs"
+  flag --fns bool "with --similar: function-pair merge candidates"
+  flag --threshold num "similarity cutoff (per-mode default: 0.85 modules, 0.9 fns)"
+  flag --query str "concept query (alternative to the positional form)"
+  handler search-cmd#run
 
 command spec
   summary Generate a project SPEC.md (graph, modules, API surface, coverage); --narrate adds LLM descriptions; --wiki publishes.
@@ -223,11 +239,21 @@ command otel
   summary Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans — one per run — + metrics: token usage, runs, acceptance, cost by model) → write a file, POST to a collector (--endpoint / OTEL_EXPORTER_OTLP_ENDPOINT), or emit Prometheus text (--prometheus). $0, reads runs.jsonl.
   usage probevane otel [--root <stateDir>] [--out <file>] [--endpoint <url>] [--prometheus]
   example probevane otel --prometheus
+  flag --root str "state dir override (reads <root>/runs.jsonl)"
+  flag --out str "write the payload/text to a file instead of stdout"
+  flag --endpoint str "OTLP collector URL (or OTEL_EXPORTER_OTLP_ENDPOINT)"
+  flag --prometheus bool "emit Prometheus text instead of OTLP/JSON"
+  handler otel#run
 
 command doctor
   summary Health checks distilled from real field failures — detect (and with --fix repair) broken toolchains (bootstraps e.g. a python .venv), coverage blind spots (source never loaded by any test, respecting deliberate config excludes), git-tracked test artifacts (untrack + gitignore), package.json "files" entries that don't exist, CI steps swallowing failures (|| true), and stale replay cassettes; also missing node_modules/Playwright browsers, invalid probevane.config, absent live credentials, eval case↔fixture↔baseline bijection, and stale coverage reports. --full appends a read-only grader scorecard (audit/assertions/coverage/quality/arch). Exit 1 on unfixed errors.
   usage probevane doctor <dir> [--fix] [--full] [--json]
   example probevane doctor . --fix
+  dir
+  flag --fix bool "apply the automatic repairs"
+  flag --full bool "append the read-only grader scorecard"
+  flag --json bool "machine output"
+  handler doctor-cmd#run
 
 command history
   summary Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown; --trend adds the daily time-series + the daemon’s cost/acceptance alerts.
@@ -292,6 +318,24 @@ command quality
   summary Project source-quality gate — file size, function length/cyclomatic+cognitive complexity/nesting/params, long lines, debt markers (TODO/FIXME, comment-scoped), import fan-out, (maximal-block) duplication, and doc coverage (doc-comment: a function should say what it does and why; type-doc: an exported interface/type should carry a shape comment) → a 0–100 health grade. Size rules count CODE lines only — comment-only lines never push a file/function over the bar, so the gate rewards documenting instead of punishing it. --strict exits 1 on error-severity violations (CI); --sarif emits GitHub code-scanning output; --write-baseline ratchets (gate only NEW violations on a messy repo, --no-baseline ignores it); --since <ref> scans only changed files; --no-docs disables the doc rules. Complements audit (test specs), assert-score (assertions), bench (mutation).
   usage probevane quality <dir> [--strict] [--json] [--sarif] [--write-baseline] [--no-baseline] [--since <ref>] [--max-file N] [--max-fn N] [--max-complexity N] [--max-cognitive N] [--max-nesting N] [--max-params N] [--max-width N] [--max-imports N] [--no-debt] [--no-docs]
   example probevane quality ./app --strict
+  dir
+  flag --strict bool "exit 1 on error-severity violations (CI)"
+  flag --json bool "machine output"
+  flag --sarif bool "GitHub code-scanning output"
+  flag --write-baseline bool "ratchet: capture the full-project baseline"
+  flag --no-baseline bool "ignore the baseline ratchet"
+  flag --since str "scan only source files changed since <ref>"
+  flag --max-file str "max file LOC (positive int; bad value = exit 2)"
+  flag --max-fn str "max function LOC (positive int)"
+  flag --max-complexity str "max cyclomatic complexity (positive int)"
+  flag --max-cognitive str "max cognitive complexity (positive int)"
+  flag --max-nesting str "max nesting depth (positive int)"
+  flag --max-params str "max parameter count (positive int)"
+  flag --max-width str "max line width (positive int)"
+  flag --max-imports str "max import fan-out (positive int)"
+  flag --no-debt bool "disable debt-marker checks"
+  flag --no-docs bool "disable the doc-coverage rules"
+  handler quality#run
 
 command mfe-audit
   summary Micro-frontend (Module Federation) standards gate — per repo: boundaries (no deep cross-remote imports), shared singletons, runtime resilience (Suspense + error boundary), typed contracts; across repos: shared version alignment. Pure analysis ($0, no LLM) → grade + violations; --strict exits 1 (CI). The fitness function the refactor loop enforces.
