@@ -156,6 +156,13 @@ command learn
   summary Save a spec to the cross-project learning library.
   usage probevane learn <dir> --file <spec> --category <c> [--kind] [--bad]
   example probevane learn ./app --file src/x.test.ts --category crud
+  dir
+  flag --file str "spec file to save (relative to <dir>)"
+  flag --category str = misc "library category, e.g. crud"
+  flag --kind str = unit "unit|e2e"
+  flag --bad bool "save as an anti-pattern example"
+  flag --rationale str "why this example is good/bad"
+  handler learn#run
 
 command eval
   summary Run probevane's fixture eval (self-test of the harness); --live regenerates; --paths replays the refactor/feature/repair cassettes (--record --model bridge re-records for $0).
@@ -226,6 +233,11 @@ command history
   summary Run history + cost ledger — total spend, how much the harness landed alone vs needed takeover vs needed hand-finishing, per-model/per-path breakdown; --trend adds the daily time-series + the daemon’s cost/acceptance alerts.
   usage probevane history [--limit N] [--json] [--trend [--days N]]
   example probevane history --trend
+  flag --limit int = 12 "recent runs to list"
+  flag --json bool "machine output"
+  flag --trend bool "daily time-series + alerts"
+  flag --days int = 14 "trend window in days"
+  handler history#run
 
 command peek
   summary Terminal live view of the loop — same event stream as serve, compact table (step/tool/gate/tokens) in the console.
@@ -262,6 +274,14 @@ command simcost
   summary Simulated cost benchmark — triage a dir into easy/hard modules and compare all-api vs hybrid (local easy + api hard) vs bridge cost, grounded in measured per-module $ from the ledger.
   usage probevane simcost [dir] [--easy N --hard M] [--local-hit R] [--json]
   example probevane simcost ./app --local-hit 0.6
+  arg dir str "project dir to triage (optional — empty = manual --easy/--hard mode; kept unresolved)"
+  flag --project bool "reprice the ledger's $0 runs at API rates"
+  flag --easy num = 0 "easy module count (manual mode)"
+  flag --hard num = 0 "hard module count (manual mode)"
+  flag --local-hit num = 0.5 "fraction of easy modules the local model lands"
+  flag --kind str = unit "unit|e2e for dir triage"
+  flag --json bool "machine output"
+  handler simcost#run
 
 command factory
   summary Run the gated generate loop over many repos concurrently — each with isolated state, errored repos auto-reverted + retried once — into one cost/coverage/quality rollup (report.json, with an error-mode breakdown). --resume skips repos already accepted in a prior report. Unrecognized flags forward to generate per-repo.
