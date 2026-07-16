@@ -12,6 +12,7 @@ import { loadCommands } from './load.js';
 export interface CommandCtx {
   dir: string;
   args: Record<string, string>;
+  rest: string[]; // the variadic arg's collected positionals (empty when none declared)
   flags: Record<string, string | number | boolean | string[] | undefined>;
   argv: string[];
 }
@@ -59,10 +60,15 @@ export function parseArgv(decl: CommandDecl, argv: string[]): CommandCtx {
   }
   const flags: CommandCtx['flags'] = {};
   for (const f of decl.flags) flags[f.name] = typeValue(f, raw.has(f.name) ? (raw.get(f.name) ?? '') : undefined);
+  // Scalar args consume one positional each in order; a trailing variadic arg
+  // (str...) collects everything after them into ctx.rest.
+  const scalar = decl.args.filter((a) => !a.variadic);
   const args: Record<string, string> = {};
-  decl.args.forEach((a, i) => { args[a.name] = positionals[i] ?? ''; });
+  scalar.forEach((a, i) => { args[a.name] = positionals[i] ?? ''; });
+  const hasVariadic = decl.args.some((a) => a.variadic);
+  const rest = hasVariadic ? positionals.slice(scalar.length) : [];
   const dir = decl.dir ? resolve(positionals[decl.args.length] ?? '.') : process.cwd();
-  return { dir, args, flags, argv };
+  return { dir, args, rest, flags, argv };
 }
 
 /** Load the spec, parse argv, resolve + call the handler. Throws (rather than

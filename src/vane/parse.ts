@@ -35,11 +35,11 @@ function parseFlag(p: P, l: LexLine, rest: string): FlagSpec | null {
   return { name: m[1], type: m[2] as FlagType, def: m[3], doc: m[4] ?? '', pos: posOf(p, l) };
 }
 
-/** Parse one `arg …` body line onto the command. */
+/** Parse one `arg …` body line onto the command (`str` scalar or `str...` variadic). */
 function parseArg(p: P, d: CommandDecl, l: LexLine, rest: string): void {
-  const m = rest.match(/^(\w+)\s+str(?:\s+"([^"]*)")?$/);
-  if (m) d.args.push({ name: m[1], doc: m[2] ?? '', pos: posOf(p, l) });
-  else err(p, l, 'bad arg line — expected: arg <name> str ["doc"]');
+  const m = rest.match(/^(\w+)\s+str(\.\.\.)?(?:\s+"([^"]*)")?$/);
+  if (m) d.args.push({ name: m[1], variadic: !!m[2], doc: m[3] ?? '', pos: posOf(p, l) });
+  else err(p, l, 'bad arg line — expected: arg <name> str[...] ["doc"]');
 }
 
 /** Parse one `handler …` body line onto the command. */

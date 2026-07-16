@@ -234,6 +234,10 @@ command scan
   summary Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon).
   usage probevane scan <repos.txt | dir...> [--op generate] [--root <stateDir>]
   example probevane scan repos.txt --op generate
+  arg repos str... "repo-list file, or one or more project dirs"
+  flag --op str = generate "queue op (generate|refactor|...)"
+  flag --root str "state dir (default the shared state root)"
+  handler scan#run
 
 command otel
   summary Export the cost ledger as OpenTelemetry data (dep-free OTLP/JSON: gen_ai.* spans — one per run — + metrics: token usage, runs, acceptance, cost by model) → write a file, POST to a collector (--endpoint / OTEL_EXPORTER_OTLP_ENDPOINT), or emit Prometheus text (--prometheus). $0, reads runs.jsonl.

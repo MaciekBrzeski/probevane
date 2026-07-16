@@ -32,9 +32,22 @@ function flagErrors(d: CommandDecl): VaneError[] {
   return out;
 }
 
+/** Variadic-arg constraints: at most one, it must be last, and not alongside dir
+ *  (both would fight over trailing positionals). */
+function variadicErrors(d: CommandDecl): VaneError[] {
+  const out: VaneError[] = [];
+  const idx = d.args.findIndex((a) => a.variadic);
+  if (idx === -1) return out;
+  const v = d.args[idx];
+  if (idx !== d.args.length - 1) out.push({ message: `variadic arg '${v.name}' must be the last positional`, pos: v.pos });
+  if (d.args.filter((a) => a.variadic).length > 1) out.push({ message: `only one variadic arg allowed`, pos: v.pos });
+  if (d.dir) out.push({ message: `variadic arg '${v.name}' cannot coexist with dir (both eat trailing positionals)`, pos: v.pos });
+  return out;
+}
+
 /** Command-level checks: catalog fields present, spec shape coherent. */
 function commandErrors(d: CommandDecl): VaneError[] {
-  const out: VaneError[] = [];
+  const out: VaneError[] = variadicErrors(d);
   for (const field of ['summary', 'usage', 'example'] as const) {
     if (!d[field]) out.push({ message: `command '${d.name}' missing ${field}`, pos: d.pos });
   }

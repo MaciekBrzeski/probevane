@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgv } from '../src/vane/run-command.js';
+import { parseVane } from '../src/vane/parse.js';
+import { validateVane } from '../src/vane/validate.js';
+import { formatVaneError } from '../src/vane/ast.js';
 import type { CommandDecl } from '../src/vane/ast.js';
 import { dirArg, flag, num } from '../src/util/args.js';
 
@@ -50,7 +53,7 @@ describe('vane parseArgv — parity with util/args.ts semantics', () => {
   });
 
   it('defaults, NaN → undefined, declared args before dir, cwd when no dir', () => {
-    const d = decl([F('budget', 'int', '40'), F('rate', 'num')], [{ name: 'prompt', doc: '', pos: { file: 't', line: 1 } }]);
+    const d = decl([F('budget', 'int', '40'), F('rate', 'num')], [{ name: 'prompt', variadic: false, doc: '', pos: { file: 't', line: 1 } }]);
     const ctx = parseArgv(d, ['add tests', 'fixtures/react-todo', '--rate', 'oops']);
     expect(ctx.args.prompt).toBe('add tests');
     expect(ctx.dir).toBe(resolve('fixtures/react-todo'));
@@ -104,5 +107,31 @@ describe('vane dispatchCommand — spec load + handler resolution', () => {
     const { dispatchCommand } = await import('../src/vane/run-command.js');
     await expect(dispatchCommand('tui', [])).rejects.toThrow(/no handler spec/);
     await expect(dispatchCommand('does-not-exist', [])).rejects.toThrow(/no handler spec/);
+  });
+});
+
+/** Parse asserting zero errors. */
+function parseVane2(src: string) {
+  const { ast, errors } = parseVane(src, "test.vane");
+  expect(errors).toEqual([]);
+  return ast;
+}
+
+describe('vane grammar v2 — variadic positional', () => {
+  it('parses arg name str... as variadic; scalar str stays non-variadic', () => {
+    const ast = parseVane2('command scan\n  summary s\n  usage u\n  example e\n  arg repos str... "repo list or dirs"\n  handler scan#run\n');
+    const d = ast.decls[0] as CommandDecl;
+    expect(d.args).toEqual([{ name: 'repos', variadic: true, doc: 'repo list or dirs', pos: { file: 'test.vane', line: 5 } }]);
+    expect(validateVane(ast)).toEqual([]);
+  });
+
+  it('rejects a variadic that is not last, a second variadic, and variadic+dir', () => {
+    const errsOf = (src: string) => validateVane(parseVane(src, 't.vane').ast).map(formatVaneError);
+    expect(errsOf('command c\n  summary s\n  usage u\n  example e\n  arg a str...\n  arg b str\n  handler c#run\n')[0])
+      .toContain("variadic arg 'a' must be the last positional");
+    expect(errsOf('command c\n  summary s\n  usage u\n  example e\n  arg a str...\n  arg b str...\n  handler c#run\n')
+      .some((e) => e.includes('must be the last positional') || e.includes('only one variadic'))).toBe(true);
+    expect(errsOf('command c\n  summary s\n  usage u\n  example e\n  dir\n  arg a str...\n  handler c#run\n')[0])
+      .toContain("cannot coexist with dir");
   });
 });

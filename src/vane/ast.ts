@@ -22,9 +22,12 @@ export interface FlagSpec {
   pos: Pos;
 }
 
-/** One `arg name type "doc"` line — extra positionals consumed before `dir`. */
+/** One `arg name str["..."] "doc"` line — extra positionals consumed before `dir`.
+ *  `variadic` (`str...`) collects ALL remaining positionals into ctx.rest; it
+ *  must be the last arg and is mutually exclusive with `dir`. */
 export interface ArgSpec {
   name: string;
+  variadic: boolean;
   doc: string;
   pos: Pos;
 }
