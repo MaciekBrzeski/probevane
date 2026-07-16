@@ -129,6 +129,22 @@ npm test                                       # the harness's own suite (dogfoo
 
 `doctor` catches the common fresh-environment problems (missing toolchain, uninstalled browsers, invalid config, missing keys, stale artifacts). For a full self-check, the CI sequence in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) is the exhaustive gate (typecheck → engine gate → coverage → dist build + smoke → ui perf → drift gates → quality → mutation → e2e → eval).
 
+## 10. Periodic maintenance (not in CI)
+
+Some quality signals need a human cadence — they cost minutes, need a local model, or are advisory. Run them on a maintenance cadence, not per-commit:
+
+```sh
+probevane arch . --pyramid                     # structural drift: pyramid score + crowding + role-violation report
+probevane arch . --snapshot                    # commit docs/arch-snapshot.json → coupling regressions become diffs
+probevane search . --similar --fns             # function-level merge candidates by doc-comment similarity (needs local ollama embed)
+probevane mutation . --budget 200              # correctness sample → writes .probevane/mutation-report.json for the Checks tab
+probevane distill stats                        # trace-dataset inventory per stack (fine-tune readiness)
+```
+
+- **Doc-similarity** (`--similar --fns`) needs a local ollama embedding endpoint (`PROBEVANE_EMBED_URL`); it can't run in CI, so it's the periodic way to find the next consolidation batch (the walk-family paydown came from it).
+- **Distill**: the trace dataset currently skews one stack (node-vitest dominant); a balanced LoRA run wants more per-stack traces first. When ready, the training entrypoint is `scripts/train_lora.py` over the `distill build` dataset, promoted via `<state>/model.json` — see the `distill` subsystem in [Architecture](Architecture.md).
+- **Vane / skill drift** (`probevane vane --check`, `probevane skill --check`) DO run in CI — listed under §9's full sequence, not here.
+
 ## See also
 
 - [Home](Home.md) · [Control Center](Control-Center.md) (the daemon dashboard + `tui`) · [Commands](Commands.md) (full CLI, generated) · [Architecture](Architecture.md) · [Drawing Engine](Drawing-Engine.md) (the vendored `engine/`).
