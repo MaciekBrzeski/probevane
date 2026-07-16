@@ -23,6 +23,7 @@ You point probevane at a project. An **adapter** detects the stack (React first)
 - [Operations](Operations.md) — run it in a fresh / isolated / production environment (install, build, secrets, env, security)
 - [Task paths](Paths.md) — write-tests · refactor · feature · repair · fix
 - [Worktree mode](Worktree.md) — isolated, reviewed (self-)improvement runs
+- [Vane](Vane.md) — the declarative layer: command specs, rune-profile pipelines, adapter manifests (one small language, drift-gated)
 - [Commands](Commands.md) — full CLI reference (generated, gated)
 - [Control Center](Control-Center.md) — the daemon's LCARS console: live pipeline light show, theater replay, TSX build
 - [Drawing Engine](Drawing-Engine.md) — facet: one vector `Painter`, two backends (SVG + terminal cells); the 44-widget library both control centers share
