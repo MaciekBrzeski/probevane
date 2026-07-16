@@ -1,4 +1,5 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import { walk } from '../../util/fs.js';
 import { join, relative } from 'node:path';
 import type { TestKind, TestTarget } from '../adapter.js';
 
@@ -32,7 +33,7 @@ function testCost(src: string, rel: string, isComponent: boolean): number {
  *  scaffolding (Redux store / Router / Context). */
 export async function discoverReact(dir: string, kind: TestKind): Promise<TestTarget[]> {
   const root = join(dir, 'src');
-  const files = await walk(root).catch(() => [] as string[]);
+  const files = await walk(root, SKIP_DIRS).catch(() => [] as string[]);
   const scored: { t: TestTarget; cost: number }[] = [];
   for (const f of files) {
     if (isSkippable(f)) continue;
@@ -46,21 +47,6 @@ export async function discoverReact(dir: string, kind: TestKind): Promise<TestTa
   }
   scored.sort((a, b) => a.cost - b.cost);
   return scored.map((s) => s.t);
-}
-
-// Recursive file listing under src/, skipping build/test dirs.
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const e of entries) {
-    if (e.isDirectory()) {
-      if (SKIP_DIRS.has(e.name)) continue;
-      out.push(...(await walk(join(dir, e.name))));
-    } else {
-      out.push(join(dir, e.name));
-    }
-  }
-  return out;
 }
 
 // File name minus dir + JS/TS extension — becomes the target's display name.

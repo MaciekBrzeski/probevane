@@ -1,6 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, dirname, resolve } from 'node:path';
 import { isGeneratedSource } from '../util/generated.js';
+import { walk } from '../util/fs.js';
 
 // Module dependency graph of src/ — the backbone for mock synthesis (what a
 // module depends on) and for chaining (topological order so an upstream
@@ -54,7 +55,7 @@ export async function buildGraph(dir: string): Promise<ModuleGraph> {
     const s = join(dir, ws.dir, 'src');
     wsRoots.push(await readdir(s).then(() => s).catch(() => join(dir, ws.dir)));
   }
-  const walks = await Promise.all([root, ...wsRoots].map((r) => walk(r).catch(() => [] as string[])));
+  const walks = await Promise.all([root, ...wsRoots].map((r) => walk(r, SKIP)));
   const all = walks.flat();
   const isSource = (f: string) =>
     (/\.(tsx|ts|jsx|js)$/.test(f) && !/main\.[tj]sx?$/.test(f)) || IS_PY.test(f);
@@ -248,14 +249,3 @@ function topoSort(nodes: Map<string, ModuleNode>): string[] {
   return order; // deps appear before dependents
 }
 
-/** Recursive file listing under dir, skipping vendored/generated dirs (SKIP). */
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true })) {
-    if (e.isDirectory()) {
-      if (SKIP.has(e.name)) continue;
-      out.push(...(await walk(join(dir, e.name))));
-    } else out.push(join(dir, e.name));
-  }
-  return out;
-}

@@ -2,6 +2,7 @@ import { join, relative } from 'node:path';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { analyzeProject, DEFAULT_QUALITY, type QualityConfig, type QualityReport } from './analyze.js';
 import { detectPythonFunctions } from './py-detect.js';
+import { walk } from '../util/fs.js';
 import { isGeneratedSource } from '../util/generated.js';
 
 // I/O wrapper around the pure analyzer: walk a project's source tree, read the files,
@@ -17,18 +18,6 @@ const SRC = /\.(tsx|ts|jsx|js|py)$/;
 const TEST = /\.(test|spec|d)\.[tj]sx?$/;
 const PY_TEST = /(^|\/)(test_[^/]+|[^/]+_test|conftest)\.py$/;
 const IS_PY = /\.py$/;
-
-/** Recursively collect file paths under dir, pruning SKIP dirs; unreadable
- *  dirs read as empty so a bad entry can't fail the whole scan. */
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (!SKIP.has(e.name)) out.push(...(await walk(join(dir, e.name))));
-    } else out.push(join(dir, e.name));
-  }
-  return out;
-}
 
 /** Narrow walked paths to a changed subset (`--since`); undefined keeps all. */
 export function selectInputPaths(allPaths: string[], changed?: string[]): string[] {
@@ -48,7 +37,7 @@ export async function scanProject(
   const srcRoot = (await stat(join(dir, 'src')).then((s) => s.isDirectory()).catch(() => false))
     ? join(dir, 'src')
     : dir;
-  const files = (await walk(srcRoot)).filter(
+  const files = (await walk(srcRoot, SKIP)).filter(
     (f) => SRC.test(f) && !TEST.test(f) && !PY_TEST.test(f),
   );
   const keep = new Set(selectInputPaths(files.map((f) => relative(dir, f)), only));

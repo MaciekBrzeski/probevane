@@ -1,4 +1,5 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
+import { walk } from '../../util/fs.js';
 import { join, relative } from 'node:path';
 import { detectFunctionDocs } from '../../quality/detect-docs.js';
 import { embedIndex, type Indexed, type IndexOpts } from './index.js';
@@ -23,18 +24,6 @@ const SKIP_DIRS = new Set([
 const TS_SRC = /\.(tsx|ts|jsx|js)$/;
 const TEST = /\.(test|spec|d)\.[tj]sx?$/;
 
-/** Recursively collect file paths, pruning vendored/cache dirs (same set the
- *  quality scanner prunes); unreadable dirs read as empty. */
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (!SKIP_DIRS.has(e.name)) out.push(...(await walk(join(dir, e.name))));
-    } else out.push(join(dir, e.name));
-  }
-  return out;
-}
-
 /** One embeddable function: display path (`file:line name()`) + the text that
  *  gets embedded (name + doc prose — the file path is deliberately EXCLUDED so
  *  same-dir functions aren't inflated by path similarity). */
@@ -49,7 +38,7 @@ async function fnTexts(dir: string): Promise<FnText[]> {
   const srcRoot = (await stat(join(dir, 'src')).then((s) => s.isDirectory()).catch(() => false))
     ? join(dir, 'src')
     : dir;
-  const files = (await walk(srcRoot)).filter((f) => TS_SRC.test(f) && !TEST.test(f));
+  const files = (await walk(srcRoot, SKIP_DIRS)).filter((f) => TS_SRC.test(f) && !TEST.test(f));
   const out: FnText[] = [];
   for (const abs of files) {
     const source = await readFile(abs, 'utf8').catch(() => '');

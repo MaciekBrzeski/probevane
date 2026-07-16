@@ -1,4 +1,7 @@
-import { readdir, readFile, access } from 'node:fs/promises';
+import { readFile, access } from 'node:fs/promises';
+import { walk } from '../../util/fs.js';
+
+const GO_SKIP = new Set(['.git', 'vendor', 'node_modules']);
 import { manifestFields } from '../../vane/adapter-manifest.js';
 import { join, relative } from 'node:path';
 import type {
@@ -37,7 +40,7 @@ export const goAdapter: StackAdapter = {
     let score = 0;
     if (await exists(join(dir, 'go.mod'))) score += 0.6;
     try {
-      if ((await walk(dir)).some((f) => f.endsWith('.go'))) score += 0.3;
+      if ((await walk(dir, GO_SKIP)).some((f) => f.endsWith('.go'))) score += 0.3;
     } catch {
       /* ignore */
     }
@@ -49,7 +52,7 @@ export const goAdapter: StackAdapter = {
   },
 
   async discover(dir: string, _kind: TestKind): Promise<TestTarget[]> {
-    const files = (await walk(dir)).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go'));
+    const files = (await walk(dir, GO_SKIP)).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go'));
     return files.map((f) => ({
       kind: 'unit',
       sourcePath: relative(dir, f),
@@ -99,7 +102,7 @@ export const goAdapter: StackAdapter = {
   },
 
   async specFiles(dir: string): Promise<string[]> {
-    return (await walk(dir)).filter((f) => f.endsWith('_test.go')).map((f) => relative(dir, f));
+    return (await walk(dir, GO_SKIP)).filter((f) => f.endsWith('_test.go')).map((f) => relative(dir, f));
   },
 
   // DATA fields (guidance/patternsDoc/auditRules/commands) come from the vane
@@ -123,15 +126,3 @@ export const goAdapter: StackAdapter = {
 
   ...manifestFields('go-test'),
 };
-
-// Recursive file listing rooted at dir, skipping vendor/VCS/dep dirs.
-async function walk(dir: string, sub = ''): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(join(dir, sub), { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (['.git', 'vendor', 'node_modules'].includes(e.name)) continue;
-      out.push(...(await walk(dir, join(sub, e.name))));
-    } else out.push(join(dir, sub, e.name));
-  }
-  return out;
-}

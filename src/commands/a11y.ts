@@ -1,4 +1,5 @@
 import { join, relative } from 'node:path';
+import { walk } from '../util/fs.js';
 import { readdir, readFile, appendFile } from 'node:fs/promises';
 import { auditSource, formatViolations } from '../audit/core.js';
 import { a11yRules } from '../audit/a11y-rules.js';
@@ -16,7 +17,7 @@ const SKIP = new Set(['node_modules', 'dist', 'build', 'coverage', '.git']);
  *  then print the graded markdown (mirrored to $GITHUB_STEP_SUMMARY in Actions). */
 export async function run(ctx: CommandCtx): Promise<void> {
   const dir = ctx.dir;
-  const files = (await walk(join(dir, 'src')).catch(() => [])).filter((f) => COMPONENT_RE.test(f) && !/\.(test|spec)\./.test(f));
+  const files = (await walk(join(dir, 'src'), SKIP)).filter((f) => COMPONENT_RE.test(f) && !/\.(test|spec)\./.test(f));
   const rules = a11yRules();
 
   let errors = 0;
@@ -44,14 +45,3 @@ export async function run(ctx: CommandCtx): Promise<void> {
   if (errors > 0) process.exit(1);
 }
 
-/** Recursive file listing under dir, skipping vendored/build dirs (SKIP). */
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (SKIP.has(e.name)) continue;
-      out.push(...(await walk(join(dir, e.name))));
-    } else out.push(join(dir, e.name));
-  }
-  return out;
-}

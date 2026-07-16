@@ -1,4 +1,7 @@
-import { readFile, readdir, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access } from 'node:fs/promises';
+import { walk } from '../../util/fs.js';
+
+const SV_SKIP = new Set(['node_modules', 'dist', 'build', 'coverage']);
 import { join, relative } from 'node:path';
 import type {
   StackAdapter,
@@ -61,7 +64,7 @@ export const svelteAdapter: StackAdapter = {
   },
 
   async discover(dir: string, _kind: TestKind): Promise<TestTarget[]> {
-    const files = await walk(join(dir, 'src')).catch(() => []);
+    const files = await walk(join(dir, 'src'), SV_SKIP);
     return files
       .filter((f) => /\.(svelte|ts)$/.test(f) && !/\.(test|spec|d)\.ts$/.test(f) && !/main\.ts$/.test(f))
       .map((f) => ({ kind: 'unit', sourcePath: relative(dir, f), name: f.split('/').pop()!.replace(/\.(svelte|ts)$/, '') }));
@@ -108,15 +111,3 @@ export const svelteAdapter: StackAdapter = {
 
   ...manifestFields('svelte-vitest'),
 };
-
-// Recursive file listing, skipping build/VCS dirs.
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (['node_modules', 'dist', 'build', 'coverage'].includes(e.name)) continue;
-      out.push(...(await walk(join(dir, e.name))));
-    } else out.push(join(dir, e.name));
-  }
-  return out;
-}

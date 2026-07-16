@@ -1,4 +1,5 @@
-import { readdir, access } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
+import { walk } from '../../util/fs.js';
 import { join, relative } from 'node:path';
 
 // Shared contract + tiny helpers for the doctor checks (checks.ts + lanes.ts).
@@ -42,15 +43,8 @@ export function lastLine(s: string | undefined): string {
 
 const SKIP = new Set(['node_modules', 'dist', 'coverage', '.git', '__pycache__', '.venv']);
 /** Recursive file walk returning root-relative paths, skipping generated and
- *  vendored dirs — the file inventory the checks scan. */
+ *  vendored dirs — the file inventory the checks scan. Thin wrapper over the
+ *  shared util walk; only the root-relative output is doctor-specific. */
 export async function walkSrc(root: string, dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (e.isDirectory()) {
-      if (!SKIP.has(e.name)) out.push(...(await walkSrc(root, join(dir, e.name))));
-    } else {
-      out.push(relative(root, join(dir, e.name)));
-    }
-  }
-  return out;
+  return (await walk(dir, SKIP)).map((f) => relative(root, f));
 }
