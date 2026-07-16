@@ -10,5 +10,6 @@ export interface ChecksReport {
   crowding: { dir: string; files: number }[];
   cycles: number;
   coverage: { statements: number; branches: number; functions: number; lines: number } | null;
+  mutation: { score: number; survived: number; total: number; sampled: boolean; at: string } | null; // last CLI run's artifact
   evalHistory: { label: string; ratio: number }[]; // improvement-log tail, oldest first
 }

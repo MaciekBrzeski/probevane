@@ -747,7 +747,19 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       cov.statements >= 90 && cov.branches >= 90,
       "coverage floors",
       `${cov.statements}% stmts \xB7 ${cov.branches}% branch \xB7 ${cov.functions}% fn`
-    ) : lampAbsent("coverage", "no artifact \u2014 run npm run coverage"));
+    ) : lampAbsent("coverage", "no artifact \u2014 run npm run coverage"), d.mutation ? lamp(
+      d.mutation.score >= 0.6,
+      "mutation score",
+      `${Math.round(d.mutation.score * 100)}% \xB7 ${d.mutation.survived}/${d.mutation.total} survived${d.mutation.sampled ? " (sampled)" : ""} \xB7 ${ageOf(d.mutation.at)}`
+    ) : lampAbsent("mutation score", "no artifact \u2014 run probevane mutation ."));
+  }
+  function ageOf(iso) {
+    const ms = new Date(iso).getTime();
+    if (!Number.isFinite(ms)) return "?";
+    const mins = Math.round((Date.now() - ms) / 6e4);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.round(mins / 60);
+    return hrs < 24 ? `${hrs}h ago` : `${Math.round(hrs / 24)}d ago`;
   }
   function trendColumn(d) {
     const maxCrowd = Math.max(1, ...d.crowding.map((c) => c.files));

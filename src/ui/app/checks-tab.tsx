@@ -56,8 +56,26 @@ function gateLamps(d: ChecksReport): Node {
             `${cov.statements}% stmts · ${cov.branches}% branch · ${cov.functions}% fn`,
           )
         : lampAbsent('coverage', 'no artifact — run npm run coverage')}
+      {d.mutation
+        ? lamp(
+            d.mutation.score >= 0.6,
+            'mutation score',
+            `${Math.round(d.mutation.score * 100)}% · ${d.mutation.survived}/${d.mutation.total} survived` +
+              `${d.mutation.sampled ? ' (sampled)' : ''} · ${ageOf(d.mutation.at)}`,
+          )
+        : lampAbsent('mutation score', 'no artifact — run probevane mutation .')}
     </div>
   );
+}
+
+/** Human age of an ISO timestamp for the artifact staleness hint. */
+function ageOf(iso: string): string {
+  const ms = new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '?';
+  const mins = Math.round((Date.now() - ms) / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs < 24 ? `${hrs}h ago` : `${Math.round(hrs / 24)}d ago`;
 }
 
 /** Crowding bars (single hue = magnitude) + the eval pass-rate sparkline. */

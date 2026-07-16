@@ -1,6 +1,33 @@
+import { join } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { runMutation, type MutationRun } from '../loop/mutation.js';
 import type { CommandCtx } from '../vane/run-command.js';
+
+/** The compact mutation summary the Checks tab reads (.probevane/mutation-report.json).
+ *  Timestamped so the tab can show how stale the number is; heavy gates are never
+ *  run live by the daemon, only surfaced from the last CLI run's artifact. */
+export interface MutationArtifact {
+  score: number;
+  killed: number;
+  survived: number;
+  total: number;
+  sampled: boolean;
+  at: string; // ISO timestamp
+}
+
+/** Persist the compact summary for the Checks tab. Best-effort — a write failure
+ *  must never fail the mutation run itself. */
+async function writeArtifact(dir: string, r: MutationRun): Promise<void> {
+  const artifact: MutationArtifact = {
+    score: r.score, killed: r.killed, survived: r.survived, total: r.total,
+    sampled: r.sampled, at: new Date().toISOString(),
+  };
+  try {
+    await mkdir(join(dir, '.probevane'), { recursive: true });
+    await writeFile(join(dir, '.probevane', 'mutation-report.json'), JSON.stringify(artifact, null, 2));
+  } catch { /* best-effort */ }
+}
 
 // `probevane mutation` backend — full per-site mutation test: flips operators
 // (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs
@@ -43,6 +70,7 @@ export async function run(ctx: CommandCtx): Promise<void> {
     log: (l) => console.error(l),
   });
 
+  await writeArtifact(ctx.dir, r);
   if (ctx.flags.json === true) console.log(JSON.stringify(r, null, 2));
   else report(r);
 

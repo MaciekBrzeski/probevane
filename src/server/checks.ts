@@ -50,14 +50,27 @@ async function readEvalHistory(dir: string, tailN = 30): Promise<ChecksReport['e
     .map(([label, b]) => ({ label: label.slice(0, 10), ratio: b.total ? b.passed / b.total : 0 }));
 }
 
+/** Last mutation CLI run's compact summary, or null when no artifact exists
+ *  (mutation is a heavy gate — never run live here, only surfaced if a run left
+ *  .probevane/mutation-report.json behind). */
+async function readMutation(dir: string): Promise<ChecksReport['mutation']> {
+  try {
+    const j = JSON.parse(await readFile(join(dir, '.probevane', 'mutation-report.json'), 'utf8'));
+    return { score: j.score, survived: j.survived, total: j.total, sampled: j.sampled, at: j.at };
+  } catch {
+    return null;
+  }
+}
+
 /** Run the cheap checks + read the artifacts for one project dir. */
 export async function collectChecks(dirIn: string): Promise<ChecksReport> {
   const dir = resolve(dirIn);
-  const [raw, graph, cfg, coverage, evalHistory] = await Promise.all([
+  const [raw, graph, cfg, coverage, mutation, evalHistory] = await Promise.all([
     scanProject(dir),
     buildGraph(dir),
     loadConfig(dir),
     readCoverage(dir),
+    readMutation(dir),
     readEvalHistory(dir),
   ]);
   // Grade the RATCHETED view (what the gate enforces) but count the raw doc
@@ -81,6 +94,7 @@ export async function collectChecks(dirIn: string): Promise<ChecksReport> {
     crowding: crowded.map((c) => ({ dir: c.dir, files: c.files })),
     cycles: archMetrics(graph).cycles.length,
     coverage,
+    mutation,
     evalHistory,
   };
 }
