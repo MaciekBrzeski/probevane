@@ -839,7 +839,17 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   }
 
   // src/ui/app/chat-tab.tsx
-  var MODELS = ["auto", "haiku", "sonnet", "opus", "ollama"];
+  var MODELS = [
+    "auto",
+    "haiku",
+    "sonnet",
+    "opus",
+    "ollama",
+    "ollama:qwen3.5:397b",
+    "ollama:deepseek-v4-pro",
+    "ollama:glm-5.2",
+    "ollama:gpt-oss:120b"
+  ];
   var running = false;
   function setRunning(on) {
     running = on;

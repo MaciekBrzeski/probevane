@@ -14,7 +14,13 @@ import type { Interpretation, Proposal } from '../../util/assistant-shape.ts';
 // Bridge is NOT offered here (a daemon run has no servicer for it → hangs), and
 // the run row ALWAYS sends an explicit --model so the repo config default (which
 // may be bridge) can't leak into a fire-and-forget daemon run.
-const MODELS = ['auto', 'haiku', 'sonnet', 'opus', 'ollama'];
+// auto/haiku/sonnet/opus route through Anthropic; the ollama:* IDs are stronger
+// tool-capable models on the cloud endpoint (the bare `ollama` = kimi default is
+// weaker at the loop's multi-turn tool-calling).
+const MODELS = [
+  'auto', 'haiku', 'sonnet', 'opus',
+  'ollama', 'ollama:qwen3.5:397b', 'ollama:deepseek-v4-pro', 'ollama:glm-5.2', 'ollama:gpt-oss:120b',
+];
 
 // One run at a time per tab — clicking several RUN buttons otherwise clobbers.
 let running = false;
