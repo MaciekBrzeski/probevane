@@ -4,15 +4,16 @@ import type { Interpretation, Proposal } from '../../util/assistant-shape.ts';
 
 // Chat tab renderer — three regions, deterministic and non-deterministic kept
 // apart per the layout:
-//   • conversation (#chat-convo): your request + the assistant's narration + run
-//     lifecycle. The "talking to the model" thread.
+//   • conversation (#chat-convo): the durable, append-only history — your request,
+//     the assistant's narration + run lifecycle, AND the full transcript (every
+//     turn: the model's text + tool calls/results, followed live from the
+//     transcript file). Never wiped, so runs accumulate as scrollable history.
 //   • signals (#chat-signals): the DETERMINISTIC $0 output — the interpreted plan
 //     (op/flags), the plan context, and post-run proposals. Replaced per request.
-//   • tool output (#chat-tools): the run's live detail — the rune-pipeline strip
-//     (which phase/gate is running, lit by the same reducer the console uses), a
-//     status line (active step · tool, or blocked-at gate, + tokens), and the
-//     chain-of-thought turn stream (the model's text + tool calls/results,
-//     followed live from the transcript).
+//   • tool output (#chat-tools): the run's LIVE status — the rune-pipeline strip
+//     (which phase/gate is running, lit by the same reducer the console uses) and
+//     a status line (active step · tool, or blocked-at gate, + tokens). Ephemeral;
+//     the durable record is the transcript in the conversation window.
 // Each region animates its loading / empty / unavailable state.
 //
 // Bridge is NOT offered here (a daemon run has no servicer for it → hangs), and
@@ -49,12 +50,23 @@ function empty(label: string): Node {
   return <div class="chat-empty">{label}</div>;
 }
 
-/** Append a message to the conversation and keep it scrolled. */
-function convo(role: string, cls: string, body: Node): void {
+/** Append a node to the conversation (dropping the placeholder) and keep it scrolled. */
+function convoAppend(node: Node): void {
   const el = $('chat-convo');
   el.querySelector('.chat-empty')?.remove();
-  el.appendChild(<div class={`chat-msg ${cls}`}><span class="chat-role">{role}</span> {body}</div>);
+  el.appendChild(node);
   el.scrollTop = el.scrollHeight;
+}
+
+/** Append a message to the conversation and keep it scrolled. */
+function convo(role: string, cls: string, body: Node): void {
+  convoAppend(<div class={`chat-msg ${cls}`}><span class="chat-role">{role}</span> {body}</div>);
+}
+
+/** Append a full transcript turn (model text + tool calls/results) to the
+ *  conversation — the durable, append-only history in the main window. */
+function convoTurn(t: TurnData): void {
+  convoAppend(<Turn t={t} />);
 }
 
 /** Replace the signals region wholesale (deterministic content is per-request). */
@@ -195,8 +207,9 @@ function statusLine(e: RunEvent): Node {
 
 // --- run + stream -----------------------------------------------------------
 
-/** Launch a run; wire the tool region (pipeline strip + status + chain-of-thought
- *  turns), narrate lifecycle in the conversation, then show proposals in signals. */
+/** Launch a run; the tool region shows the live pipeline strip + status (which
+ *  phase/gate is running), the full transcript streams into the main conversation
+ *  as durable history, and proposals land in signals on completion. */
 async function runLaunch(dir: string, op: string, flags: string[], label: string): Promise<void> {
   setRunning(true);
   const model = flags[flags.indexOf('--model') + 1] ?? 'auto';
@@ -204,14 +217,11 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
 
   const pipe = <div class="chat-pipeline"></div> as HTMLElement;
   const status = <div class="chat-status">{statusLine({})}</div> as HTMLElement;
-  const turns = <div class="chat-turns"><div class="chat-empty">waiting for the model…</div></div> as HTMLElement;
   setTools(
     <div>
       <div class="chat-signal-sub">pipeline · {profileFor(op)}</div>
       {pipe}
       {status}
-      <div class="chat-signal-sub">chain of thought</div>
-      {turns}
     </div>,
   );
 
@@ -234,11 +244,7 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
       renderPipeline(pipe, runes, state);
       status.replaceChildren(statusLine(e));
     },
-    onTurn: (t) => {
-      turns.querySelector('.chat-empty')?.remove();
-      turns.appendChild(<Turn t={t} />);
-      turns.scrollTop = turns.scrollHeight;
-    },
+    onTurn: convoTurn,
     onDone: (stop) => {
       setRunning(false);
       status.classList.add('chat-live-off');
