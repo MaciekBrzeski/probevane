@@ -246,6 +246,25 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .checks-bar-label { min-width:170px; color:var(--fg); }
 .checks-bar { height:10px; background:var(--acc); border-radius:2px; min-width:2px; box-shadow:0 0 6px var(--acc); }
 
+/* --- assistant / chat tab --- */
+.chat { display:flex; flex-direction:column; }
+.chat-log { flex:1; min-height:320px; max-height:60vh; overflow-y:auto; padding:8px 4px; display:flex; flex-direction:column; gap:10px; }
+.chat-turn { border-left:3px solid var(--line); padding:6px 10px; background:var(--panel); }
+.chat-turn.user { border-left-color:var(--acc); }
+.chat-turn.asst { border-left-color:var(--mag); }
+.chat-turn.run { border-left-color:var(--warn); }
+.chat-turn.err { border-left-color:var(--err); }
+.chat-role { display:inline-block; min-width:64px; color:var(--dim); text-transform:uppercase; font-size:11px; letter-spacing:.1em; }
+.chat-assume { margin:6px 0 0 72px; color:var(--warn); font-size:12px; }
+.chat-ctx { margin:6px 0 0 72px; font-size:12px; }
+.chat-run-row { margin:8px 0 0 72px; display:flex; align-items:center; gap:8px; }
+.chat-stream { margin:6px 0 0 72px; max-height:220px; overflow-y:auto; white-space:pre-wrap; font-size:12px; }
+.chat-prop { margin:8px 0 0 72px; padding:6px 8px; border-left:2px solid var(--acc); background:var(--bg); }
+.chat-input { display:flex; gap:8px; margin-top:10px; }
+.chat-input input { flex:1; }
+.chat-input .chat-dir { flex:0 0 220px; }
+.chat-model { min-width:90px; }
+
 </style>
 </head>
 <body>
@@ -437,6 +456,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     { id: "quality", title: "Quality", accent: "ok", terminal: true },
     { id: "checks", title: "Checks", accent: "ok", terminal: false },
     // gate scoreboard (browser-only for now)
+    { id: "chat", title: "Assistant", accent: "mag", terminal: false },
+    // conversational driver (browser-only)
     { id: "console", title: "Console", accent: "acc", terminal: true },
     { id: "terminal", title: "Terminal", accent: "acc", terminal: true }
   ];
@@ -531,6 +552,11 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   // src/ui/app/components/panels/ChecksPanel.tsx
   function ChecksPanel() {
     return /* @__PURE__ */ h("section", { "data-tab": "checks" }, /* @__PURE__ */ h("div", { class: "panel wide" }, /* @__PURE__ */ h("h2", null, "checks ", /* @__PURE__ */ h("span", { id: "checksmeta", class: "muted" })), /* @__PURE__ */ h("div", { id: "checks-body", class: "muted" }, "loading gate scoreboard\u2026")));
+  }
+
+  // src/ui/app/components/panels/ChatPanel.tsx
+  function ChatPanel() {
+    return /* @__PURE__ */ h("section", { "data-tab": "chat" }, /* @__PURE__ */ h("div", { class: "panel wide chat" }, /* @__PURE__ */ h("h2", null, "assistant ", /* @__PURE__ */ h("span", { class: "muted" }, "\u2014 describe what you want; probevane plans it, runs it, proposes next")), /* @__PURE__ */ h("div", { id: "chat-log", class: "chat-log" }), /* @__PURE__ */ h("div", { class: "chat-input" }, /* @__PURE__ */ h("input", { type: "text", id: "chat-dir", placeholder: "/path/to/project", class: "chat-dir" }), /* @__PURE__ */ h("input", { type: "text", id: "chat-prompt", placeholder: "e.g. add unit tests for the parser, or refactor the giant App component" }), /* @__PURE__ */ h("button", { class: "act", id: "chat-send" }, "SEND \u25B6"))));
   }
 
   // src/ui/app/components/chrome/ScanFrame.tsx
@@ -785,6 +811,107 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     body.replaceChildren(
       /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "checks-gauges" }, /* @__PURE__ */ h(Gauge, { value: ring(d.quality.grade / 100), label: `quality ${d.quality.grade}/100`, accent: packed("ok") }), /* @__PURE__ */ h(Gauge, { value: ring(d.pyramid.score / 100), label: `pyramid ${d.pyramid.score}/100`, accent: packed("acc") }), d.coverage ? /* @__PURE__ */ h(Gauge, { value: ring(d.coverage.statements / 100), label: "coverage (stmts)", accent: packed("mag") }) : null), /* @__PURE__ */ h("div", { class: "checks-cols" }, gateLamps(d), trendColumn(d)))
     );
+  }
+
+  // src/ui/app/chat-tab.tsx
+  var MODELS = ["auto", "haiku", "sonnet", "opus", "bridge", "ollama"];
+  function push(node) {
+    const log = $("chat-log");
+    log.appendChild(node);
+    log.scrollTop = log.scrollHeight;
+    return node;
+  }
+  function userTurn(prompt) {
+    push(/* @__PURE__ */ h("div", { class: "chat-turn user" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "you"), " ", prompt));
+  }
+  function proposalCard(dir, p) {
+    return /* @__PURE__ */ h("div", { class: "chat-prop" }, /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("b", null, p.title), " ", /* @__PURE__ */ h("span", { class: "muted" }, "(", p.source, ")")), /* @__PURE__ */ h("div", { class: "muted" }, p.why), /* @__PURE__ */ h("button", { class: "ghost", onClick: () => runLaunch(dir, p.op, p.flags, `${p.op} ${p.flags.join(" ")}`) }, "run this \u25B6"));
+  }
+  async function showProposals(dir) {
+    const { proposals } = await j(`/assistant/propose?dir=${encodeURIComponent(dir)}`);
+    if (!proposals.length) return;
+    push(
+      /* @__PURE__ */ h("div", { class: "chat-turn asst" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "assistant"), " proposed next steps:", proposals.map((p) => proposalCard(dir, p)))
+    );
+  }
+  async function runLaunch(dir, op, flags, label) {
+    const turn = push(/* @__PURE__ */ h("div", { class: "chat-turn run" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "run"), " ", label, /* @__PURE__ */ h("pre", { class: "chat-stream muted" }, "launching\u2026")));
+    const pre = turn.querySelector(".chat-stream");
+    const body = JSON.stringify({ op, dir, flags });
+    const r = await j("/run", { method: "POST", headers: { "content-type": "application/json" }, body });
+    if (r.error) {
+      pre.textContent = "\u2717 " + r.error;
+      return;
+    }
+    pre.textContent = `\u25B6 job ${r.id}
+`;
+    streamRun(dir, pre, () => showProposals(dir));
+  }
+  function streamRun(dir, pre, onDone) {
+    const es2 = new EventSource("/stream?dir=" + encodeURIComponent(dir));
+    let last = "";
+    es2.onmessage = (ev) => {
+      try {
+        const e = JSON.parse(ev.data);
+        const line = `${e.kind ?? "event"}${e.step != null ? ` step ${e.step}` : ""}${e.tool ? ` \xB7 ${e.tool}` : ""}`;
+        if (line !== last) {
+          pre.textContent += line + "\n";
+          last = line;
+          pre.classList.remove("muted");
+        }
+        if (e.stopReason) {
+          pre.textContent += `
+\u2014 ${e.stopReason} \u2014
+`;
+          es2.close();
+          onDone();
+        }
+      } catch {
+      }
+    };
+    es2.onerror = () => {
+      es2.close();
+    };
+  }
+  function planCard(r) {
+    const dir = r.launch.dir;
+    const modelSel = /* @__PURE__ */ h("select", { class: "chat-model" }, MODELS.map((m) => /* @__PURE__ */ h("option", { value: m }, m)));
+    const confirm = /* @__PURE__ */ h("button", { class: "act", onClick: () => {
+      const flags = withModel(r.launch.flags, modelSel.value);
+      runLaunch(dir, r.launch.op, flags, r.summary);
+    } }, "run \u25B6");
+    return /* @__PURE__ */ h("div", { class: "chat-turn asst" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "assistant"), " ", r.summary, r.assumptions.length ? /* @__PURE__ */ h("ul", { class: "chat-assume" }, r.assumptions.map((a) => /* @__PURE__ */ h("li", null, a))) : null, r.planContext.length ? /* @__PURE__ */ h("div", { class: "muted chat-ctx" }, "context: ", r.planContext.slice(0, 3).map((i) => `${i.action} ${i.target}`).join(" \xB7 ")) : null, /* @__PURE__ */ h("div", { class: "chat-run-row" }, "model ", modelSel, " ", confirm));
+  }
+  function withModel(flags, model) {
+    const out = flags.filter((f, i) => f !== "--model" && flags[i - 1] !== "--model");
+    if (model !== "auto") out.push("--model", model);
+    return out;
+  }
+  async function send() {
+    const dir = $("chat-dir").value.trim();
+    const prompt = $("chat-prompt").value.trim();
+    if (!dir || !prompt) return;
+    userTurn(prompt);
+    $("chat-prompt").value = "";
+    const r = await j("/assistant/interpret", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dir, prompt })
+    });
+    if (!r.ok) {
+      push(/* @__PURE__ */ h("div", { class: "chat-turn asst err" }, /* @__PURE__ */ h("span", { class: "chat-role" }, "assistant"), " \u2717 ", r.error ?? "could not interpret"));
+      return;
+    }
+    push(planCard(r));
+  }
+  function loadChat() {
+    const btn = $("chat-send");
+    if (btn.dataset.wired) return;
+    btn.dataset.wired = "1";
+    btn.onclick = () => void send();
+    $("chat-prompt").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") void send();
+    });
   }
 
   // src/ui/app/components/viz/NodeGraph.tsx
@@ -1070,7 +1197,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   applyPalette();
   mount(
     document.getElementById("app"),
-    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ChecksPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
+    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ChecksPanel, null), /* @__PURE__ */ h(ChatPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
   );
   try {
     mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "dark" });
@@ -1086,6 +1213,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     if (go === "runs") loadRuns();
     if (go === "docs") loadWiki();
     if (go === "checks") loadChecks();
+    if (go === "chat") loadChat();
     if (go === "terminal") {
       loadTerminal();
       terminalActivated();

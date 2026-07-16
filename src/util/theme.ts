@@ -47,6 +47,7 @@ export const TABS: TabDef[] = [
   { id: 'cost', title: 'Cost / Alerts', accent: 'warn', terminal: true },
   { id: 'quality', title: 'Quality', accent: 'ok', terminal: true },
   { id: 'checks', title: 'Checks', accent: 'ok', terminal: false }, // gate scoreboard (browser-only for now)
+  { id: 'chat', title: 'Assistant', accent: 'mag', terminal: false }, // conversational driver (browser-only)
   { id: 'console', title: 'Console', accent: 'acc', terminal: true },
   { id: 'terminal', title: 'Terminal', accent: 'acc', terminal: true },
 ];

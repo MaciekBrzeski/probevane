@@ -3,6 +3,7 @@
 declare global {
   const h: typeof import('../runtime.ts').h;
   const Fragment: typeof import('../runtime.ts').Fragment;
+  const ChatPanel: typeof import('./components/panels/ChatPanel.tsx').ChatPanel;
   const ChecksPanel: typeof import('./components/panels/ChecksPanel.tsx').ChecksPanel;
   const ConsolePanel: typeof import('./components/panels/ConsolePanel.tsx').ConsolePanel;
   const CostPanel: typeof import('./components/panels/CostPanel.tsx').CostPanel;

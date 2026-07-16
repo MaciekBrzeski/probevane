@@ -18,9 +18,9 @@ describe('palette SSOT', () => {
 
 describe('tabs SSOT', () => {
   it('terminal renders every browser tab except the browser-only checks scoreboard', () => {
-    const browser = ['projects', 'runs', 'docs', 'launch', 'cost', 'quality', 'checks', 'console', 'terminal'];
+    const browser = ['projects', 'runs', 'docs', 'launch', 'cost', 'quality', 'checks', 'chat', 'console', 'terminal'];
     expect(TABS.map((t) => t.id)).toEqual(browser);
-    expect(TERMINAL_TABS.map((t) => t.id)).toEqual(browser.filter((id) => id !== 'checks'));
+    expect(TERMINAL_TABS.map((t) => t.id)).toEqual(browser.filter((id) => id !== 'checks' && id !== 'chat'));
     expect(TERMINAL_TABS.every((t) => t.terminal)).toBe(true);
   });
 });

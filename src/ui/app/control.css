@@ -236,3 +236,22 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .checks-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
 .checks-bar-label { min-width:170px; color:var(--fg); }
 .checks-bar { height:10px; background:var(--acc); border-radius:2px; min-width:2px; box-shadow:0 0 6px var(--acc); }
+
+/* --- assistant / chat tab --- */
+.chat { display:flex; flex-direction:column; }
+.chat-log { flex:1; min-height:320px; max-height:60vh; overflow-y:auto; padding:8px 4px; display:flex; flex-direction:column; gap:10px; }
+.chat-turn { border-left:3px solid var(--line); padding:6px 10px; background:var(--panel); }
+.chat-turn.user { border-left-color:var(--acc); }
+.chat-turn.asst { border-left-color:var(--mag); }
+.chat-turn.run { border-left-color:var(--warn); }
+.chat-turn.err { border-left-color:var(--err); }
+.chat-role { display:inline-block; min-width:64px; color:var(--dim); text-transform:uppercase; font-size:11px; letter-spacing:.1em; }
+.chat-assume { margin:6px 0 0 72px; color:var(--warn); font-size:12px; }
+.chat-ctx { margin:6px 0 0 72px; font-size:12px; }
+.chat-run-row { margin:8px 0 0 72px; display:flex; align-items:center; gap:8px; }
+.chat-stream { margin:6px 0 0 72px; max-height:220px; overflow-y:auto; white-space:pre-wrap; font-size:12px; }
+.chat-prop { margin:8px 0 0 72px; padding:6px 8px; border-left:2px solid var(--acc); background:var(--bg); }
+.chat-input { display:flex; gap:8px; margin-top:10px; }
+.chat-input input { flex:1; }
+.chat-input .chat-dir { flex:0 0 220px; }
+.chat-model { min-width:90px; }

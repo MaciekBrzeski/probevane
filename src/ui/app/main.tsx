@@ -2,6 +2,7 @@
 // inline script (polling, tabs, drawer, markdown/mermaid, filtering) as functions.
 import { mount } from '../runtime.ts';
 import { loadChecks } from './checks-tab.tsx';
+import { loadChat } from './chat-tab.tsx';
 import { $, j, esc, dirOf, applyPalette, type ProjectInfo, type RunRecord } from './lib.ts';
 import { RUN_COLUMNS } from '../../util/theme.ts';
 import { loadConsole, consolePipelineEvent, consolePipelineReset, startTheater } from './console.tsx';
@@ -27,6 +28,7 @@ mount(
     <CostPanel />
     <QualityPanel />
     <ChecksPanel />
+    <ChatPanel />
     <ConsolePanel />
     <TerminalPanel />
     <Drawer />
@@ -46,6 +48,7 @@ $('tabs').addEventListener('click', (e) => {
   if (go === 'runs') loadRuns();
   if (go === 'docs') loadWiki();
   if (go === 'checks') loadChecks();
+  if (go === 'chat') loadChat();
   if (go === 'terminal') { loadTerminal(); terminalActivated(); }
 });
 
