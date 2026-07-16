@@ -14,7 +14,7 @@ import { runReact, coverageReact } from './run.js';
 import { probeReactUnit, probeReactE2e } from './probe.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { findSpecFiles } from '../../util/specfiles.js';
-import { loadPrompt } from '../../library/prompt.js';
+import { manifestFields } from '../../vane/adapter-manifest.js';
 
 // react-vitest-playwright — the first-class adapter.
 // P0: detect / install / discover / run / coverage / auditRules / commands.
@@ -36,14 +36,15 @@ export const reactAdapter: StackAdapter = {
     return findSpecFiles(dir); // *.{test,spec}.{ts,tsx,js,jsx}
   },
 
-  guidance(kind: TestKind): string {
-    return kind === 'unit'
-      ? `(vitest + @testing-library/react) placed next to their source under src/ as src/<Name>.test.tsx. Cover happy paths, edge cases, and immutability for pure functions; user-visible behavior for components. PREFER pure functions / hooks / slices — they need the least setup. If a component requires context (Redux store, React Router, a Theme/Context provider), wrap it in the app's REAL providers via a render helper, e.g. render(<Provider store={makeStore()}><MemoryRouter>{ui}</MemoryRouter></Provider>) — import the app's store/router from its modules; do not reimplement them. Mock only the network. CSS/asset imports are ignored by the config, so don't worry about them.`
-      : `(Playwright @playwright/test) placed under the e2e/ directory as e2e/<name>.spec.ts. ALWAYS \`import { test, expect } from '@playwright/test'\` — NEVER the bare 'playwright/test' (it collects 0 tests → "No tests found"). The app runs at the base URL; use page.goto('/') then drive it via getByRole/getByLabel using ONLY the labels/roles/buttons in the ground truth. Assert user-visible outcomes.`;
+  // DATA fields (guidance/patternsDoc/commands) come from the vane manifest;
+  // TS fallbacks stay so a missing manifest fails loud, never silently degrades.
+  // auditRules stays TS — a clean 1-liner, no gain from a registry ref.
+  guidance(_kind: TestKind): string {
+    return '';
   },
 
-  patternsDoc(kind: TestKind): Promise<string> {
-    return loadPrompt(kind === 'unit' ? 'unit-patterns.md' : 'e2e-patterns.md');
+  patternsDoc(_kind: TestKind): Promise<string> {
+    return Promise.resolve('');
   },
 
   auditRules(): AuditRule[] {
@@ -51,12 +52,8 @@ export const reactAdapter: StackAdapter = {
   },
 
   commands(): AdapterCommands {
-    return {
-      typecheck: 'npx tsc --noEmit',
-      lint: 'true', // most fixtures have no linter; adapter stays green-by-default
-      testUnit: 'npx vitest run',
-      testE2e: 'npx playwright test',
-      coverage: 'npx vitest run --coverage --coverage.reporter=json-summary',
-    };
+    return { typecheck: '', lint: '', testUnit: '', testE2e: '', coverage: '' };
   },
+
+  ...manifestFields('react-vitest-playwright'),
 };

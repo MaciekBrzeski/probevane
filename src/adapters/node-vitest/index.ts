@@ -12,7 +12,7 @@ import type {
 import { sh } from '../../util/exec.js';
 import { runVitest, coverageVitest } from '../vitest-runner.js';
 import { findSpecFiles } from '../../util/specfiles.js';
-import { loadPrompt } from '../../library/prompt.js';
+import { manifestFields } from '../../vane/adapter-manifest.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { astExtract } from '../ast-probe.js';
 import { readPackageDeps } from '../pkg-deps.js';
@@ -90,16 +90,21 @@ export default defineConfig({ test: {
   coverage: (dir: string) => coverageVitest(dir),
   specFiles: (dir: string) => findSpecFiles(dir),
 
+  // DATA fields (guidance/patternsDoc/commands) come from the vane manifest;
+  // TS fallbacks stay so a missing manifest fails loud, never silently degrades.
+  // auditRules stays TS — a clean 1-liner, no gain from a registry ref.
   guidance(_kind: TestKind): string {
-    return `(vitest, plain TS) place the test next to its source as src/<name>.test.ts. ALWAYS \`import { describe, it, expect } from 'vitest'\` (no globals). Import the exported functions and assert concrete values; cover happy paths, edge cases, and error paths. No DOM, no framework. Use only the ground-truth exports.`;
+    return '';
   },
   patternsDoc(_kind: TestKind): Promise<string> {
-    return loadPrompt('node-unit-patterns.md');
+    return Promise.resolve('');
   },
   auditRules(): AuditRule[] {
     return jsAuditRules();
   },
   commands(): AdapterCommands {
-    return { typecheck: 'npx tsc --noEmit', lint: 'true', testUnit: 'npx vitest run', testE2e: 'true', coverage: 'npx vitest run --coverage --coverage.reporter=json-summary' };
+    return { typecheck: '', lint: '', testUnit: '', testE2e: '', coverage: '' };
   },
+
+  ...manifestFields('node-vitest'),
 };

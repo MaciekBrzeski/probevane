@@ -1,0 +1,19 @@
+# react-vitest-playwright adapter manifest — the DATA fields of the first-class
+# React StackAdapter. Code fields (detect/install/discover/probe/run/coverage)
+# stay in src/adapters/react-vitest-playwright/index.ts; auditRules stays TS
+# (jsAuditRules). Declared fields override via manifestFields. Partial by design.
+# guidance + patterns are PER-KIND: unit (vitest + testing-library) differs from
+# e2e (Playwright), so both blocks/pointers are declared distinctly.
+
+adapter react-vitest-playwright
+  command typecheck = npx tsc --noEmit
+  command lint = true
+  command test-unit = npx vitest run
+  command test-e2e = npx playwright test
+  command coverage = npx vitest run --coverage --coverage.reporter=json-summary
+  patterns unit = unit-patterns.md
+  patterns e2e = e2e-patterns.md
+  guidance unit:
+    (vitest + @testing-library/react) placed next to their source under src/ as src/<Name>.test.tsx. Cover happy paths, edge cases, and immutability for pure functions; user-visible behavior for components. PREFER pure functions / hooks / slices — they need the least setup. If a component requires context (Redux store, React Router, a Theme/Context provider), wrap it in the app's REAL providers via a render helper, e.g. render(<Provider store={makeStore()}><MemoryRouter>{ui}</MemoryRouter></Provider>) — import the app's store/router from its modules; do not reimplement them. Mock only the network. CSS/asset imports are ignored by the config, so don't worry about them.
+  guidance e2e:
+    (Playwright @playwright/test) placed under the e2e/ directory as e2e/<name>.spec.ts. ALWAYS `import { test, expect } from '@playwright/test'` — NEVER the bare 'playwright/test' (it collects 0 tests → "No tests found"). The app runs at the base URL; use page.goto('/') then drive it via getByRole/getByLabel using ONLY the labels/roles/buttons in the ground truth. Assert user-visible outcomes.

@@ -12,7 +12,7 @@ import { installVue } from './install.js';
 import { probeVueUnit, discoverVue } from './probe.js';
 import { runVue, coverageVue } from './run.js';
 import { findSpecFiles } from '../../util/specfiles.js';
-import { loadPrompt } from '../../library/prompt.js';
+import { manifestFields } from '../../vane/adapter-manifest.js';
 import { vueAuditRules } from '../../audit/rules-vue.js';
 
 // vue-vitest-playwright — third stack. Implements the SAME StackAdapter
@@ -35,14 +35,15 @@ export const vueAdapter: StackAdapter = {
   coverage: (dir: string) => coverageVue(dir),
   specFiles: (dir: string) => findSpecFiles(dir),
 
-  guidance(kind: TestKind): string {
-    return kind === 'unit'
-      ? `(vitest + @vue/test-utils) placed next to source as src/<Name>.test.ts. Mount components with mount(Comp, { props }); query with wrapper.get('[aria-label="…"]'); ALWAYS await wrapper.get(...).trigger('click') before asserting. Test pure .ts helpers directly.`
-      : `(Playwright @playwright/test) under e2e/<name>.spec.ts; page.goto('/') then drive via getByLabel/getByRole using ONLY the labels in the ground truth.`;
+  // DATA fields (guidance/patternsDoc/commands) come from the vane manifest;
+  // TS fallbacks stay so a missing manifest fails loud, never silently degrades.
+  // auditRules stays TS — a clean 1-liner, no gain from a registry ref.
+  guidance(_kind: TestKind): string {
+    return '';
   },
 
-  patternsDoc(kind: TestKind): Promise<string> {
-    return loadPrompt(kind === 'unit' ? 'vue-unit-patterns.md' : 'vue-e2e-patterns.md');
+  patternsDoc(_kind: TestKind): Promise<string> {
+    return Promise.resolve('');
   },
 
   auditRules(): AuditRule[] {
@@ -50,12 +51,8 @@ export const vueAdapter: StackAdapter = {
   },
 
   commands(): AdapterCommands {
-    return {
-      typecheck: 'true', // vue-tsc is finicky; validation relies on the green suite
-      lint: 'true',
-      testUnit: 'npx vitest run',
-      testE2e: 'npx playwright test',
-      coverage: 'npx vitest run --coverage --coverage.reporter=json-summary',
-    };
+    return { typecheck: '', lint: '', testUnit: '', testE2e: '', coverage: '' };
   },
+
+  ...manifestFields('vue-vitest-playwright'),
 };

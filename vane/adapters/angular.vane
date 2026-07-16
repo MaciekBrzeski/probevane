@@ -1,0 +1,19 @@
+# angular adapter manifest — the DATA fields of the Angular StackAdapter.
+# Code fields (detect/install/discover/probe/run/coverage) stay in
+# src/adapters/angular/index.ts; auditRules stays TS (jsAuditRules).
+# Declared fields override via manifestFields. Partial by design.
+# guidance/patterns are kind-independent — both unit and e2e blocks are the SAME
+# text, reproducing the TS's kind-agnostic behavior byte-for-byte.
+
+adapter angular
+  command typecheck = npx tsc --noEmit
+  command lint = true
+  command test-unit = npx jest
+  command test-e2e = true
+  command coverage = npx jest --coverage
+  patterns unit = angular-unit-patterns.md
+  patterns e2e = angular-unit-patterns.md
+  guidance unit:
+    (Angular + jest-preset-angular) place the test next to its source as <name>.spec.ts. Use TestBed for components/services. `import { describe, it, expect } from '@jest/globals'` is implicit; assert concrete values + error paths. Use ONLY the class/exports in the ground truth.
+  guidance e2e:
+    (Angular + jest-preset-angular) place the test next to its source as <name>.spec.ts. Use TestBed for components/services. `import { describe, it, expect } from '@jest/globals'` is implicit; assert concrete values + error paths. Use ONLY the class/exports in the ground truth.

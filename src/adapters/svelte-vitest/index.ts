@@ -12,7 +12,7 @@ import type {
 import { sh } from '../../util/exec.js';
 import { runSvelte, coverageSvelte } from './run.js';
 import { findSpecFiles } from '../../util/specfiles.js';
-import { loadPrompt } from '../../library/prompt.js';
+import { manifestFields } from '../../vane/adapter-manifest.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { astExtract } from '../ast-probe.js';
 import { readPackageDeps } from '../pkg-deps.js';
@@ -90,18 +90,23 @@ export const svelteAdapter: StackAdapter = {
   coverage: (dir: string) => coverageSvelte(dir),
   specFiles: (dir: string) => findSpecFiles(dir),
 
+  // DATA fields (guidance/patternsDoc/commands) come from the vane manifest;
+  // TS fallbacks stay so a missing manifest fails loud, never silently degrades.
+  // auditRules stays TS — a clean 1-liner, no gain from a registry ref.
   guidance(_kind: TestKind): string {
-    return `(vitest + @testing-library/svelte) one <Name>.test.ts per source. Components: render(Component, { props }), query by role/label, fireEvent.click(...) then await the update. Pure .ts: test the exported functions directly. Use only the ground-truth props/labels.`;
+    return '';
   },
   patternsDoc(_kind: TestKind): Promise<string> {
-    return loadPrompt('svelte-unit-patterns.md');
+    return Promise.resolve('');
   },
   auditRules(): AuditRule[] {
     return jsAuditRules();
   },
   commands(): AdapterCommands {
-    return { typecheck: 'true', lint: 'true', testUnit: 'npx vitest run', testE2e: 'true', coverage: 'npx vitest run --coverage --coverage.reporter=json-summary' };
+    return { typecheck: '', lint: '', testUnit: '', testE2e: '', coverage: '' };
   },
+
+  ...manifestFields('svelte-vitest'),
 };
 
 // Recursive file listing, skipping build/VCS dirs.

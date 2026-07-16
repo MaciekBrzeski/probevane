@@ -1,0 +1,19 @@
+# node-vitest adapter manifest — the DATA fields of the generic Node/TS
+# StackAdapter. Code fields (detect/install/discover/probe/run/coverage) stay in
+# src/adapters/node-vitest/index.ts; auditRules stays TS (jsAuditRules). Anything
+# declared here overrides via manifestFields('node-vitest'). Partial by design.
+# guidance/patterns are kind-independent — both unit and e2e blocks are the SAME
+# text, reproducing the TS's kind-agnostic behavior byte-for-byte.
+
+adapter node-vitest
+  command typecheck = npx tsc --noEmit
+  command lint = true
+  command test-unit = npx vitest run
+  command test-e2e = true
+  command coverage = npx vitest run --coverage --coverage.reporter=json-summary
+  patterns unit = node-unit-patterns.md
+  patterns e2e = node-unit-patterns.md
+  guidance unit:
+    (vitest, plain TS) place the test next to its source as src/<name>.test.ts. ALWAYS `import { describe, it, expect } from 'vitest'` (no globals). Import the exported functions and assert concrete values; cover happy paths, edge cases, and error paths. No DOM, no framework. Use only the ground-truth exports.
+  guidance e2e:
+    (vitest, plain TS) place the test next to its source as src/<name>.test.ts. ALWAYS `import { describe, it, expect } from 'vitest'` (no globals). Import the exported functions and assert concrete values; cover happy paths, edge cases, and error paths. No DOM, no framework. Use only the ground-truth exports.

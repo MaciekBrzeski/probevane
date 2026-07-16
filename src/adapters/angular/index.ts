@@ -6,7 +6,7 @@ import type {
 import { sh } from '../../util/exec.js';
 import { jsAuditRules } from '../../audit/rules-js.js';
 import { astExtract } from '../ast-probe.js';
-import { loadPrompt } from '../../library/prompt.js';
+import { manifestFields } from '../../vane/adapter-manifest.js';
 import { readCoverageSummary } from '../coverage-summary.js';
 import { walkFiles } from '../walk.js';
 
@@ -106,18 +106,17 @@ export const angularAdapter: StackAdapter = {
     return files.filter((f) => /\.spec\.ts$/.test(f)).map((f) => relative(dir, f));
   },
 
+  // DATA fields (guidance/patternsDoc/commands) come from the vane manifest;
+  // TS fallbacks stay so a missing manifest fails loud, never silently degrades.
+  // auditRules stays TS — a clean 1-liner, no gain from a registry ref.
   guidance(_kind: TestKind): string {
-    return `(Angular + jest-preset-angular) place the test next to its source as <name>.spec.ts. Use TestBed for components/services. \`import { describe, it, expect } from '@jest/globals'\` is implicit; assert concrete values + error paths. Use ONLY the class/exports in the ground truth.`;
+    return '';
   },
-  patternsDoc(_kind: TestKind): Promise<string> { return loadPrompt('angular-unit-patterns.md'); },
+  patternsDoc(_kind: TestKind): Promise<string> { return Promise.resolve(''); },
   auditRules(): AuditRule[] { return jsAuditRules(); },
   commands(): AdapterCommands {
-    return {
-      typecheck: 'npx tsc --noEmit',
-      lint: 'true',
-      testUnit: 'npx jest',
-      testE2e: 'true',
-      coverage: 'npx jest --coverage',
-    };
+    return { typecheck: '', lint: '', testUnit: '', testE2e: '', coverage: '' };
   },
+
+  ...manifestFields('angular'),
 };

@@ -1,0 +1,19 @@
+# svelte-vitest adapter manifest — the DATA fields of the Svelte StackAdapter.
+# Code fields (detect/install/discover/probe/run/coverage) stay in
+# src/adapters/svelte-vitest/index.ts; auditRules stays TS (jsAuditRules).
+# Declared fields override via manifestFields. Partial by design.
+# guidance/patterns are kind-independent — both unit and e2e blocks are the SAME
+# text, reproducing the TS's kind-agnostic behavior byte-for-byte.
+
+adapter svelte-vitest
+  command typecheck = true
+  command lint = true
+  command test-unit = npx vitest run
+  command test-e2e = true
+  command coverage = npx vitest run --coverage --coverage.reporter=json-summary
+  patterns unit = svelte-unit-patterns.md
+  patterns e2e = svelte-unit-patterns.md
+  guidance unit:
+    (vitest + @testing-library/svelte) one <Name>.test.ts per source. Components: render(Component, { props }), query by role/label, fireEvent.click(...) then await the update. Pure .ts: test the exported functions directly. Use only the ground-truth props/labels.
+  guidance e2e:
+    (vitest + @testing-library/svelte) one <Name>.test.ts per source. Components: render(Component, { props }), query by role/label, fireEvent.click(...) then await the update. Pure .ts: test the exported functions directly. Use only the ground-truth props/labels.

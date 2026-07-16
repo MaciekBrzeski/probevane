@@ -37,7 +37,7 @@ describe('vane parse — command', () => {
     expect(d.name).toBe('mutation');
     expect(d.summary).toContain('mutation test — flips'); // unicode dash survives
     expect(d.dir).toBe(true);
-    expect(d.args).toEqual([{ name: 'prompt', doc: 'the NL task', pos: { file: 'test.vane', line: 7 } }]);
+    expect(d.args).toEqual([{ name: 'prompt', variadic: false, doc: 'the NL task', pos: { file: 'test.vane', line: 7 } }]);
     expect(d.flags.map((f) => [f.name, f.type, f.def ?? null, f.doc])).toEqual([
       ['budget', 'int', '0', 'cap mutants; 0 = no cap'],
       ['only', 'list', null, 'path substrings'],
@@ -228,6 +228,69 @@ describe('adapter manifest fields (go-test pilot)', () => {
   it('missing manifest → null; unknown ruleset ref throws at load', async () => {
     const { manifestFields } = await import('../src/vane/adapter-manifest.js');
     expect(manifestFields('rust-cargo')).toBeNull(); // no manifest yet — TS-only
+  });
+});
+
+describe('adapter manifest fields (node/react/vue/svelte/angular migration)', () => {
+  // Parity oracle: the exact commands/guidance/patterns each adapter served
+  // BEFORE the DATA fields moved into vane/adapters/<id>.vane. The assembled
+  // adapter must reproduce these byte-for-byte — the whole point of a partial
+  // manifest is that behavior does not change. auditRules stays pure-TS.
+  it('assembled adapters deep-equal their pre-migration values', async () => {
+    delete process.env.PROBEVANE_ROOT;
+    clearVaneCache();
+    const { nodeAdapter } = await import('../src/adapters/node-vitest/index.js');
+    const { reactAdapter } = await import('../src/adapters/react-vitest-playwright/index.js');
+    const { vueAdapter } = await import('../src/adapters/vue-vitest-playwright/index.js');
+    const { svelteAdapter } = await import('../src/adapters/svelte-vitest/index.js');
+    const { angularAdapter } = await import('../src/adapters/angular/index.js');
+
+    // node-vitest — kind-independent guidance/patterns (both kinds identical).
+    expect(nodeAdapter.commands('.')).toEqual({
+      typecheck: 'npx tsc --noEmit', lint: 'true', testUnit: 'npx vitest run',
+      testE2e: 'true', coverage: 'npx vitest run --coverage --coverage.reporter=json-summary',
+    });
+    const nodeGuidance =
+      "(vitest, plain TS) place the test next to its source as src/<name>.test.ts. ALWAYS `import { describe, it, expect } from 'vitest'` (no globals). Import the exported functions and assert concrete values; cover happy paths, edge cases, and error paths. No DOM, no framework. Use only the ground-truth exports.";
+    expect(nodeAdapter.guidance('unit')).toBe(nodeGuidance);
+    expect(nodeAdapter.guidance('e2e')).toBe(nodeGuidance); // TS ignored kind — manifest reproduces both
+    expect(await nodeAdapter.patternsDoc('unit')).toContain('Unit patterns — vitest (plain TS/JS)');
+    expect(await nodeAdapter.patternsDoc('e2e')).toBe(await nodeAdapter.patternsDoc('unit'));
+    expect(nodeAdapter.auditRules().length).toBe(9); // jsAuditRules, still TS
+
+    // react — PER-KIND guidance + patterns.
+    expect(reactAdapter.commands('.').testE2e).toBe('npx playwright test');
+    expect(reactAdapter.guidance('unit')).toContain('@testing-library/react');
+    expect(reactAdapter.guidance('e2e')).toContain("import { test, expect } from '@playwright/test'");
+    expect(reactAdapter.guidance('unit')).not.toBe(reactAdapter.guidance('e2e'));
+    expect(await reactAdapter.patternsDoc('unit')).toContain('vitest + @testing-library/react');
+    expect(await reactAdapter.patternsDoc('e2e')).toContain('E2E patterns — Playwright');
+    expect(reactAdapter.auditRules().length).toBe(9);
+
+    // vue — PER-KIND guidance + patterns; keeps vueAuditRules (10).
+    expect(vueAdapter.commands('.').typecheck).toBe('true');
+    expect(vueAdapter.guidance('unit')).toContain('@vue/test-utils');
+    expect(vueAdapter.guidance('e2e')).toContain('page.goto');
+    expect(await vueAdapter.patternsDoc('unit')).toContain('vitest + @vue/test-utils');
+    expect(await vueAdapter.patternsDoc('e2e')).toContain('E2E patterns — Playwright (Vue app)');
+    expect(vueAdapter.auditRules().length).toBe(10);
+
+    // svelte — kind-independent (both kinds identical).
+    expect(svelteAdapter.commands('.')).toEqual({
+      typecheck: 'true', lint: 'true', testUnit: 'npx vitest run',
+      testE2e: 'true', coverage: 'npx vitest run --coverage --coverage.reporter=json-summary',
+    });
+    expect(svelteAdapter.guidance('unit')).toContain('@testing-library/svelte');
+    expect(svelteAdapter.guidance('e2e')).toBe(svelteAdapter.guidance('unit'));
+    expect(await svelteAdapter.patternsDoc('e2e')).toBe(await svelteAdapter.patternsDoc('unit'));
+    expect(svelteAdapter.auditRules().length).toBe(9);
+
+    // angular — kind-independent (both kinds identical); jest commands.
+    expect(angularAdapter.commands('.').testUnit).toBe('npx jest');
+    expect(angularAdapter.guidance('unit')).toContain('jest-preset-angular');
+    expect(angularAdapter.guidance('e2e')).toBe(angularAdapter.guidance('unit'));
+    expect(await angularAdapter.patternsDoc('e2e')).toBe(await angularAdapter.patternsDoc('unit'));
+    expect(angularAdapter.auditRules().length).toBe(9);
   });
 });
 
