@@ -12,7 +12,7 @@ import { pageRuns, mergeRun } from '../observe/run-detail.js';
 import { parseEvents } from '../loop/events.js';
 import { parseTranscript } from '../loop/transcript.js';
 import { scanProject } from '../quality/scan.js';
-import { jobs, getQueue, isPaused, snapshot, launch, cancelJob, enqueue, streamEvents, streamFiles } from './daemon-control.js';
+import { jobs, getQueue, isPaused, snapshot, launch, cancelJob, enqueue, streamEvents, streamFiles, readBody } from './daemon-control.js';
 import { handleTerm } from './terminal-routes.js';
 
 // A runId / wiki filename is safe to interpolate into a path only if it has no
@@ -71,6 +71,15 @@ async function handlePost(
   }
   if (url === '/enqueue') {
     await enqueue(req, res);
+    return true;
+  }
+  if (url === '/assistant/interpret') {
+    // NL request → a confirmable launch plan (deterministic, $0). The actual run
+    // is launched separately via POST /run with the returned launch body.
+    const { interpret } = await import('./assistant.js');
+    const raw = (await readBody(req, 64 * 1024)) || '{}';
+    const body = JSON.parse(raw) as { dir?: string; prompt?: string; model?: string };
+    CTX.sendJson(res, 200, await interpret(body.dir ?? '.', body.prompt ?? '', body.model));
     return true;
   }
   return false;
@@ -244,6 +253,12 @@ async function handleAnalysis(url: string, query: URLSearchParams, res: ServerRe
     // from artifacts. Defaults to the daemon's own cwd (the repo it serves).
     const { collectChecks } = await import('./checks.js');
     CTX.sendJson(res, 200, await collectChecks(query.get('dir') ?? '.'));
+    return true;
+  }
+  if (url === '/assistant/propose') {
+    // Post-run $0 improvement follow-ups for the Chat tab.
+    const { propose } = await import('./assistant.js');
+    CTX.sendJson(res, 200, { proposals: await propose(query.get('dir') ?? '.') });
     return true;
   }
   return false;
