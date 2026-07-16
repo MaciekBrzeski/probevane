@@ -962,8 +962,8 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   async function fillDirs() {
     let server = [];
     try {
-      const { runs } = await j("/runs?limit=300");
-      server = runs.map((r) => r.dir).filter((d) => !!d && !d.includes("probevane-wt"));
+      const { dirs } = await j("/assistant/dirs");
+      server = dirs;
     } catch {
     }
     const all = [.../* @__PURE__ */ new Set([...recentDirs(), ...server])];

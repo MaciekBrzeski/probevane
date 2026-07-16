@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { interpret, propose } from '../src/server/assistant.js';
+import { interpret, propose, resolveHistoryDirs } from '../src/server/assistant.js';
 
 // The assistant driver is deterministic + $0 — no brain, no run. These pin the
 // NL→launch classification and the post-run proposal ranking on temp projects.
@@ -82,5 +82,34 @@ describe('propose — post-run $0 improvement follow-ups', () => {
     const ps = await propose(bare);
     expect(Array.isArray(ps)).toBe(true);
     rmSync(bare, { recursive: true, force: true });
+  });
+});
+
+describe('resolveHistoryDirs — path dropdown history', () => {
+  const isDir = (existing: string[]) => (p: string) => existing.includes(p);
+
+  it('prefers a recorded workdir, skipping throwaway worktrees', () => {
+    const recs = [
+      { dir: '/w/real-a', label: 'generate:real-a' },
+      { dir: '/tmp/probevane-wt-feature-1/x', label: 'feature:x' },
+    ];
+    const out = resolveHistoryDirs(recs, ['/roots'], isDir(['/w/real-a']));
+    expect(out).toEqual(['/w/real-a']); // worktree dropped (not real / filtered)
+  });
+
+  it('resolves a label target against roots when no dir is stored', () => {
+    const recs = [{ label: 'generate:react-shop' }, { label: 'refactor:probevane' }];
+    const out = resolveHistoryDirs(recs, ['/repo/fixtures', '/work'], isDir(['/repo/fixtures/react-shop', '/work/probevane']));
+    expect(out).toEqual(['/repo/fixtures/react-shop', '/work/probevane']);
+  });
+
+  it('dedupes and drops targets that resolve nowhere', () => {
+    const recs = [
+      { label: 'generate:probevane' },
+      { label: 'refactor:probevane' }, // same target → deduped
+      { label: 'feature:gone' }, // resolves nowhere → dropped
+    ];
+    const out = resolveHistoryDirs(recs, ['/work'], isDir(['/work/probevane']));
+    expect(out).toEqual(['/work/probevane']);
   });
 });

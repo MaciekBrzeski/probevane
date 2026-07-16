@@ -24,13 +24,14 @@ export function rememberDir(dir: string): void {
   try { localStorage.setItem(DIRS_KEY, JSON.stringify(next)); } catch { /* storage disabled */ }
 }
 
-/** Fill the path datalist from localStorage + the ledger's distinct dirs
- *  (skipping throwaway worktrees, whose transcripts are gone after cleanup). */
+/** Fill the path datalist from localStorage + the ledger's real historical
+ *  project dirs (/assistant/dirs resolves each run's workdir or its label target
+ *  to an existing directory, so past projects appear even without a stored dir). */
 export async function fillDirs(): Promise<void> {
   let server: string[] = [];
   try {
-    const { runs } = (await j('/runs?limit=300')) as { runs: RunRecord[] };
-    server = runs.map((r) => r.dir).filter((d): d is string => !!d && !d.includes('probevane-wt'));
+    const { dirs } = (await j('/assistant/dirs')) as { dirs: string[] };
+    server = dirs;
   } catch { /* daemon offline / no ledger */ }
   const all = [...new Set([...recentDirs(), ...server])];
   $('chat-dirs').replaceChildren(...all.map((d) => <option value={d}></option>));

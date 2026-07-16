@@ -1,5 +1,6 @@
-import { resolve } from 'node:path';
+import { resolve, join, isAbsolute, dirname } from 'node:path';
 import { stat } from 'node:fs/promises';
+import { statSync } from 'node:fs';
 import { classifyPrompt } from '../spec-run/classify.js';
 import { buildSpec } from '../spec-run/build-spec.js';
 import { specToLaunchPlan } from '../spec-run/runspec.js';
@@ -14,6 +15,47 @@ import type { Interpretation, Proposal, AssistantPlanItem } from '../util/assist
 // turns a request into a confirmable launch plan (interpret) and, after a run,
 // into ranked improvement follow-ups (propose). The model only drives the actual
 // loop, launched separately via POST /run with interpret()'s launch body.
+
+/** Resolve one ledger record to a real, existing project dir (or null): prefer its
+ *  recorded workdir (skipping throwaway worktrees), else its "op:target" label
+ *  resolved against the workspace roots. `isDir` is injected for testability. */
+function recordDir(
+  r: { dir?: string; label?: string },
+  roots: string[],
+  isDir: (p: string) => boolean,
+): string | null {
+  if (r.dir && !r.dir.includes('probevane-wt')) return isDir(r.dir) ? r.dir : null;
+  const target = (r.label ?? '').split(':').slice(1).join(':');
+  if (!target) return null;
+  if (isAbsolute(target)) return isDir(target) ? target : null;
+  for (const root of roots) { const c = join(root, target); if (isDir(c)) return c; }
+  return null;
+}
+
+/** Resolve ledger records to distinct real project dirs for the path dropdown,
+ *  newest-first (records come newest-first), capped. Pure — see `recordDir`. */
+export function resolveHistoryDirs(
+  records: { dir?: string; label?: string }[],
+  roots: string[],
+  isDir: (p: string) => boolean,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const r of records) {
+    const d = recordDir(r, roots, isDir);
+    if (d && !seen.has(d)) { seen.add(d); out.push(d); }
+  }
+  return out.slice(0, 40);
+}
+
+/** The daemon-facing wrapper: resolve history dirs against the real workspace
+ *  (repo = cwd/PROBEVANE_ROOT, its fixtures + live sandboxes, parent workspace). */
+export function historyDirs(records: { dir?: string; label?: string }[]): string[] {
+  const root = process.env.PROBEVANE_ROOT ?? process.cwd();
+  const roots = [root, join(root, 'fixtures'), join(root, '.probevane-live'), dirname(root)];
+  const isDir = (p: string): boolean => { try { return statSync(p).isDirectory(); } catch { return false; } };
+  return resolveHistoryDirs(records, roots, isDir);
+}
 
 /** Human-readable "assumed X" lines from the classifier's still-open questions —
  *  surfaced so the user can correct a misread before confirming. */

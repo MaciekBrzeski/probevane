@@ -77,8 +77,7 @@ async function handlePost(
     // NL request → a confirmable launch plan (deterministic, $0). The actual run
     // is launched separately via POST /run with the returned launch body.
     const { interpret } = await import('./assistant.js');
-    const raw = (await readBody(req, 64 * 1024)) || '{}';
-    const body = JSON.parse(raw) as { dir?: string; prompt?: string; model?: string };
+    const body = JSON.parse((await readBody(req, 64 * 1024)) || '{}') as {dir?: string; prompt?: string; model?: string};
     CTX.sendJson(res, 200, await interpret(body.dir ?? '.', body.prompt ?? '', body.model));
     return true;
   }
@@ -142,6 +141,11 @@ async function handleData(
   if (url === '/runs') {
     const { records } = await CTX.scanRuns();
     CTX.sendJson(res, 200, pageRuns(records, Number(query.get('limit') ?? 50), Number(query.get('offset') ?? 0)));
+    return true;
+  }
+  if (url === '/assistant/dirs') {
+    const { historyDirs } = await import('./assistant.js');
+    CTX.sendJson(res, 200, { dirs: historyDirs((await CTX.scanRuns()).records) });
     return true;
   }
   if (url === '/run') return handleRun(query, res);
