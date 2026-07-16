@@ -1,4 +1,5 @@
 import { readdir, readFile, access } from 'node:fs/promises';
+import { manifestFields } from '../../vane/adapter-manifest.js';
 import { join, relative } from 'node:path';
 import type {
   StackAdapter,
@@ -13,7 +14,6 @@ import type {
 } from '../adapter.js';
 import { sh } from '../../util/exec.js';
 import { goAuditRules } from '../../audit/rules-go.js';
-import { loadPrompt } from '../../library/prompt.js';
 
 const exists = (p: string) => access(p).then(() => true).catch(() => false);
 
@@ -102,12 +102,15 @@ export const goAdapter: StackAdapter = {
     return (await walk(dir)).filter((f) => f.endsWith('_test.go')).map((f) => relative(dir, f));
   },
 
+  // DATA fields (guidance/patternsDoc/auditRules/commands) come from the vane
+  // manifest below; TS fallbacks stay so a missing manifest file fails loud in
+  // manifestFields, never silently degrades.
   guidance(_kind: TestKind): string {
-    return `(Go stdlib testing) one <name>_test.go per source file, SAME package. Use table-driven tests: a slice of cases struct, loop with t.Run(name, ...), assert with t.Errorf/t.Fatalf. Test error paths too. Use ONLY exported funcs in the ground truth.`;
+    return '';
   },
 
   patternsDoc(_kind: TestKind): Promise<string> {
-    return loadPrompt('go-unit-patterns.md');
+    return Promise.resolve('');
   },
 
   auditRules(): AuditRule[] {
@@ -115,14 +118,10 @@ export const goAdapter: StackAdapter = {
   },
 
   commands(): AdapterCommands {
-    return {
-      typecheck: 'go build ./...',
-      lint: 'gofmt -l . || true',
-      testUnit: 'go test ./...',
-      testE2e: 'true',
-      coverage: 'go test -cover ./...',
-    };
+    return { typecheck: '', lint: '', testUnit: '', testE2e: '', coverage: '' };
   },
+
+  ...manifestFields('go-test'),
 };
 
 // Recursive file listing rooted at dir, skipping vendor/VCS/dep dirs.

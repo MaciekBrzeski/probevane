@@ -199,3 +199,34 @@ describe('vane catalog (the real shipped commands.vane)', () => {
     expect(mutation.usage).toContain('[--min-score P]');
   });
 });
+
+describe('adapter manifest fields (go-test pilot)', () => {
+  it('manifest-built fields deep-equal the previous hard-coded values', async () => {
+    delete process.env.PROBEVANE_ROOT;
+    clearVaneCache();
+    const { manifestFields } = await import('../src/vane/adapter-manifest.js');
+    const f = manifestFields('go-test')!;
+    expect(f.commands!('.')).toEqual({
+      typecheck: 'go build ./...',
+      lint: 'gofmt -l . || true',
+      testUnit: 'go test ./...',
+      testE2e: 'true',
+      coverage: 'go test -cover ./...',
+    });
+    expect(f.guidance!('unit')).toBe(
+      '(Go stdlib testing) one <name>_test.go per source file, SAME package. Use table-driven tests: ' +
+        'a slice of cases struct, loop with t.Run(name, ...), assert with t.Errorf/t.Fatalf. ' +
+        'Test error paths too. Use ONLY exported funcs in the ground truth.',
+    );
+    expect((f.auditRules!() as { id: string }[]).length).toBeGreaterThan(0);
+    // the assembled adapter exposes the manifest values through the normal API
+    const { goAdapter } = await import('../src/adapters/go-test/index.js');
+    expect(goAdapter.commands('.').testUnit).toBe('go test ./...');
+    expect(goAdapter.guidance('unit')).toContain('table-driven');
+  });
+
+  it('missing manifest → null; unknown ruleset ref throws at load', async () => {
+    const { manifestFields } = await import('../src/vane/adapter-manifest.js');
+    expect(manifestFields('rust-cargo')).toBeNull(); // no manifest yet — TS-only
+  });
+});

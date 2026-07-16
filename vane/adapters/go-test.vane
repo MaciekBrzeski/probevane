@@ -1,0 +1,15 @@
+# go-test adapter manifest — the DATA fields of the Go StackAdapter.
+# Code fields (detect/install/discover/probe/run/coverage) stay in
+# src/adapters/go-test/index.ts; anything declared here overrides via
+# manifestFields('go-test'). Partial by design.
+
+adapter go-test
+  command typecheck = go build ./...
+  command lint = gofmt -l . || true
+  command test-unit = go test ./...
+  command test-e2e = true
+  command coverage = go test -cover ./...
+  patterns unit = go-unit-patterns.md
+  audit-rules = go
+  guidance unit:
+    (Go stdlib testing) one <name>_test.go per source file, SAME package. Use table-driven tests: a slice of cases struct, loop with t.Run(name, ...), assert with t.Errorf/t.Fatalf. Test error paths too. Use ONLY exported funcs in the ground truth.
