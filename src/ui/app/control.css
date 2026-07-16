@@ -298,6 +298,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-hrun .chat-verdict { font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
 .chat-hrun .chat-verdict.ok { color:var(--ok); } .chat-hrun .chat-verdict.err { color:var(--warn); }
 .chat-hrun .chat-hmeta { font-size:11px; margin-left:auto; }
+.chat-hsearch { width:100%; margin:6px 0; font-size:12px; }
+#chat-hlist { display:flex; flex-direction:column; gap:2px; }
+.chat-more { width:100%; margin-top:6px; font-size:11px; }
 
 /* secondary (ghost) button — history vs the primary SEND */
 .act.ghost { background:transparent; border:1px solid var(--line); color:var(--dim); }

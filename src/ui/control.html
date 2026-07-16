@@ -307,6 +307,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-hrun .chat-verdict { font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
 .chat-hrun .chat-verdict.ok { color:var(--ok); } .chat-hrun .chat-verdict.err { color:var(--warn); }
 .chat-hrun .chat-hmeta { font-size:11px; margin-left:auto; }
+.chat-hsearch { width:100%; margin:6px 0; font-size:12px; }
+#chat-hlist { display:flex; flex-direction:column; gap:2px; }
+.chat-more { width:100%; margin-top:6px; font-size:11px; }
 
 /* secondary (ghost) button — history vs the primary SEND */
 .act.ghost { background:transparent; border:1px solid var(--line); color:var(--dim); }
@@ -1002,6 +1005,31 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       convo("assistant", "asst err", /* @__PURE__ */ h("span", null, "\u2717 could not load transcript"));
     }
   }
+  var PAGE = 30;
+  var view = null;
+  function matches(r, q) {
+    if (!q) return true;
+    const hay = [opOf(r.label), r.model ?? "", r.runId, r.stopReason ?? "", r.accepted ? "accepted" : "failed"].join(" ").toLowerCase();
+    return q.toLowerCase().split(/\s+/).every((t) => hay.includes(t));
+  }
+  function renderHistoryCards() {
+    if (!view) return;
+    const filtered = view.all.filter((r) => matches(r, view.query));
+    const kids = filtered.slice(0, view.shown).map((r) => runHistoryCard(view.dir, r));
+    if (!filtered.length) {
+      kids.push(empty(`no runs match \u201C${view.query}\u201D`));
+    } else if (filtered.length > view.shown) {
+      const hidden = filtered.length - view.shown;
+      kids.push(
+        /* @__PURE__ */ h("button", { class: "act ghost chat-more", onClick: () => {
+          view.shown += PAGE;
+          renderHistoryCards();
+        } }, "load ", Math.min(PAGE, hidden), " more \xB7 ", hidden, " hidden")
+      );
+    }
+    $("chat-hlist").replaceChildren(...kids);
+    $("chat-hcount").textContent = view.query ? `${filtered.length} / ${view.all.length}` : `${view.all.length}`;
+  }
   async function showHistory() {
     const dir = dirVal();
     if (!dir) {
@@ -1012,18 +1040,25 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     setSignals(spinner2("loading past runs\u2026"));
     let runs = [];
     try {
-      runs = (await j("/runs?limit=300")).runs;
+      runs = (await j("/runs?limit=1000")).runs;
     } catch {
     }
-    const mine = runsForDir(runs, dir);
-    if (!mine.length) {
+    const all = runsForDir(runs, dir);
+    if (!all.length) {
       setSignals(empty(`no past runs recorded for ${baseName(dir)}`));
       return;
     }
-    const box = /* @__PURE__ */ h("div", null);
-    box.appendChild(/* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "past runs \xB7 ", baseName(dir), " (", mine.length, ")"));
-    for (const r of mine.slice(0, 30)) box.appendChild(runHistoryCard(dir, r));
-    setSignals(box);
+    view = { dir, all, shown: PAGE, query: "" };
+    const search = /* @__PURE__ */ h("input", { class: "chat-hsearch", placeholder: "search op / model / verdict / runId\u2026" });
+    search.oninput = () => {
+      view.query = search.value.trim();
+      view.shown = PAGE;
+      renderHistoryCards();
+    };
+    setSignals(
+      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "past runs \xB7 ", baseName(dir), " ", /* @__PURE__ */ h("span", { id: "chat-hcount", class: "muted" })), search, /* @__PURE__ */ h("div", { id: "chat-hlist" }))
+    );
+    renderHistoryCards();
   }
 
   // src/ui/app/chat-tab.tsx
