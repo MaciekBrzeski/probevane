@@ -67,6 +67,9 @@ command review
   summary Read-only quality grade (0–100) of a suite: green, coverage, audit, flake.
   usage probevane review <dir> [--flake N]
   example probevane review ./app
+  dir
+  flag --flake int = 3 "suite reruns for flake detection"
+  handler review#run
 
 command a11y
   summary Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade.
@@ -77,6 +80,9 @@ command bench
   summary Measure a suite: coverage, audit, and mutation score (does it catch bugs?).
   usage probevane bench <dir> [--mutants N]
   example probevane bench ./app --mutants 6
+  dir
+  flag --mutants int = 6 "mutants to inject"
+  handler bench#run
 
 command mutation
   summary Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --budget caps mutants (sampled evenly); string/comment literals skipped.
@@ -113,6 +119,12 @@ command spec
   summary Generate a project SPEC.md (graph, modules, API surface, coverage); --narrate adds LLM descriptions; --wiki publishes.
   usage probevane spec <dir> [--narrate] [--out <file>] [--wiki]
   example probevane spec ./app --narrate
+  dir
+  flag --narrate bool "LLM one-liner per module"
+  flag --model str "brain for --narrate (openai:<m> / local:<m> / bridge)"
+  flag --out str "output file (default <dir>/SPEC.md)"
+  flag --wiki bool "publish to docs/wiki as a Projects page"
+  handler spec-cmd#run
 
 command run
   summary Execute the test suite via the detected adapter.
@@ -224,11 +236,19 @@ command revert
   summary Undo a run — restore the files a run edited to its pre-run checkpoint (or remove ones it created), from the diary record. Safety net for a crashed/bad run.
   usage probevane revert <runId> [dir]
   example probevane revert run-abc123 ./app
+  arg runId str "run to undo (diary record id)"
+  dir
+  handler revert#run
 
 command impact
   summary Test-impact analysis — which specs are affected by the diff since <base> (transitive import graph); --run executes only those to speed CI.
   usage probevane impact <dir> [--base <ref>] [--run] [--json]
   example probevane impact . --base origin/main --run
+  dir
+  flag --base str = HEAD~1 "git ref to diff against"
+  flag --run bool "execute only the impacted specs"
+  flag --json bool "machine output"
+  handler impact#run
 
 command assert-score
   summary Assertion-quality grade (0–100) of a suite — flags weak assertions (toBeDefined/toBeTruthy, tautologies, snapshot-only, bare not.toThrow) that pass without testing behavior. Complements audit (assertion-free) + bench (mutation).
