@@ -24,6 +24,7 @@ export interface RunPathOpts {
   budget?: number;
   quality?: ProfileOpts['quality']; // opt-in source-quality gate
   mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
+  structure?: boolean; // opt-in pyramid-structure gate
   render?: ProfileOpts['render']; // the visual path's render/vision acceptance oracle
   forceStopAfter?: number; // barren-turn ceiling (raise for big-repo refactors that read/plan a lot before editing)
   only?: string; // focus path — narrows context + injects a repo-map so the model edits instead of crawling
@@ -86,7 +87,9 @@ export async function runPath(opts: RunPathOpts): Promise<RunOutcome> {
     adapter: opts.adapter,
     brain,
     takeoverBrain,
-    runes: profile(opts.profileName, { kind: 'unit', quality: opts.quality, mfe: opts.mfe, render: opts.render }),
+    runes: profile(opts.profileName, {
+      kind: 'unit', quality: opts.quality, mfe: opts.mfe, structure: opts.structure, render: opts.render,
+    }),
     task,
     label: `${opts.profileName}:${opts.dir.split('/').pop()}`,
     maxSteps: opts.maxSteps ?? 30,

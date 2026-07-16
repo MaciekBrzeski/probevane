@@ -72,6 +72,7 @@ export function buildGenOpts(
     flakeTolerance: num(flag(args, '--flake-tolerance')),
     assertMin: num(flag(args, '--assert-min')),
     quality: args.includes('--quality') || cfg.quality === true,
+    structure: args.includes('--structure') || cfg.structure === true,
     budget,
     mock,
     targetGaps,

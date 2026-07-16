@@ -21,6 +21,7 @@ export interface ProbevaneConfig {
   visual?: boolean;
   quality?: boolean; // opt-in source-quality gate on edited files (refactor/feature/fix/repair)
   mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
+  structure?: boolean; // opt-in pyramid-structure gate (block NEW cross-dir layering violations)
   takeover?: string;
   budget?: number; // hard output-token ceiling per run
   arch?: ArchRoles; // declared pyramid-model roles for `arch --pyramid` (flags override)
@@ -43,7 +44,7 @@ const SCHEMA: Record<Exclude<keyof ProbevaneConfig, 'arch'>, 'string' | 'number'
   model: 'string', kind: 'string', minTests: 'number', minCoverage: 'number',
   maxTargets: 'number', maxSteps: 'number', mock: 'boolean', mutation: 'boolean',
   strict: 'boolean', flakeGuard: 'boolean', a11y: 'boolean', visual: 'boolean', quality: 'boolean',
-  mfe: 'boolean', takeover: 'string', budget: 'number',
+  mfe: 'boolean', structure: 'boolean', takeover: 'string', budget: 'number',
 };
 
 const isStringArray = (v: unknown): boolean => Array.isArray(v) && v.every((s) => typeof s === 'string');

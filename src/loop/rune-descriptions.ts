@@ -101,6 +101,11 @@ export const RUNE_DESCRIPTIONS: Record<string, RuneDescription> = {
     detail:
       'Opt-in. Runs a source-quality analysis on the files the model edited and blocks if quality regresses (e.g. oversized files/functions), keeping the change clean, not just green.',
   },
+  structure_gate: {
+    summary: 'Finish gate: no new pyramid-structure violations.',
+    detail:
+      'Opt-in. Snapshots the repo\'s pyramid-model violations at run start and blocks finishing if the run introduced a new cross-directory layering violation (feature\u2192feature, base\u2192tip, glue reaching past a feature base). Pre-existing issues are tolerated \u2014 ratchet, not absolute.',
+  },
   mfe_gate: {
     summary: 'Finish gate: micro-frontend standards.',
     detail:

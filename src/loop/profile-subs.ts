@@ -4,7 +4,7 @@ import type { AcceptanceOpts } from './runes/index.js';
 import {
   contextInject, pathGuard, planFirst, noRegression, validationGate, auditGate,
   acceptanceGate, hermeticGate, mutationGate, a11yGate, visualGate, flakeGate,
-  redFirst, qualityGate, mfeGate, assertionGate,
+  redFirst, qualityGate, mfeGate, assertionGate, structureGate,
   sessionDiary, caveatHarvest, distillTrace, libraryPromote,
 } from './runes/index.js';
 import type { ProfileOpts, Segment, SubroutineId } from './profile-types.js';
@@ -46,18 +46,24 @@ export function greenGates(scope: RunScope, o: { fullSuite?: boolean; acceptance
   ];
 }
 
-/** Opt-in gates. `extras` adds the write_tests-only suite (flake/assert/mutation/a11y/visual). */
-export function optInGates(opts: ProfileOpts, scope: RunScope, o: { extras?: boolean; mfe?: boolean } = {}): Rune[] {
+/** The write_tests-only extras suite (flake/assert/mutation/a11y/visual gates). */
+function extraGates(opts: ProfileOpts, scope: RunScope): Rune[] {
   const out: Rune[] = [];
-  if (o.extras) {
-    if (opts.flakeGuard) out.push(flakeGate(3, opts.flakeTolerance ?? 0));
-    if (opts.assertMin) out.push(assertionGate(opts.assertMin));
-    if (opts.mutation) out.push(mutationGate({ enforce: true }));
-    if (opts.a11y) out.push(a11yGate);
-    if (opts.visual && scope === 'e2e') out.push(visualGate);
-  }
+  if (opts.flakeGuard) out.push(flakeGate(3, opts.flakeTolerance ?? 0));
+  if (opts.assertMin) out.push(assertionGate(opts.assertMin));
+  if (opts.mutation) out.push(mutationGate({ enforce: true }));
+  if (opts.a11y) out.push(a11yGate);
+  if (opts.visual && scope === 'e2e') out.push(visualGate);
+  return out;
+}
+
+/** Opt-in gates. `extras` adds the write_tests-only suite; quality/mfe/structure
+ *  are available to every profile that passes the matching opt. */
+export function optInGates(opts: ProfileOpts, scope: RunScope, o: { extras?: boolean; mfe?: boolean } = {}): Rune[] {
+  const out: Rune[] = o.extras ? extraGates(opts, scope) : [];
   out.push(...maybeQuality(opts.quality));
   if (o.mfe) out.push(...maybeMfe(opts.mfe));
+  if (opts.structure) out.push(structureGate());
   return out;
 }
 

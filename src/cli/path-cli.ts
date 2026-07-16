@@ -78,6 +78,7 @@ export async function runPathCli(
   const qualityOn = spec.quality !== false;
   const quality = qualityOn ? args.includes('--quality') || cfg.quality === true : undefined;
   const mfe = qualityOn ? args.includes('--mfe') || cfg.mfe === true : undefined;
+  const structure = qualityOn ? args.includes('--structure') || cfg.structure === true : undefined;
 
   const outcome = await runPath({
     dir,
@@ -89,6 +90,7 @@ export async function runPathCli(
     budget,
     quality,
     mfe,
+    structure,
     forceStopAfter,
     only,
     worktree: args.includes('--worktree'),

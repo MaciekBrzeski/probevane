@@ -38,6 +38,7 @@ export interface GenerateOpts {
   flakeTolerance?: number; // allow K outlier runs in the flake gate
   assertMin?: number; // assertion-quality floor (0..100) fed back into the loop
   quality?: boolean; // opt-in source-quality gate (no-op for tests; useful with --target-gaps source edits)
+  structure?: boolean; // opt-in pyramid-structure gate
   budget?: number;
   mock?: boolean; // synthesize + inject mocks (network/deps), enforce hermeticity
   targetGaps?: boolean; // run coverage first + steer the model at uncovered lines
@@ -184,6 +185,7 @@ function buildRunes(opts: GenerateOpts, kind: TestKind, mockRune?: Rune): Rune[]
     a11y: opts.a11y,
     visual: opts.visual,
     quality: opts.quality,
+    structure: opts.structure,
     flakeTolerance: opts.flakeTolerance,
     assertMin: opts.assertMin,
   });

@@ -116,7 +116,7 @@ probevane plan-feature --from "empty repo" --to "REST API with auth"
 Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).
 
 ```
-probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec] [--ship]
+probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--structure] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec] [--ship]
 # e.g.
 probevane generate ./my-app --kind unit --mock
 ```
@@ -125,7 +125,7 @@ probevane generate ./my-app --kind unit --mock
 Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress).
 
 ```
-probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g.
 probevane refactor ./app --task "extract helpers into utils.ts" --quality
 ```
@@ -134,7 +134,7 @@ probevane refactor ./app --task "extract helpers into utils.ts" --quality
 TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.
 
 ```
-probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g.
 probevane feature ./app --task "add a discount field to cartTotal"
 ```
@@ -143,7 +143,7 @@ probevane feature ./app --task "add a discount field to cartTotal"
 After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality.
 
 ```
-probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g.
 probevane repair ./app --since HEAD~1
 ```
@@ -152,7 +152,7 @@ probevane repair ./app --since HEAD~1
 Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality.
 
 ```
-probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g.
 probevane fix ./app --task "handle the null case in parse()"
 ```
@@ -161,7 +161,7 @@ probevane fix ./app --task "handle the null case in parse()"
 Codemod / framework-version migration: change source to the new API/version while every existing test stays green (behavior_lock). --quality/--mfe gates optional; run repair after if expectations legitimately change.
 
 ```
-probevane migrate <dir> --task "<migration>" | --to <pkg@version> [--only <path>] [--model …] [--quality] [--mfe] [--force-stop-after N] [--worktree [--worktree-merge|--worktree-review]]
+probevane migrate <dir> --task "<migration>" | --to <pkg@version> [--only <path>] [--model …] [--quality] [--mfe] [--structure] [--force-stop-after N] [--worktree [--worktree-merge|--worktree-review]]
 # e.g.
 probevane migrate ./app --to react@19
 ```

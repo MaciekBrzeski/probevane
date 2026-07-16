@@ -94,7 +94,7 @@ probevane plan-feature --from "<current>" --to "<desired>" [--from-file f] [--to
 Probe-grounded gated loop writes unit/e2e tests (mock maker, hermetic, audited).
 
 ```bash
-probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec] [--ship]
+probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local:<id>] [--mock] [--mutation] [--flake-guard] [--target-gaps] [--a11y] [--visual] [--quality] [--structure] [--assert-min N] [--flake-tolerance K] [--passk N] [--budget N] [--only <substr>] [--spec] [--ship]
 # e.g. probevane generate ./my-app --kind unit --mock
 ```
 
@@ -102,7 +102,7 @@ probevane generate <dir> [--kind unit|e2e] [--model auto|haiku|sonnet|opus|local
 Characterization-first refactor: change source only, every test stays green (behavior_lock). --quality adds a source-quality gate (edited files mustn't regress).
 
 ```bash
-probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model …] [--budget N] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g. probevane refactor ./app --task "extract helpers into utils.ts" --quality
 ```
 
@@ -110,7 +110,7 @@ probevane refactor <dir> --task "<what to refactor>" [--only <path>] [--model �
 TDD red-first: write a failing test, implement, go green; existing tests protected. --quality gates edited-source quality.
 
 ```bash
-probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g. probevane feature ./app --task "add a discount field to cartTotal"
 ```
 
@@ -118,7 +118,7 @@ probevane feature <dir> --task "<feature>" [--only <path>] [--model …] [--forc
 After source changes, update the affected (stale) tests so the whole suite is green. --quality gates edited-source quality.
 
 ```bash
-probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g. probevane repair ./app --since HEAD~1
 ```
 
@@ -126,7 +126,7 @@ probevane repair <dir> [--since <ref>] [--only <path>] [--model …] [--force-st
 Apply described issues/findings to the code, keeping the suite green + audit-clean. --quality gates edited-source quality.
 
 ```bash
-probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--worktree [--worktree-merge|--worktree-review]]
+probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-stop-after N] [--quality] [--mfe] [--structure] [--worktree [--worktree-merge|--worktree-review]]
 # e.g. probevane fix ./app --task "handle the null case in parse()"
 ```
 
@@ -134,7 +134,7 @@ probevane fix <dir> --task "<issues>" [--only <path>] [--model …] [--force-sto
 Codemod / framework-version migration: change source to the new API/version while every existing test stays green (behavior_lock). --quality/--mfe gates optional; run repair after if expectations legitimately change.
 
 ```bash
-probevane migrate <dir> --task "<migration>" | --to <pkg@version> [--only <path>] [--model …] [--quality] [--mfe] [--force-stop-after N] [--worktree [--worktree-merge|--worktree-review]]
+probevane migrate <dir> --task "<migration>" | --to <pkg@version> [--only <path>] [--model …] [--quality] [--mfe] [--structure] [--force-stop-after N] [--worktree [--worktree-merge|--worktree-review]]
 # e.g. probevane migrate ./app --to react@19
 ```
 

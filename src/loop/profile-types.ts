@@ -25,6 +25,7 @@ export interface ProfileOpts {
   visual?: boolean; // opt-in visual gate (e2e specs must capture a screenshot checkpoint)
   quality?: boolean | Partial<QualityConfig>; // opt-in source-quality gate (edited files mustn't regress)
   mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
+  structure?: boolean; // opt-in pyramid-structure gate (block NEW cross-dir layering violations)
   render?: RenderGateOpts; // the visual path's render/vision acceptance oracle
 }
 

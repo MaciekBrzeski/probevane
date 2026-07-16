@@ -19,6 +19,7 @@ export { behaviorLock } from './behavior_lock.js';
 export { renderGate, type RenderGateOpts } from './render_gate.js';
 export { redFirst } from './red_first.js';
 export { qualityGate } from './quality_gate.js';
+export { structureGate } from './structure_gate.js';
 export { mfeGate } from './mfe_gate.js';
 export { assertionGate } from './assertion_gate.js';
 export { sessionDiary } from './session_diary.js';
