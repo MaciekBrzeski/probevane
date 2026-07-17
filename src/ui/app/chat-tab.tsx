@@ -51,19 +51,35 @@ const GATES: { flag: string; label: string; title: string }[] = [
   { flag: '--flake-guard', label: 'flake', title: 'run the new specs several times; reject nondeterminism' },
 ];
 
-/** A model-select + opt-in gate toggles + gated RUN (always explicit --model). */
+// Run-mode toggles (not gates) — how the run executes.
+const RUN_OPTS: { flag: string; label: string; title: string }[] = [
+  { flag: '--worktree', label: 'worktree · safe', title: 'run in a throwaway git worktree — the live tree is never edited (safe to dogfood, no revert). Needs a git repo with ≥1 commit.' },
+];
+
+interface ToggleOpt { flag: string; label: string; title: string }
+
+/** A checkbox group: a label per option, returning the boxes so the caller can
+ *  collect the checked flags. */
+function toggleGroup(opts: ToggleOpt[]): { boxes: HTMLInputElement[]; nodes: Node[] } {
+  const boxes = opts.map((o) => <input type="checkbox" value={o.flag} /> as HTMLInputElement);
+  const nodes = opts.map((o, i) => <label class="chat-gate" title={o.title}>{boxes[i]} {o.label}</label>);
+  return { boxes, nodes };
+}
+
+/** A model-select + gate/run-mode toggles + gated RUN (always explicit --model). */
 function runRow(dir: string, op: string, baseFlags: string[], label: string): Node {
   const modelSel = <select class="chat-model">{MODELS.map((m) => <option value={m}>{m}</option>)}</select> as HTMLSelectElement;
-  const gateBoxes = GATES.map((g) => <input type="checkbox" value={g.flag} /> as HTMLInputElement);
-  const toggles = GATES.map((g, i) => <label class="chat-gate" title={g.title}>{gateBoxes[i]} {g.label}</label>);
+  const gates = toggleGroup(GATES);
+  const opts = toggleGroup(RUN_OPTS);
+  const checkedFlags = () => [...gates.boxes, ...opts.boxes].filter((b) => b.checked).map((b) => b.value);
   return (
     <div class="chat-run-row">
       <span class="chat-run-model">model {modelSel}</span>
-      <span class="chat-gates">gates {toggles}</span>
+      <span class="chat-gates">gates {gates.nodes}</span>
+      <span class="chat-gates">run {opts.nodes}</span>
       <button class="act chat-run-btn" onClick={() => {
         if (running) return;
-        const gateFlags = gateBoxes.filter((b) => b.checked).map((b) => b.value);
-        void runLaunch(dir, op, [...withModel(baseFlags, modelSel.value), ...gateFlags], label);
+        void runLaunch(dir, op, [...withModel(baseFlags, modelSel.value), ...checkedFlags()], label);
       }}>run ▶</button>
     </div>
   );
@@ -192,6 +208,28 @@ function statusLine(e: RunEvent): Node {
 
 // --- run + stream -----------------------------------------------------------
 
+/** Build + mount the tool region for a run: pipeline strip, status, notes, and a
+ *  hidden cancel button (shown once the job id is known). */
+interface LiveRegion { pipe: HTMLElement; status: HTMLElement; notes: HTMLElement; cancelBtn: HTMLButtonElement }
+
+/** Build + mount the tool region (pipeline strip, status, notes, hidden cancel). */
+function liveRegion(op: string): LiveRegion {
+  const pipe = <div class="chat-pipeline"></div> as HTMLElement;
+  const status = <div class="chat-status">{statusLine({})}</div> as HTMLElement;
+  const notes = <div class="chat-notes"></div> as HTMLElement;
+  // Cancel is NOT gated by setRunning (it's the escape hatch) — its own class.
+  const cancelBtn = <button class="act ghost chat-cancel" style="display:none">⏹ cancel</button> as HTMLButtonElement;
+  setTools(
+    <div>
+      <div class="chat-signal-sub">pipeline · {profileFor(op)} {pipelineLegend()} {cancelBtn}</div>
+      {pipe}
+      {status}
+      {notes}
+    </div>,
+  );
+  return { pipe, status, notes, cancelBtn };
+}
+
 /** Launch a run; the tool region shows the live pipeline strip + status (which
  *  phase/gate is running), the full transcript streams into the main conversation
  *  as durable history, and proposals land in signals on completion. */
@@ -201,18 +239,7 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
   const model = flags[flags.indexOf('--model') + 1] ?? 'auto';
   convo('assistant', 'asst', <span>running <b>{op}</b> with model <b>{model}</b>…</span>);
 
-  const pipe = <div class="chat-pipeline"></div> as HTMLElement;
-  const status = <div class="chat-status">{statusLine({})}</div> as HTMLElement;
-  const notes = <div class="chat-notes"></div> as HTMLElement;
-  setTools(
-    <div>
-      <div class="chat-signal-sub">pipeline · {profileFor(op)} {pipelineLegend()}</div>
-      {pipe}
-      {status}
-      {notes}
-    </div>,
-  );
-
+  const { pipe, status, notes, cancelBtn } = liveRegion(op);
   const runes = await pipelineRunes(op);
   let state: PipelineState = {};
   renderPipeline(pipe, runes, state);
@@ -226,7 +253,7 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
     return;
   }
 
-  streamRun(dir, {
+  const handle = streamRun(dir, {
     onEvent: (e) => {
       if (e.note) { notes.appendChild(<div class="chat-note">{e.note}</div>); return; }
       state = pipelineReducer(state, e, runes.map((x) => x.name));
@@ -236,20 +263,31 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
     onTurn: convoTurn,
     onDone: (stop) => {
       setRunning(false);
+      cancelBtn.style.display = 'none';
       status.classList.add('chat-live-off');
       convo('assistant', 'asst', <span>run finished — <b>{stop ?? 'done'}</b></span>);
       void showProposals(dir);
       void fillDirs(); // the ledger just gained this run's dir
     },
   });
+
+  // Cancel: SIGTERM the child ($id) then tear down the UI ourselves — a cancelled
+  // run emits no terminal event and /stream (a file tail) doesn't reliably drop.
+  cancelBtn.style.display = '';
+  cancelBtn.onclick = () => {
+    cancelBtn.disabled = true;
+    void j(`/cancel?id=${encodeURIComponent(r.id ?? '')}`, { method: 'POST' }).catch(() => {});
+    handle.stop('cancelled');
+  };
 }
 
 /** Tail the run: SSE events drive the pipeline + status; the first event's runId
- *  starts a transcript follow feeding chain-of-thought turns. */
+ *  starts a transcript follow feeding chain-of-thought turns. Returns a handle to
+ *  stop it (for the cancel button — cancel emits no terminal event of its own). */
 function streamRun(
   dir: string,
   cb: { onEvent: (e: RunEvent) => void; onTurn: (t: TurnData) => void; onDone: (stop?: string) => void },
-): void {
+): { stop: (reason?: string) => void } {
   const es = new EventSource('/stream?dir=' + encodeURIComponent(dir));
   let followES: EventSource | null = null;
   let done = false;
@@ -265,6 +303,7 @@ function streamRun(
     } catch { /* keepalive / partial frame */ }
   };
   es.onerror = () => finish(); // stream dropped → re-enable, don't wedge
+  return { stop: (reason) => finish(reason ?? 'cancelled') };
 }
 
 /** Follow a run's transcript over SSE, handing each turn to onTurn as it appends. */

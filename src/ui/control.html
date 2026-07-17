@@ -283,6 +283,10 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-notes { margin-top:6px; display:flex; flex-direction:column; gap:3px; }
 .chat-note { font-family:var(--num); font-size:12.5px; color:var(--mag); border-left:2px solid var(--mag); padding:2px 8px; background:rgba(199,146,234,.08); border-radius:3px; }
 .chat-run-btn:disabled, #chat-send:disabled { opacity:.4; cursor:not-allowed; }
+/* cancel: the run's escape hatch — not disabled by the run lock; warn-colored */
+.chat-cancel { margin-left:8px; padding:2px 10px; font-size:11px; color:var(--warn); border:1px solid var(--warn); background:transparent; border-radius:4px; cursor:pointer; }
+.chat-cancel:hover { background:rgba(210,153,34,.12); }
+.chat-cancel:disabled { opacity:.4; cursor:not-allowed; }
 
 .chat-stream { max-height:22vh; overflow-y:auto; white-space:pre-wrap; font-size:12px; margin:4px 0 0; }
 .chat-live { display:flex; align-items:center; font-size:12px; color:var(--warn); }
@@ -1116,14 +1120,22 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     { flag: "--mutation", label: "mutation", title: "require the new tests to catch mutants (slow)" },
     { flag: "--flake-guard", label: "flake", title: "run the new specs several times; reject nondeterminism" }
   ];
+  var RUN_OPTS = [
+    { flag: "--worktree", label: "worktree \xB7 safe", title: "run in a throwaway git worktree \u2014 the live tree is never edited (safe to dogfood, no revert). Needs a git repo with \u22651 commit." }
+  ];
+  function toggleGroup(opts) {
+    const boxes = opts.map((o) => /* @__PURE__ */ h("input", { type: "checkbox", value: o.flag }));
+    const nodes = opts.map((o, i) => /* @__PURE__ */ h("label", { class: "chat-gate", title: o.title }, boxes[i], " ", o.label));
+    return { boxes, nodes };
+  }
   function runRow(dir, op, baseFlags, label) {
     const modelSel = /* @__PURE__ */ h("select", { class: "chat-model" }, MODELS.map((m) => /* @__PURE__ */ h("option", { value: m }, m)));
-    const gateBoxes = GATES.map((g) => /* @__PURE__ */ h("input", { type: "checkbox", value: g.flag }));
-    const toggles = GATES.map((g, i) => /* @__PURE__ */ h("label", { class: "chat-gate", title: g.title }, gateBoxes[i], " ", g.label));
-    return /* @__PURE__ */ h("div", { class: "chat-run-row" }, /* @__PURE__ */ h("span", { class: "chat-run-model" }, "model ", modelSel), /* @__PURE__ */ h("span", { class: "chat-gates" }, "gates ", toggles), /* @__PURE__ */ h("button", { class: "act chat-run-btn", onClick: () => {
+    const gates = toggleGroup(GATES);
+    const opts = toggleGroup(RUN_OPTS);
+    const checkedFlags = () => [...gates.boxes, ...opts.boxes].filter((b) => b.checked).map((b) => b.value);
+    return /* @__PURE__ */ h("div", { class: "chat-run-row" }, /* @__PURE__ */ h("span", { class: "chat-run-model" }, "model ", modelSel), /* @__PURE__ */ h("span", { class: "chat-gates" }, "gates ", gates.nodes), /* @__PURE__ */ h("span", { class: "chat-gates" }, "run ", opts.nodes), /* @__PURE__ */ h("button", { class: "act chat-run-btn", onClick: () => {
       if (running) return;
-      const gateFlags = gateBoxes.filter((b) => b.checked).map((b) => b.value);
-      void runLaunch(dir, op, [...withModel(baseFlags, modelSel.value), ...gateFlags], label);
+      void runLaunch(dir, op, [...withModel(baseFlags, modelSel.value), ...checkedFlags()], label);
     } }, "run \u25B6"));
   }
   function withModel(flags, model) {
@@ -1201,17 +1213,22 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     const tok = spent ? /* @__PURE__ */ h("span", { class: "chat-tok" }, "\u2191", e.tokensOut ?? 0, " \u2193", e.tokensIn ?? 0) : null;
     return /* @__PURE__ */ h("span", null, /* @__PURE__ */ h("span", { class: "chat-live-dot" }), statusMsg(e), " ", tok);
   }
+  function liveRegion(op) {
+    const pipe = /* @__PURE__ */ h("div", { class: "chat-pipeline" });
+    const status = /* @__PURE__ */ h("div", { class: "chat-status" }, statusLine({}));
+    const notes = /* @__PURE__ */ h("div", { class: "chat-notes" });
+    const cancelBtn = /* @__PURE__ */ h("button", { class: "act ghost chat-cancel", style: "display:none" }, "\u23F9 cancel");
+    setTools(
+      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "pipeline \xB7 ", profileFor(op), " ", pipelineLegend(), " ", cancelBtn), pipe, status, notes)
+    );
+    return { pipe, status, notes, cancelBtn };
+  }
   async function runLaunch(dir, op, flags, label) {
     setRunning(true);
     rememberDir(dir);
     const model = flags[flags.indexOf("--model") + 1] ?? "auto";
     convo("assistant", "asst", /* @__PURE__ */ h("span", null, "running ", /* @__PURE__ */ h("b", null, op), " with model ", /* @__PURE__ */ h("b", null, model), "\u2026"));
-    const pipe = /* @__PURE__ */ h("div", { class: "chat-pipeline" });
-    const status = /* @__PURE__ */ h("div", { class: "chat-status" }, statusLine({}));
-    const notes = /* @__PURE__ */ h("div", { class: "chat-notes" });
-    setTools(
-      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "pipeline \xB7 ", profileFor(op), " ", pipelineLegend()), pipe, status, notes)
-    );
+    const { pipe, status, notes, cancelBtn } = liveRegion(op);
     const runes = await pipelineRunes(op);
     let state = {};
     renderPipeline(pipe, runes, state);
@@ -1223,7 +1240,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       setRunning(false);
       return;
     }
-    streamRun(dir, {
+    const handle = streamRun(dir, {
       onEvent: (e) => {
         if (e.note) {
           notes.appendChild(/* @__PURE__ */ h("div", { class: "chat-note" }, e.note));
@@ -1236,12 +1253,20 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       onTurn: convoTurn,
       onDone: (stop) => {
         setRunning(false);
+        cancelBtn.style.display = "none";
         status.classList.add("chat-live-off");
         convo("assistant", "asst", /* @__PURE__ */ h("span", null, "run finished \u2014 ", /* @__PURE__ */ h("b", null, stop ?? "done")));
         void showProposals(dir);
         void fillDirs();
       }
     });
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = () => {
+      cancelBtn.disabled = true;
+      void j(`/cancel?id=${encodeURIComponent(r.id ?? "")}`, { method: "POST" }).catch(() => {
+      });
+      handle.stop("cancelled");
+    };
   }
   function streamRun(dir, cb) {
     const es2 = new EventSource("/stream?dir=" + encodeURIComponent(dir));
@@ -1265,6 +1290,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       }
     };
     es2.onerror = () => finish();
+    return { stop: (reason) => finish(reason ?? "cancelled") };
   }
   function followTranscript(dir, runId, onTurn) {
     const es2 = new EventSource("/transcript?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(runId) + "&follow=1");
