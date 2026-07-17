@@ -1,9 +1,9 @@
 import type { Rune } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { detectFunctions } from '../../quality/analyze.js';
-import { analyzeNames } from '../../quality/euphony.js';
+import { analyzeByFile } from '../../quality/euphony.js';
 
 // euphony_gate (opt-in, ADVISORY) — a novel rune that reads the run's new
 // function names for prosody. It nudges the model (preamble) to name sibling
@@ -20,27 +20,31 @@ const EUPHONY_SYSTEM_PROMPT =
 
 const SOURCE = /\.(ts|tsx|js|jsx|mjs)$/;
 
-/** Collect function names from the run's edited (non-test) source files. */
-async function editedFunctionNames(ctx: RunCtx): Promise<string[]> {
-  const names: string[] = [];
+/** Collect function names per edited (non-test) source file. */
+async function editedFunctionsByFile(ctx: RunCtx): Promise<Map<string, string[]>> {
+  const byFile = new Map<string, string[]>();
   for (const rel of ctx.editedFiles) {
     if (!SOURCE.test(rel) || /\.(test|spec)\./.test(rel)) continue;
     const src = await readFile(join(ctx.workdir, rel), 'utf8').catch(() => '');
-    for (const fn of detectFunctions(src)) if (fn.name.length >= 3) names.push(fn.name);
+    const names = detectFunctions(src).map((fn) => fn.name).filter((n) => n.length >= 3);
+    if (names.length) byFile.set(rel, names);
   }
-  return names;
+  return byFile;
 }
 
-/** Advisory harvest: measure + log the euphony of the run's new function names. */
+/** Advisory harvest: measure + log the euphony of the run's new function names,
+ *  overall + naming the most-musical file (per-file scoring). */
 async function euphonyReport(ctx: RunCtx): Promise<void> {
-  const names = await editedFunctionNames(ctx);
-  if (names.length < 2) return;
-  const r = analyzeNames(names);
-  const fams = r.families.slice(0, 3).map((f) => f.names.join('/')).join(', ');
-  const plural = r.families.length === 1 ? 'family' : 'families';
+  const byFile = await editedFunctionsByFile(ctx);
+  const { files, overall } = analyzeByFile(byFile);
+  if (overall.count < 2) return;
+  const fams = overall.families.slice(0, 3).map((f) => f.names.join('/')).join(', ');
+  const plural = overall.families.length === 1 ? 'family' : 'families';
+  const best = files.length > 1 && files[0].report.count >= 2
+    ? ` · best ${basename(files[0].file)} ${files[0].report.score}` : '';
   const report =
-    `♪ euphony ${r.score}/100 · ${r.families.length} rhyming ${plural}` +
-    `${fams ? ` — ${fams}` : ''} · meter ${r.meterMean.toFixed(1)}±${r.meterStdev.toFixed(1)}`;
+    `♪ euphony ${overall.score}/100 · ${overall.families.length} rhyming ${plural}` +
+    `${fams ? ` — ${fams}` : ''} · meter ${overall.meterMean.toFixed(1)}±${overall.meterStdev.toFixed(1)}${best}`;
   console.log(`[euphony] ${report}`); // CLI log
   ctx.notes.push(report); // surfaced as a `note` event for the UI
 }

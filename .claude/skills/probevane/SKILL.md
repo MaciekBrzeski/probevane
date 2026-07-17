@@ -58,6 +58,7 @@ Run the CLI: `./bin/probevane <command> <dir> [flags]` (or `npx probevane …`).
 | `serve` | Live loop dashboard — tails .probevane/events-*.jsonl and streams steps/gates/tokens/edits to the browser over SSE while the loop runs. |
 | `improve` | Screenshot-driven visual improvement loop — capture a page, a vision model judges it against a goal and rewrites the target file until met (visual analogue of the test loop). |
 | `arch` | Experimental architecture critique — render the on-disk folder tree + module dependency tree + directory coupling metrics (fan-in/out, heaviest cross-dir edges, dir cycles, shared hubs), then an LLM ($0 ollama) surfaces concrete structural improvements (misplaced modules, over-coupled/splittable dirs, layering issues). Report-only, never edits. --snapshot persists the coupling metrics (docs/arch-snapshot.json) and prints drift vs the previous snapshot — commit it to make coupling regressions visible over time. --pyramid scores the tree against the pyramid structure model (isolated feature pyramids on a glue base, shared dirs as the common floor): dir roles inferred from coupling, declared durably in probevane.config (arch: { glue, shared, feature }) or per-run via --glue/--shared/--feature (flag > config > heuristic); flags feature→feature, feature→glue, shared→feature and glue deep-reach imports with per-violation fix cost, 0-100 score; appends the folder-crowding check — dirs over --max-files (config arch.maxFiles, default 15) get subfolder candidates (>=3 same-prefix files) and move suggestions for zero-cohesion files (index/barrel + registry patterns suppressed). |
+| `euphony` | Report a project's naming MUSIC — the euphony (function-name rhyme + syllabic meter) of each source file, scored per file + overall. Rhyme groups names by their shared "rime" (last vowel cluster + trailing consonants), exact plus half-weight slant/near-rhyme; meter is the syllable count, its regularity the rhythm signal. Report-only, $0, no LLM — a playful naming-quality read (the same model the euphony_gate rune scores runs with live). Files print most-musical first. |
 | `design` | Combined design loop — write a Playwright spec that screenshots each page/tab, a vision model judges each shot for design practice, then rewrite the target html's <style> to address findings, and repeat. Leaves the spec as a visual-regression test. $0 vision via PROBEVANE_VISION_BASE (ollama cloud minimax-m3). |
 | `enqueue` | Add one work item (op + dir + flags) to the supervisor queue (<state>/queue.jsonl). A daemon started with PROBEVANE_QUEUE=1 pulls it on its next tick and dispatches it — the autonomous work intake. |
 | `scan` | Enqueue one work item per repo for the supervisor to dispatch — feed a repo-list or dirs into the dark-factory queue. The autonomous front door (pairs with a PROBEVANE_QUEUE=1 daemon). |
@@ -380,6 +381,15 @@ Experimental architecture critique — render the on-disk folder tree + module d
 probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d] [--feature e,f] [--max-files N]] [--snapshot [--out <file>]]
 # e.g.
 probevane arch . --pyramid
+```
+
+### euphony
+Report a project's naming MUSIC — the euphony (function-name rhyme + syllabic meter) of each source file, scored per file + overall. Rhyme groups names by their shared "rime" (last vowel cluster + trailing consonants), exact plus half-weight slant/near-rhyme; meter is the syllable count, its regularity the rhythm signal. Report-only, $0, no LLM — a playful naming-quality read (the same model the euphony_gate rune scores runs with live). Files print most-musical first.
+
+```
+probevane euphony <dir> [--top N]
+# e.g.
+probevane euphony src/adapters
 ```
 
 ### design

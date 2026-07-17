@@ -16,10 +16,16 @@ export function splitWords(id: string): string[] {
     .filter(Boolean);
 }
 
-/** Approximate a word's syllables: count vowel groups (min 1), trailing silent-e dropped. */
+/** Approximate a word's syllables (min 1): vowel groups, with the common English
+ *  rules that move the count — a silent trailing e is dropped ("parse"→1), UNLESS
+ *  it's a consonant+"le" beat ("handle"→2, "cycle"→2), and a silent -ed after a
+ *  non-t/d consonant is one beat not two ("parsed"→1, "mapped"→1; but "edited"→3). */
 export function syllables(word: string): number {
-  const groups = word.replace(/e$/, '').match(VOWELS);
-  return Math.max(1, groups ? groups.length : 1);
+  const w = word.toLowerCase();
+  const stripped = /[^aeiouy]le$/.test(w) ? w : w.replace(/e$/, '');
+  const silentEd = /[^aeioudt]ed$/.test(stripped);
+  const groups = (stripped.match(VOWELS) ?? []).length - (silentEd ? 1 : 0);
+  return Math.max(1, groups);
 }
 
 /** A word's rhyming tail ("rime"): its last vowel cluster to the end, silent-e folded
@@ -43,6 +49,15 @@ export function rhymes(a: string, b: string): boolean {
   return key.length >= 2 && key === rhymeKey(b) && a !== b;
 }
 
+/** Two identifiers NEAR-rhyme (slant/assonance) — their head rimes differ but share
+ *  their last 2 chars: "parser"/"faster" (rimes "arser"/"aster" → share "er"). */
+export function nearRhymes(a: string, b: string): boolean {
+  const ka = rhymeKey(a);
+  const kb = rhymeKey(b);
+  if (ka.length < 2 || kb.length < 2 || ka === kb || a === b) return false;
+  return ka.slice(-2) === kb.slice(-2);
+}
+
 /** An identifier's "meter" — its total syllable count across words. */
 export function meter(id: string): number {
   return splitWords(id).reduce((n, w) => n + syllables(w), 0);
@@ -55,8 +70,9 @@ export interface RhymeFamily { rime: string; names: string[] }
 export interface EuphonyReport {
   count: number;
   families: RhymeFamily[]; // rhyming groups, largest first
-  rhymingNames: number; // how many names belong to some family
-  density: number; // rhymingNames / count (0..1) — how much of the set rhymes
+  rhymingNames: number; // how many names belong to some (exact) family
+  nearRhyming: number; // names that only near-rhyme (slant) with another, counted at half weight
+  density: number; // (rhyming + 0.5·near) / count (0..1) — how much of the set is musical
   meterMean: number;
   meterStdev: number; // spread of meter — lower = more rhythmically regular
   score: number; // 0..100 euphony (rhyme density + rhythmic regularity)
@@ -76,17 +92,44 @@ export function rhymeFamilies(names: string[]): RhymeFamily[] {
     .sort((a, b) => b.names.length - a.names.length);
 }
 
-/** Score a set of identifiers for rhyme density + rhythmic regularity (0..100). */
+/** Names that only NEAR-rhyme (not already in an exact family) with some other name. */
+function nearRhymingCount(names: string[], inFamily: Set<string>): number {
+  const near = names.filter(
+    (n, i) => !inFamily.has(n) && names.some((m, j) => i !== j && nearRhymes(n, m)),
+  );
+  return new Set(near).size;
+}
+
+/** Score a set of identifiers for rhyme density + rhythmic regularity (0..100).
+ *  Density counts exact rhymes fully and near-rhymes (slant) at half weight. */
 export function analyzeNames(names: string[]): EuphonyReport {
   const count = names.length;
-  if (!count) return { count: 0, families: [], rhymingNames: 0, density: 0, meterMean: 0, meterStdev: 0, score: 0 };
+  if (!count) {
+    return {
+      count: 0, families: [], rhymingNames: 0, nearRhyming: 0,
+      density: 0, meterMean: 0, meterStdev: 0, score: 0,
+    };
+  }
   const families = rhymeFamilies(names);
   const rhymingNames = families.reduce((n, f) => n + f.names.length, 0);
-  const density = rhymingNames / count;
+  const nearRhyming = nearRhymingCount(names, new Set(families.flatMap((f) => f.names)));
+  const density = Math.min(1, (rhymingNames + 0.5 * nearRhyming) / count);
   const meters = names.map(meter);
   const meterMean = meters.reduce((a, b) => a + b, 0) / count;
   const meterStdev = Math.sqrt(meters.reduce((a, m) => a + (m - meterMean) ** 2, 0) / count);
   const regularity = Math.max(0, 1 - meterStdev / 2); // stdev 0 → 1, ≥2 syllables → 0
   const score = Math.round(density * 70 + regularity * 30);
-  return { count, families, rhymingNames, density, meterMean, meterStdev, score };
+  return { count, families, rhymingNames, nearRhyming, density, meterMean, meterStdev, score };
+}
+
+/** Per-file euphony: each file's function names scored on their own, plus a pooled
+ *  overall roll-up. `files` is sorted most-musical first. */
+export interface EuphonyByFile { files: { file: string; report: EuphonyReport }[]; overall: EuphonyReport }
+
+/** Score each file's names on their own + a pooled overall; files most-musical first. */
+export function analyzeByFile(byFile: Map<string, string[]>): EuphonyByFile {
+  const files = [...byFile.entries()]
+    .map(([file, names]) => ({ file, report: analyzeNames(names) }))
+    .sort((a, b) => b.report.score - a.report.score);
+  return { files, overall: analyzeNames([...byFile.values()].flat()) };
 }

@@ -220,6 +220,14 @@ command arch
   usage probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d] [--feature e,f] [--max-files N]] [--snapshot [--out <file>]]
   example probevane arch . --pyramid
 
+command euphony
+  summary Report a project's naming MUSIC — the euphony (function-name rhyme + syllabic meter) of each source file, scored per file + overall. Rhyme groups names by their shared "rime" (last vowel cluster + trailing consonants), exact plus half-weight slant/near-rhyme; meter is the syllable count, its regularity the rhythm signal. Report-only, $0, no LLM — a playful naming-quality read (the same model the euphony_gate rune scores runs with live). Files print most-musical first.
+  usage probevane euphony <dir> [--top N]
+  example probevane euphony src/adapters
+  dir
+  flag --top num "show up to N rhyme families per file (default 5)"
+  handler euphony#run
+
 command design
   summary Combined design loop — write a Playwright spec that screenshots each page/tab, a vision model judges each shot for design practice, then rewrite the target html's <style> to address findings, and repeat. Leaves the spec as a visual-regression test. $0 vision via PROBEVANE_VISION_BASE (ollama cloud minimax-m3).
   usage probevane design --url <u> --target <file> [--tabs a,b,c] [--goal "<g>"] [--rounds N] [--spec <file>]
