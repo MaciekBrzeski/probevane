@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { writeFileSync } from 'node:fs';
-import type { StackAdapter } from '../adapters/adapter.js';
+import type { StackAdapter, TestTarget } from '../adapters/adapter.js';
 import { buildGraph } from '../mock/graph.js';
 import { stripToCode } from '../quality/analyze-detect.js';
 import { MUTATIONS, lineOf, type SurvivingMutant, type MutationResult } from './mutants.js';
@@ -233,6 +233,37 @@ async function runOneSite(
 
 /** Budget-capped mutation sampling for the gate: a few mutants over a few (preferably
  *  just-tested) targets — a fast kill-rate estimate, not the exhaustive runMutation. */
+/** Narrow discovered targets to the ones THIS run tested (by source stem), capped.
+ *  Clean fallback to all targets when nothing matches (heuristic, never fails closed). */
+function scopeTargets(targets: TestTarget[], scope: string[] | undefined, maxTargets: number): TestTarget[] {
+  if (scope?.length) {
+    const want = new Set(scope.map(sourceStem));
+    const hit = targets.filter((t) => want.has(sourceStem(t.sourcePath)));
+    if (hit.length) targets = hit;
+  }
+  return targets.slice(0, maxTargets);
+}
+
+/** Run up to `remaining` mutants for one target's ctx (each re-runs the suite),
+ *  stopping early on the wall-budget deadline. Returns the kill tally + budget flag. */
+async function runTargetMutants(
+  ctx: MutantCtx, deadline: number, remaining: number,
+): Promise<{ total: number; killed: number; budgetHit: boolean }> {
+  let total = 0;
+  let killed = 0;
+  for (const [re, repl] of MUTATIONS) {
+    if (total >= remaining) break;
+    if (Date.now() >= deadline) return { total, killed, budgetHit: true };
+    const result = await scoreMutant(ctx, re, repl);
+    if (result === null) continue;
+    total++;
+    if (result) killed++;
+  }
+  return { total, killed, budgetHit: false };
+}
+
+/** Mutate a run's covered source and re-run its suite, scoring how many mutants the
+ *  tests kill (0..1) — the correctness floor. Budget-capped + advisory on timeout. */
 export async function mutationScore(
   dir: string,
   adapter: StackAdapter,
@@ -240,16 +271,7 @@ export async function mutationScore(
   maxTargets = 3,
   opts: { budgetMs?: number; scope?: string[] } = {},
 ): Promise<MutationResult> {
-  let targets = await adapter.discover(dir, 'unit');
-  // Scope: prefer targets whose source matches a file the run just tested, so we
-  // mutate what THIS run covered rather than arbitrary discover-first-N. Clean
-  // fallback to all targets when nothing matches (heuristic, never fails closed).
-  if (opts.scope?.length) {
-    const want = new Set(opts.scope.map(sourceStem));
-    const hit = targets.filter((t) => want.has(sourceStem(t.sourcePath)));
-    if (hit.length) targets = hit;
-  }
-  targets = targets.slice(0, maxTargets);
+  const targets = scopeTargets(await adapter.discover(dir, 'unit'), opts.scope, maxTargets);
   const deadline = opts.budgetMs != null ? Date.now() + opts.budgetMs : Infinity;
   let total = 0;
   let killed = 0;
@@ -257,18 +279,10 @@ export async function mutationScore(
   for (const t of targets) {
     const ctx = await targetCtx(dir, adapter, t.sourcePath);
     if (!ctx) continue;
-    for (const [re, repl] of MUTATIONS) {
-      if (total >= maxMutants) break;
-      // Wall-budget: each mutant re-runs the suite. If we're out of time, stop and
-      // flag it — the gate treats a budget-truncated run as advisory (never a false
-      // block, never a CI deadlock).
-      if (Date.now() >= deadline) { budgetHit = true; break; }
-      const result = await scoreMutant(ctx, re, repl);
-      if (result === null) continue;
-      total++;
-      if (result) killed++;
-    }
-    if (budgetHit) break;
+    const r = await runTargetMutants(ctx, deadline, maxMutants - total);
+    total += r.total;
+    killed += r.killed;
+    if (r.budgetHit) { budgetHit = true; break; }
   }
   // Only surface budgetHit when true — keeps the common result shape stable for
   // callers that deep-equal it.
