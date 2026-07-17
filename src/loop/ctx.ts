@@ -54,6 +54,12 @@ export class RunCtx {
    *  flushes each as a `note` LoopEvent after harvest so the UI can surface them. */
   notes: string[] = [];
 
+  /** An honest terminal diagnosis set by a gate when it detects a condition the
+   *  model CANNOT fix by editing code (a repeated 0-tests scope/config mismatch, an
+   *  env/infra error). The engine's fatalCheck ends the run with stopReason
+   *  'misconfigured' + this as the proposal, instead of thrashing to 'difficulty'. */
+  fatalDiagnosis?: string;
+
   /** Wires the run identity only — every counter/flag starts at its field default. */
   constructor(workdir: string, adapter: StackAdapter, task: string) {
     this.workdir = workdir;

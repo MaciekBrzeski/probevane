@@ -17,14 +17,7 @@ import {
   type LoopState,
 } from './phases.js';
 import { userTurn } from '../transcript.js';
-import {
-  nudgeCheck,
-  neverEditedCheck,
-  consultCheck,
-  difficultyCheck,
-  stuckCheck,
-  budgetCheck,
-} from './escalation.js';
+import { runEscalation } from './escalation.js';
 
 // Re-exported for API compatibility (the engine's only consumer of stableCacheIndex
 // is the phase module; kept exported here so the public surface is unchanged).
@@ -69,7 +62,7 @@ export interface RunOutcome {
   steps: number;
   toolCalls: number;
   gateBlocks: number;
-  stopReason: 'accepted' | 'max_steps' | 'stuck' | 'error' | 'budget' | 'difficulty';
+  stopReason: 'accepted' | 'max_steps' | 'stuck' | 'error' | 'budget' | 'difficulty' | 'misconfigured';
   tokensIn: number;
   tokensOut: number;
   cacheRead: number;
@@ -182,18 +175,9 @@ export async function runLoop(opts: RunOptions): Promise<RunOutcome> {
 
   while (ctx.step < lr.maxSteps) {
     if ((await runStep(lr)) === 'break') break;
-
-    // Escalation only counts AFTER the first productive edit — initial reading /
-    // planning is legitimate non-edit work, not a stall (runestone's force_stop
-    // lesson: don't fire during the read/plan phase).
-    const started = ctx.editedFiles.size > 0;
-
-    if (nudgeCheck(lr, started)) continue;
-    if (neverEditedCheck(lr, started)) break;
-    if (await consultCheck(lr, started)) continue;
-    if (await difficultyCheck(lr, started)) break;
-    if (stuckCheck(lr, started)) break;
-    if (budgetCheck(lr)) break;
+    const act = await runEscalation(lr);
+    if (act === 'break') break;
+    // 'continue' re-loops with an injected nudge; null falls through to the next step.
   }
 
   return finalizeRun(lr);

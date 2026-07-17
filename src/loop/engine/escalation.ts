@@ -7,6 +7,20 @@ import { stableCacheIndex, type LoopRun } from './phases.js';
 // `continue`, the stop checks return true to `break` (after setting st.stopReason).
 // `started` = ctx.editedFiles.size > 0 (computed once per iteration by the caller).
 
+// Fatal diagnosis: a gate detected a condition the model CANNOT fix by editing
+// code (a repeated 0-tests scope/config mismatch, an env/infra error — it sets
+// ctx.fatalDiagnosis). End the run HONESTLY with that diagnosis instead of letting
+// the loop thrash to the generic 'difficulty' give-up. Runs first in the ladder so
+// it pre-empts the misleading "model isn't writing files" path. See validation_gate.
+export function fatalCheck(lr: LoopRun): boolean {
+  const { ctx, st, log } = lr;
+  if (!ctx.fatalDiagnosis) return false;
+  st.proposalText = ctx.fatalDiagnosis;
+  st.stopReason = 'misconfigured';
+  log(`[engine] misconfigured: stopping — ${ctx.fatalDiagnosis.split('\n')[0]}`);
+  return true;
+}
+
 // Read-thrash nudge: a run that keeps READING and never edits (the large-repo
 // refactor stall — distinct read_file calls never look "circular", so the
 // never-edited stop alone would let it churn to max_steps). Push it to commit
@@ -146,4 +160,20 @@ export function budgetCheck(lr: LoopRun): boolean {
   log(`[engine] budget reached: ${st.tokensOut} >= ${opts.budget} output tokens`);
   st.stopReason = 'budget';
   return true;
+}
+
+/** Run the stall-escalation ladder once (after a step): 'break' to end the run,
+ *  'continue' to re-loop with an injected nudge, or null to proceed. Escalation
+ *  only counts AFTER the first productive edit — initial reading/planning is
+ *  legitimate non-edit work, not a stall. */
+export async function runEscalation(lr: LoopRun): Promise<'break' | 'continue' | null> {
+  const started = lr.ctx.editedFiles.size > 0;
+  if (fatalCheck(lr)) return 'break';
+  if (nudgeCheck(lr, started)) return 'continue';
+  if (neverEditedCheck(lr, started)) return 'break';
+  if (await consultCheck(lr, started)) return 'continue';
+  if (await difficultyCheck(lr, started)) return 'break';
+  if (stuckCheck(lr, started)) return 'break';
+  if (budgetCheck(lr)) return 'break';
+  return null;
 }

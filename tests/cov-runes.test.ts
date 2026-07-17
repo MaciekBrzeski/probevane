@@ -176,6 +176,40 @@ describe('validationGate', () => {
     expect(ctx.notes.some((n) => n.includes('0 tests collected'))).toBe(true);
   });
 
+  it('cognitive check: repeated 0-tests → sets ctx.fatalDiagnosis (honest stop, not thrash)', async () => {
+    const a = fakeAdapter();
+    a._run = { passed: 0, failed: 0, skipped: 0, green: false, raw: 'no test files found' };
+    const rune = validationGate('unit');
+    const ctx = ctxWith(a);
+    await rune.prepare!(ctx);
+    ctx.editedFiles.add('src/widget.test.ts');
+    await rune.shouldStop!(ctx); // 1st: note + block, no fatal yet
+    expect(ctx.fatalDiagnosis).toBeUndefined();
+    await rune.shouldStop!(ctx); // 2nd: same measurement → fatal
+    expect(ctx.fatalDiagnosis).toContain('2 attempts');
+    expect(ctx.fatalDiagnosis).toContain('config');
+  });
+
+  it('cognitive check: env/infra error → names it an environment error, fatal on repeat', async () => {
+    const a = fakeAdapter();
+    a._run = { passed: 0, failed: 0, skipped: 0, green: false, raw: "sh: vitest: command not found\nENOENT" };
+    const rune = validationGate('unit');
+    const ctx = ctxWith(a);
+    await rune.prepare!(ctx);
+    ctx.editedFiles.add('src/widget.test.ts');
+    const d = await rune.shouldStop!(ctx);
+    expect(d.kind).toBe('block');
+    if (d.kind === 'block') {
+      expect(d.reason).toContain('environment error');
+      expect(d.inject).toContain('ENVIRONMENT');
+      expect(d.inject).not.toContain('DISCOVERY'); // env path, not the 0-tests-discovery path
+    }
+    expect(ctx.notes.some((n) => n.includes('environment'))).toBe(true);
+    expect(ctx.fatalDiagnosis).toBeUndefined();
+    await rune.shouldStop!(ctx); // repeat → fatal
+    expect(ctx.fatalDiagnosis).toContain('environment');
+  });
+
   it('shouldStop allows when edited + typecheck clean + suite green (full=true scope)', async () => {
     const a = fakeAdapter();
     a._run = { passed: 5, failed: 0, skipped: 0, green: true, raw: 'all good' };

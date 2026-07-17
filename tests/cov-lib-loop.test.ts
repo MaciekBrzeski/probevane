@@ -19,6 +19,7 @@ import { scoreSuite, selectBest, type SuiteScore, type Candidate } from '../src/
 import { routeModels, assessComplexity } from '../src/loop/complexity.js';
 import {
   nudgeCheck,
+  fatalCheck,
   neverEditedCheck,
   consultCheck,
   difficultyCheck,
@@ -731,6 +732,20 @@ describe('engine-escalation.difficultyCheck', () => {
     circular(lr);
     expect(await difficultyCheck(lr, true)).toBe(true);
     expect(called).toBe(false);
+  });
+});
+
+describe('engine-escalation.fatalCheck', () => {
+  it('no-op when no fatal diagnosis', () => {
+    const { lr } = makeLR();
+    expect(fatalCheck(lr)).toBe(false);
+  });
+  it('fires: a gate-set fatalDiagnosis stops honestly (misconfigured + proposal)', () => {
+    const { lr, st } = makeLR();
+    lr.ctx.fatalDiagnosis = '0 tests collected across 2 attempts — scope/config mismatch, not fixable by editing code.';
+    expect(fatalCheck(lr)).toBe(true);
+    expect(st.stopReason).toBe('misconfigured');
+    expect(st.proposalText).toContain('scope/config');
   });
 });
 

@@ -19,7 +19,18 @@ import { sh } from '../../util/exec.js';
 interface ValidationState {
   baselineErrors: number;
   baselineTypecheckOk: boolean;
-  zeroCollectedWarned: boolean; // pushed the "0 tests collected" note once already
+  zeroCollected: number; // times the runner collected 0 tests (repeat → fatalDiagnosis)
+  envErrored: number; // times the suite failed to EXECUTE on an env/infra signal
+}
+
+// Signatures of an ENVIRONMENT failure (the runner couldn't execute) vs a red test:
+// missing binary / dep / module, or blocked network. Only consulted when 0 tests ran.
+const INFRA_ERROR =
+  /command not found|: not found|\bENOENT\b|Cannot find (?:module|package)|ERR_MODULE_NOT_FOUND|\bECONNREFUSED\b|\bEADDRINUSE\b|No such file or directory|is not recognized as/i;
+
+/** If the suite output shows an environment/infra failure signature, return it. */
+function infraError(raw: string): string | null {
+  return raw.match(INFRA_ERROR)?.[0] ?? null;
 }
 
 const VALIDATION_SYSTEM_PROMPT =
@@ -60,13 +71,15 @@ async function validationRunCheck(
   const ours = full ? [] : newSpecs(ctx);
   const run = await ctx.adapter.run(ctx.workdir, scope, ours.length ? ours : undefined);
   ctx.validatedSinceEdit = true;
-  // Cognitive check: we named new spec file(s) but the runner collected ZERO
-  // tests. That's not a failing suite to fix by editing code — the runner isn't
-  // DISCOVERING the spec (scope/config, e.g. a monorepo where the command runs at
-  // the repo root instead of the sub-package) or the spec has no runnable test.
-  // Naming it stops the loop thrashing on "not green (0/0/0)" and misdiagnosing it.
-  if (ours.length && run.passed + run.failed + run.skipped === 0) {
-    return zeroCollected(ctx, ours, state);
+  // Cognitive checks: when NOTHING ran (0 tests), a red-suite message is a
+  // misdiagnosis — the model can't fix it by editing code. Distinguish an
+  // environment failure (runner couldn't execute) from a discovery/scope miss,
+  // name each accurately, and on repeat set an honest terminal diagnosis so the
+  // engine stops (fatalCheck) instead of thrashing to a generic 'difficulty'.
+  if (run.passed + run.failed + run.skipped === 0) {
+    const infra = infraError(run.raw);
+    if (infra) return envErrored(ctx, infra, state);
+    if (ours.length) return zeroCollected(ctx, ours, state);
   }
   if (!run.green) {
     // Lead with the FIRST failing test + its assertion — weak/local models fix
@@ -83,12 +96,19 @@ async function validationRunCheck(
 }
 
 /** The "0 tests collected" diagnosis — a discovery/config problem, not a red suite.
- *  Surfaces a one-time note (for the UI) and blocks with an accurate, actionable
- *  message so the model checks scope/config instead of rewriting passing test code. */
+ *  First occurrence: a one-time UI note + an accurate Block (give the model a chance
+ *  to fix scope/config). On REPEAT: also set ctx.fatalDiagnosis so the engine ends
+ *  the run honestly (misconfigured) instead of rewriting passing test code to death. */
 function zeroCollected(ctx: RunCtx, ours: string[], state: ValidationState): RuneDecision {
-  if (!state.zeroCollectedWarned) {
-    state.zeroCollectedWarned = true;
+  state.zeroCollected++;
+  if (state.zeroCollected === 1) {
     ctx.notes.push(`⚠ validation: 0 tests collected from the new spec(s) — the runner isn't discovering them (scope/config), not a code failure`);
+  } else {
+    ctx.fatalDiagnosis =
+      `0 tests collected from the new spec(s) ${ours.join(', ')} across ${state.zeroCollected} attempts — ` +
+      'the runner is not discovering them (a scope/config mismatch, e.g. a monorepo where the test command ' +
+      'runs at the repo root instead of the sub-package). A harness/config problem, not something the model ' +
+      'can fix by editing test code.';
   }
   return block(
     'validation_gate: 0 tests collected (runner did not discover the new spec)',
@@ -98,6 +118,27 @@ function zeroCollected(ctx: RunCtx, ours: string[], state: ValidationState): Run
       'root instead of the sub-package, or an include/testMatch that misses this file). Confirm the project\'s own ' +
       'test command actually picks up this spec; if the harness runs the runner at the wrong root, editing test ' +
       'code cannot make this pass.',
+  );
+}
+
+/** An ENVIRONMENT/infra failure (the runner couldn't execute — missing binary/dep,
+ *  blocked network), NOT a red test. Accurate note + Block; fatal on repeat. */
+function envErrored(ctx: RunCtx, sig: string, state: ValidationState): RuneDecision {
+  state.envErrored++;
+  if (state.envErrored === 1) {
+    ctx.notes.push(`⚠ validation: suite failed to execute (matched "${sig}") — an environment/dependency error, not a code failure`);
+  } else {
+    ctx.fatalDiagnosis =
+      `The test runner keeps failing to EXECUTE (matched "${sig}") across ${state.envErrored} attempts — ` +
+      'an environment/dependency error (a missing binary, an uninstalled dependency, or blocked network). ' +
+      'The toolchain/deps need to be present; the model cannot fix this by editing code.';
+  }
+  return block(
+    'validation_gate: test runner failed to execute (environment error)',
+    `The test runner did not run any tests and its output shows an environment failure (matched "${sig}").\n` +
+      'This is an ENVIRONMENT/dependency problem (missing binary, uninstalled dependency, or blocked network), ' +
+      'not a failing test — editing test code will not fix it. If a dependency is genuinely missing, it must be ' +
+      'installed; the harness/toolchain, not the test code, is at fault.',
   );
 }
 
@@ -121,7 +162,7 @@ async function validationShouldStop(
 
 /** Build the validation rune for a scope; full=true validates the WHOLE suite (repair path). */
 export function validationGate(scope: RunScope = 'unit', full = false): Rune {
-  const state: ValidationState = { baselineErrors: 0, baselineTypecheckOk: true, zeroCollectedWarned: false };
+  const state: ValidationState = { baselineErrors: 0, baselineTypecheckOk: true, zeroCollected: 0, envErrored: 0 };
   return {
     name: 'validation_gate',
     systemPromptAddition: () => VALIDATION_SYSTEM_PROMPT,
