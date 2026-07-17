@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RunRecord } from '../cost/ledger.js';
 import { appendJsonl, readJsonl } from '../util/jsonl.js';
 import { statePath } from '../util/state.js';
+import { sseHead } from './sse.js';
 import { backoffMs, isTransientStop } from '../observe/quarantine.js';
 import { reduceJobs, jobsToEvict, itemFromPlan, type PersistedJob } from '../observe/jobs.js';
 import { reduceQueue, nextReady, mark, type QueueItem } from '../observe/queue.js';
@@ -285,12 +286,7 @@ export async function streamFiles(
   } = {},
 ) {
   const { sinceMs, raw = false } = opts;
-  res.writeHead(200, {
-    'content-type': 'text/event-stream',
-    'cache-control': 'no-cache',
-    connection: 'keep-alive',
-  });
-  res.write('retry: 1000\n\n');
+  sseHead(res);
   const evDir = raw ? dir : join(resolve(dir), '.probevane');
   const offsets = new Map<string, number>();
   let alive = true;

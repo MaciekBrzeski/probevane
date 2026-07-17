@@ -32,10 +32,13 @@ export interface ArchMetrics {
   cycles: [string, string][]; // dir pairs that import each other (A↔B)
 }
 
-/** Per-dir file counts + weighted cross-dir edge map ("from|to" → count). */
-function tallyDirs(graph: ModuleGraph): { files: Map<string, number>; edgeCount: Map<string, number> } {
+/** Walk every cross-dir import edge: tallies files-per-top-dir and invokes `onEdge`
+ *  once per (from, to) pair where from ≠ to. Intra-dir edges don't couple dirs, so
+ *  they're skipped. Returns the files-per-dir map. Shared by tallyDirs + dirCoupling. */
+export function crossDirEdges(
+  graph: ModuleGraph, onEdge: (from: string, to: string) => void,
+): Map<string, number> {
   const files = new Map<string, number>();
-  const edgeCount = new Map<string, number>();
   for (const n of graph.nodes.values()) {
     const from = topDir(n.path);
     files.set(from, (files.get(from) ?? 0) + 1);
@@ -43,10 +46,18 @@ function tallyDirs(graph: ModuleGraph): { files: Map<string, number>; edgeCount:
       const target = graph.nodes.get(dep);
       if (!target) continue;
       const to = topDir(target.path);
-      if (from === to) continue; // intra-dir edges don't couple directories
-      edgeCount.set(`${from}|${to}`, (edgeCount.get(`${from}|${to}`) ?? 0) + 1);
+      if (from === to) continue;
+      onEdge(from, to);
     }
   }
+  return files;
+}
+
+/** Per-dir file counts + weighted cross-dir edge map ("from|to" → count). */
+function tallyDirs(graph: ModuleGraph): { files: Map<string, number>; edgeCount: Map<string, number> } {
+  const edgeCount = new Map<string, number>();
+  const files = crossDirEdges(graph, (from, to) =>
+    edgeCount.set(`${from}|${to}`, (edgeCount.get(`${from}|${to}`) ?? 0) + 1));
   return { files, edgeCount };
 }
 

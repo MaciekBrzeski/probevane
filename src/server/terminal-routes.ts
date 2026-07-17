@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readBody } from './daemon-control.js';
+import { sseHead } from './sse.js';
 import {
   sessions, termEnabled, createSession, writeInput, resize, killSession,
   attach, detach, ringReplayB64, atCap, type TermSession,
@@ -83,12 +84,7 @@ async function handleStart(req: IncomingMessage, res: ServerResponse): Promise<b
 
 /** GET /term/stream — SSE attach: replay scrollback first, then live frames + heartbeat. */
 function handleStream(s: TermSession, req: IncomingMessage, res: ServerResponse): boolean {
-  res.writeHead(200, {
-    'content-type': 'text/event-stream',
-    'cache-control': 'no-cache',
-    connection: 'keep-alive',
-  });
-  res.write('retry: 1000\n\n');
+  sseHead(res);
   if (s.ring.length) res.write(ringReplayB64(s)); // replay scrollback
   if (s.exitCode !== undefined) { res.write(`data: ${JSON.stringify({ exit: s.exitCode })}\n\n`); res.end(); return true; }
   attach(s, res);

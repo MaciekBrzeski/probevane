@@ -1,5 +1,5 @@
 import type { ModuleGraph } from '../../mock/graph.js';
-import { topDir } from './metrics.js';
+import { topDir, crossDirEdges } from './metrics.js';
 
 // The pyramid structure model — evaluate a codebase against "isolated feature
 // pyramids on a glue base": each feature dir is a pyramid (subfolder depth =
@@ -96,19 +96,10 @@ export function inferRole(
 function dirCoupling(graph: ModuleGraph): Map<string, { fanIn: number; fanOut: number; files: number }> {
   const out = new Map<string, Set<string>>();
   const inn = new Map<string, Set<string>>();
-  const files = new Map<string, number>();
-  for (const n of graph.nodes.values()) {
-    const from = topDir(n.path);
-    files.set(from, (files.get(from) ?? 0) + 1);
-    for (const dep of n.imports) {
-      const target = graph.nodes.get(dep);
-      if (!target) continue;
-      const to = topDir(target.path);
-      if (from === to) continue;
-      (out.get(from) ?? out.set(from, new Set()).get(from)!).add(to);
-      (inn.get(to) ?? inn.set(to, new Set()).get(to)!).add(from);
-    }
-  }
+  const files = crossDirEdges(graph, (from, to) => {
+    (out.get(from) ?? out.set(from, new Set()).get(from)!).add(to);
+    (inn.get(to) ?? inn.set(to, new Set()).get(to)!).add(from);
+  });
   const coupling = new Map<string, { fanIn: number; fanOut: number; files: number }>();
   for (const [dir, f] of files)
     coupling.set(dir, { fanIn: inn.get(dir)?.size ?? 0, fanOut: out.get(dir)?.size ?? 0, files: f });
