@@ -55,7 +55,7 @@ describe('lcarsFrame', () => {
     const s = blank(12, 4);
     lcarsFrame(s, { x: 0, y: 0, w: 12, h: 4 }, '', FG.acc);
     expect(at(s, 11, 1)).toBe('│');       // right border
-    expect(serialize(s)).toContain('38;2;27;42;68'); // --line 0x1b2a44
+    expect(serialize(s)).toContain('38;2;36;54;81'); // --line 0x243651
   });
 
   it('draws nothing for a degenerate rect', () => {

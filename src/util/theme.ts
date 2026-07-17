@@ -9,7 +9,7 @@
 // Edit a colour / tab / console region here and it changes in both places.
 
 export const PALETTE = {
-  bg: '#04070f', panel: '#0b1220', line: '#1b2a44', fg: '#cfe3f5', dim: '#7d93ad',
+  bg: '#04070f', panel: '#0b1220', line: '#243651', fg: '#dbeafc', dim: '#9db3cf',
   ok: '#2fe6a8', warn: '#ffb454', err: '#ff5d6c', acc: '#4fd6ff', mag: '#c792ea',
 } as const;
 /** A palette key — themed surfaces name colours by this, never by raw hex. */
