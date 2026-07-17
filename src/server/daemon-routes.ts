@@ -10,6 +10,7 @@ import { queueSummary } from '../observe/queue.js';
 import { buildProjects } from '../observe/projects.js';
 import { pageRuns, mergeRun } from '../observe/run-detail.js';
 import { parseEvents } from '../loop/events.js';
+import { handleConsoleData } from './console-routes.js';
 import { parseTranscript } from '../loop/transcript.js';
 import { scanProject } from '../quality/scan.js';
 import { jobs, getQueue, isPaused, snapshot, launch, cancelJob, enqueue, streamEvents, streamFiles, readBody } from './daemon-control.js';
@@ -159,51 +160,9 @@ async function handleData(
     return true;
   }
   if (url.startsWith('/wiki/raw/')) return handleWikiRaw(url, res);
-  return handleConsoleData(url, query, res);
+  return handleConsoleData(url, query, res, CTX);
 }
 
-/** Console-tab data: rune pipeline + module constellation. Returns true if handled. */
-async function handleConsoleData(url: string, query: URLSearchParams, res: ServerResponse): Promise<boolean> {
-  if (url === '/pipeline') {
-    // Rune pipeline for the console's live node graph — always derived from
-    // the real profiles (describePipeline), never a stale committed model.
-    const { describePipeline } = await import('../loop/describe.js');
-    const profile = (query.get('profile') ?? 'write_tests') as Parameters<typeof describePipeline>[0];
-    try {
-      CTX.sendJson(res, 200, describePipeline(profile, { kind: 'unit' }));
-    } catch {
-      CTX.sendJson(res, 400, { error: `unknown profile ${String(profile)}` });
-    }
-    return true;
-  }
-  if (url === '/events') {
-    // Theater replay: a run's durable event stream from the state root
-    // (survives workdir deletion — the whole point).
-    const runId = query.get('runId');
-    if (!runId || !SAFE_ID.test(runId)) { CTX.sendJson(res, 400, { error: 'valid runId required' }); return true; }
-    const { statePath } = await import('../util/state.js');
-    const txt =
-      (await readFile(statePath('events', `${runId}.jsonl`), 'utf8').catch(() => null)) ??
-      (await readFile(join(CTX.ROOT, 'events', `${runId}.jsonl`), 'utf8').catch(() => null));
-    if (txt === null) { CTX.sendJson(res, 404, { error: 'no captured events for this run' }); return true; }
-    CTX.sendJson(res, 200, { runId, events: parseEvents(txt) });
-    return true;
-  }
-  if (url === '/graph') {
-    // Module constellation: dependency graph + fan-in per node.
-    const dir = query.get('dir') ?? process.env.PROBEVANE_ROOT ?? '.';
-    const { buildGraph } = await import('../mock/graph.js');
-    const g = await buildGraph(resolve(dir));
-    const fanIn = new Map<string, number>();
-    for (const n of g.nodes.values()) for (const dep of n.imports) fanIn.set(dep, (fanIn.get(dep) ?? 0) + 1);
-    CTX.sendJson(res, 200, {
-      nodes: [...g.nodes.values()].map((n) => ({ ...n, fanIn: fanIn.get(n.path) ?? 0 })),
-      order: g.order,
-    });
-    return true;
-  }
-  return false;
-}
 
 /** GET /run?dir&runId — merge ledger record + diary + events summary. */
 async function handleRun(query: URLSearchParams, res: ServerResponse): Promise<boolean> {
