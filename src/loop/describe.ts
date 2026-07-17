@@ -48,6 +48,8 @@ export const TOGGLES: { key: keyof ProfileOpts; label: string; detail: string }[
     'Adds visual_gate (e2e only) — requires e2e specs to capture a screenshot checkpoint.' },
   { key: 'mfe', label: 'mfe', detail:
     'Adds mfe_gate — enforces Module Federation standards on a micro-frontend project (no-op off-federation).' },
+  { key: 'euphony', label: 'euphony', detail:
+    'Adds euphony_gate (advisory) — nudges function names to rhyme / share meter with siblings, then scores the run’s naming music. Never blocks.' },
 ];
 
 /** One rune as the pipeline views render it — hooks/phase derived live from profile(),

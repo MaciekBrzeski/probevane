@@ -73,6 +73,7 @@ export function buildGenOpts(
     assertMin: num(flag(args, '--assert-min')),
     quality: args.includes('--quality') || cfg.quality === true,
     structure: args.includes('--structure') || cfg.structure === true,
+    euphony: args.includes('--euphony') || cfg.euphony === true,
     budget,
     mock,
     targetGaps,

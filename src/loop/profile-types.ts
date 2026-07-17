@@ -26,6 +26,7 @@ export interface ProfileOpts {
   quality?: boolean | Partial<QualityConfig>; // opt-in source-quality gate (edited files mustn't regress)
   mfe?: boolean; // opt-in micro-frontend (Module Federation) standards gate
   structure?: boolean; // opt-in pyramid-structure gate (block NEW cross-dir layering violations)
+  euphony?: boolean; // opt-in euphony rune (advisory) — nudge + score function-name rhyme/meter
   render?: RenderGateOpts; // the visual path's render/vision acceptance oracle
 }
 

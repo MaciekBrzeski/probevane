@@ -4,7 +4,7 @@ import type { AcceptanceOpts } from './runes/index.js';
 import {
   contextInject, pathGuard, planFirst, noRegression, validationGate, auditGate,
   acceptanceGate, hermeticGate, mutationGate, a11yGate, visualGate, flakeGate,
-  redFirst, qualityGate, mfeGate, assertionGate, structureGate,
+  redFirst, qualityGate, mfeGate, assertionGate, structureGate, euphonyGate,
   sessionDiary, caveatHarvest, distillTrace, libraryPromote,
 } from './runes/index.js';
 import type { ProfileOpts, Segment, SubroutineId } from './profile-types.js';
@@ -64,6 +64,7 @@ export function optInGates(opts: ProfileOpts, scope: RunScope, o: { extras?: boo
   out.push(...maybeQuality(opts.quality));
   if (o.mfe) out.push(...maybeMfe(opts.mfe));
   if (opts.structure) out.push(structureGate());
+  if (opts.euphony) out.push(euphonyGate());
   return out;
 }
 
