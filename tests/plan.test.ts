@@ -7,6 +7,21 @@ describe('untestedTargets', () => {
     const specs = ['src/Cart.test.tsx'];
     expect(untestedTargets(targets, specs)).toEqual(['src/util.ts']);
   });
+
+  it('counts a target imported by an aggregated spec as tested (content-aware)', () => {
+    const targets = [{ sourcePath: 'src/arch/metrics.ts' }, { sourcePath: 'src/arch/lonely.ts' }];
+    const specs = ['tests/arch.test.ts']; // path names neither module
+    const specTexts = ["import { archMetrics } from '../src/arch/metrics.js';"];
+    // metrics is imported → tested; lonely is not → still flagged
+    expect(untestedTargets(targets, specs, specTexts)).toEqual(['src/arch/lonely.ts']);
+  });
+
+  it('the dir/base token avoids matching a short common basename by accident', () => {
+    const targets = [{ sourcePath: 'src/loop/run.ts' }];
+    const specs = ['tests/misc.test.ts'];
+    const specTexts = ['const run = () => 1; // the word "run" appears but no arch/run import'];
+    expect(untestedTargets(targets, specs, specTexts)).toEqual(['src/loop/run.ts']);
+  });
 });
 
 describe('buildPlan', () => {

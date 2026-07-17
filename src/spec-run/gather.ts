@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { parseGaps } from '../coverage/gaps.js';
 import { scanProject } from '../quality/scan.js';
@@ -13,7 +14,8 @@ export async function gatherPlan(dir: string, kind: TestKind): Promise<{ adapter
   const adapter = await selectAdapterOrThrow(dir);
   const targets = await adapter.discover(dir, kind).catch(() => []);
   const specs = await adapter.specFiles(dir).catch(() => []);
-  const untested = untestedTargets(targets, specs);
+  const specTexts = await Promise.all(specs.map((f) => readFile(f, 'utf8').catch(() => '')));
+  const untested = untestedTargets(targets, specs, specTexts);
   const gaps = await parseGaps(dir).catch(() => []);
   const quality = await scanProject(dir).catch(() => null);
   const mfe = await scanMfe(dir).catch(() => null);

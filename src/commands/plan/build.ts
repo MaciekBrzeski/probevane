@@ -23,13 +23,28 @@ export interface PlanInput {
   mfeErrors: { message: string; file?: string }[];
 }
 
-const base = (p: string) =>
-  p.split('/').pop()!.replace(/\.(test|spec)\.[tj]sx?$/, '').replace(/\.[tj]sx?$/, '').replace(/\.py$/, '');
+const stripExt = (p: string) =>
+  p.replace(/\.(test|spec)\.[tj]sx?$/, '').replace(/\.[tj]sx?$/, '').replace(/\.py$/, '');
+const base = (p: string) => stripExt(p.split('/').pop()!);
 
-/** Source files with no spec referencing them (heuristic: basename not in any spec path). */
-export function untestedTargets(targets: { sourcePath: string }[], specs: string[]): string[] {
-  const blob = specs.join('\n');
-  return targets.filter((t) => !blob.includes(base(t.sourcePath))).map((t) => t.sourcePath);
+/** Last two path segments without extension: "src/arch/metrics.ts" → "arch/metrics".
+ *  Specific enough to spot an import in an aggregated spec file without matching a
+ *  short common basename ("run", "index") by accident. */
+const importToken = (p: string) => stripExt(p).split('/').slice(-2).join('/');
+
+/** Source files no spec references. A target counts as tested when its basename
+ *  appears in a spec PATH (co-located `foo.test.ts` next to `foo.ts`) OR its
+ *  `dir/base` import token appears in a spec's CONTENT (an aggregated spec file
+ *  like `arch.test.ts` importing `arch/metrics.js`). `specTexts` is optional so
+ *  callers that only have paths keep the path-only behaviour. */
+export function untestedTargets(
+  targets: { sourcePath: string }[], specs: string[], specTexts: string[] = [],
+): string[] {
+  const paths = specs.join('\n');
+  const texts = specTexts.join('\n');
+  return targets
+    .filter((t) => !paths.includes(base(t.sourcePath)) && !texts.includes(importToken(t.sourcePath)))
+    .map((t) => t.sourcePath);
 }
 
 /** The ranked plan plus its one-line summary — what `probevane plan` prints. */
