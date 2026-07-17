@@ -1,4 +1,4 @@
-import type { ModuleGraph } from '../../mock/graph.js';
+import type { ModuleGraph } from '../mock/graph.js';
 import { topDir, crossDirEdges } from './metrics.js';
 
 // The pyramid structure model — evaluate a codebase against "isolated feature

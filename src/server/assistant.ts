@@ -6,8 +6,8 @@ import { buildSpec } from '../spec-run/build-spec.js';
 import { specToLaunchPlan } from '../spec-run/runspec.js';
 import { gatherPlan } from '../spec-run/gather.js';
 import { buildGraph } from '../mock/graph.js';
-import { pyramidReport } from '../commands/arch/pyramid.js';
-import { crowdingReport } from '../commands/arch/crowding.js';
+import { pyramidReport } from '../arch/pyramid.js';
+import { crowdingReport } from '../arch/crowding.js';
 import { loadConfig } from '../util/config.js';
 import type { Interpretation, Proposal, AssistantPlanItem } from '../util/assistant-shape.js';
 

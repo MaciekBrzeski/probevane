@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { buildGraph } from '../../mock/graph.js';
-import { toFolderTree, toAscii, graphSummary, sharedModules } from '../../mock/render.js';
+import { buildGraph } from '../mock/graph.js';
+import { toFolderTree, toAscii, graphSummary, sharedModules } from '../mock/render.js';
 import { archMetrics, archDigest } from './metrics.js';
 import { crowdingReport, crowdingDigest } from './crowding.js';
 

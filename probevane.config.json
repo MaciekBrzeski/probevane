@@ -1,7 +1,7 @@
 {
   "arch": {
     "glue": ["cli", "server", "factory", "commands"],
-    "shared": ["util", "cost", "brain", "audit", "library", "engine", "vane"],
+    "shared": ["util", "cost", "brain", "audit", "library", "engine", "vane", "arch"],
     "feature": ["ui", "tui"]
   }
 }

@@ -1,4 +1,4 @@
-import type { ModuleGraph } from '../../mock/graph.js';
+import type { ModuleGraph } from '../mock/graph.js';
 
 // Folder-crowding check — a dir holding too many files is a cognitive load
 // problem regardless of import hygiene. For every dir (any depth) over the

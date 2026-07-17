@@ -85,7 +85,7 @@ async function qualityLine(dir: string): Promise<FullLine> {
 async function archLine(dir: string): Promise<FullLine> {
   try {
     const { buildGraph } = await import('../../mock/graph.js');
-    const { archMetrics, archDrift } = await import('../../commands/arch/metrics.js');
+    const { archMetrics, archDrift } = await import('../../arch/metrics.js');
     const metrics = archMetrics(await buildGraph(dir));
     let driftNote = 'no snapshot (arch --snapshot to start tracking)';
     const snapPath = join(dir, 'docs', 'arch-snapshot.json');

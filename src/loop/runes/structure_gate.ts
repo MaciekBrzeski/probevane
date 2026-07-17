@@ -2,7 +2,7 @@ import type { Rune, RuneDecision } from '../rune.js';
 import { ALLOW, block } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
 import { buildGraph } from '../../mock/graph.js';
-import { pyramidReport, type PyramidViolation } from '../../commands/arch/pyramid.js';
+import { pyramidReport, type PyramidViolation } from '../../arch/pyramid.js';
 import { loadConfig } from '../../util/config.js';
 
 // structure_gate (opt-in) — the pyramid structure model (arch --pyramid) as a

@@ -1,6 +1,6 @@
 import { resolve, join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
-import { archCritique } from '../commands/arch/critique.js';
+import { archCritique } from '../arch/critique.js';
 import { dirArg } from '../util/args.js';
 
 // probevane arch <dir> [--no-llm] [--folder-only] [--pyramid [--glue a,b] [--shared c,d] [--feature e,f]] [--snapshot [--out <file>]]
@@ -45,8 +45,8 @@ async function main() {
 // config > coupling inference), then append the folder-crowding check.
 async function pyramid(dir: string, args: string[]) {
   const { buildGraph } = await import('../mock/graph.js');
-  const { pyramidReport, pyramidDigest } = await import('../commands/arch/pyramid.js');
-  const { crowdingReport, crowdingDigest } = await import('../commands/arch/crowding.js');
+  const { pyramidReport, pyramidDigest } = await import('../arch/pyramid.js');
+  const { crowdingReport, crowdingDigest } = await import('../arch/crowding.js');
   const { loadConfig } = await import('../util/config.js');
   const list = (flag: string) => {
     const i = args.indexOf(flag);
@@ -79,7 +79,7 @@ async function pyramid(dir: string, args: string[]) {
 // previous snapshot — coupling regressions become visible in review.
 async function snapshot(dir: string, args: string[]) {
   const { buildGraph } = await import('../mock/graph.js');
-  const { archMetrics, archDrift } = await import('../commands/arch/metrics.js');
+  const { archMetrics, archDrift } = await import('../arch/metrics.js');
   const i = args.indexOf('--out');
   const out = resolve(i >= 0 && args[i + 1] ? args[i + 1] : join(dir, 'docs', 'arch-snapshot.json'));
   const metrics = archMetrics(await buildGraph(dir));

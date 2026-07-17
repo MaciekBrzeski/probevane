@@ -3,9 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { scanProject } from '../quality/scan.js';
 import { applyBaseline } from '../quality/baseline.js';
 import { buildGraph } from '../mock/graph.js';
-import { pyramidReport } from '../commands/arch/pyramid.js';
-import { crowdingReport } from '../commands/arch/crowding.js';
-import { archMetrics } from '../commands/arch/metrics.js';
+import { pyramidReport } from '../arch/pyramid.js';
+import { crowdingReport } from '../arch/crowding.js';
+import { archMetrics } from '../arch/metrics.js';
 import { loadConfig } from '../util/config.js';
 
 // The /checks aggregate behind the control center's Checks tab: run the CHEAP
