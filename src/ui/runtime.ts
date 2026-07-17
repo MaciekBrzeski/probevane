@@ -26,22 +26,20 @@ export function h(
 
 // Map one JSX prop onto the element: on* → listener, class → className,
 // dataset merge, known DOM property, else attribute — in that priority order.
-function applyProp(node: HTMLElement, k: string, v: unknown): void {
+export function applyProp(node: HTMLElement, k: string, v: unknown): void {
   if (v === null || v === undefined || v === false) return;
   if (k.startsWith('on') && typeof v === 'function') {
     node.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
-  } else if (k === 'class' || k === 'className') {
-    node.className = String(v);
-  } else if (k === 'dataset' && typeof v === 'object') {
-    Object.assign(node.dataset, v as Record<string, string>);
-  } else {
-    setPropOrAttr(node, k, v);
+    return;
   }
+  if (k === 'class' || k === 'className') { node.className = String(v); return; }
+  if (k === 'dataset' && typeof v === 'object') { Object.assign(node.dataset, v as Record<string, string>); return; }
+  setPropOrAttr(node, k, v);
 }
 
 // Known DOM property → assign it (value, checked, htmlFor …); read-only reflected
 // props (e.g. `list` on <input>) and unknown keys → setAttribute.
-function setPropOrAttr(node: HTMLElement, k: string, v: unknown): void {
+export function setPropOrAttr(node: HTMLElement, k: string, v: unknown): void {
   if (k in node && k !== 'style') {
     try { (node as unknown as Record<string, unknown>)[k] = v; return; } catch { /* read-only getter */ }
   }
