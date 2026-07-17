@@ -322,10 +322,14 @@ describe('supervise (guard paths only — never dispatches)', () => {
 });
 
 describe('streamEvents', () => {
-  it('tails event files as SSE frames until the client disconnects', async () => {
+  it('tails the state-root events mirror as SSE frames until the client disconnects', async () => {
+    // /stream tails statePath('events')/<runId>.jsonl (the mirror every run writes,
+    // incl. worktree runs) — not the workdir. Point statePath at a temp state root.
+    const state = mkdtempSync(join(tmpdir(), 'probevane-state-'));
+    process.env.PROBEVANE_STATE = state;
+    mkdirSync(join(state, 'events'), { recursive: true });
+    writeFileSync(join(state, 'events', 'run-1.jsonl'), '{"a":1}\n{"b":2}\n');
     const dir = mkdtempSync(join(tmpdir(), 'probevane-stream-'));
-    mkdirSync(join(dir, '.probevane'), { recursive: true });
-    writeFileSync(join(dir, '.probevane', 'events-run1.jsonl'), '{"a":1}\n{"b":2}\n');
     const req: any = new EventEmitter();
     const res = fakeRes();
     const done = streamEvents(dir, res, req as IncomingMessage);

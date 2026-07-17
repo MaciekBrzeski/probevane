@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RunRecord } from '../cost/ledger.js';
 import { appendJsonl, readJsonl } from '../util/jsonl.js';
+import { statePath } from '../util/state.js';
 import { backoffMs, isTransientStop } from '../observe/quarantine.js';
 import { reduceJobs, jobsToEvict, itemFromPlan, type PersistedJob } from '../observe/jobs.js';
 import { reduceQueue, nextReady, mark, type QueueItem } from '../observe/queue.js';
@@ -270,22 +271,27 @@ export async function supervise() {
   }
 }
 
-// SSE-tail every file in <dir>/.probevane matching `pattern`, rebroadcasting new
-// lines as appended. Shared by /stream (events-*) and /transcript (transcript-*).
+// SSE-tail every file in `evDir` matching `pattern`, rebroadcasting new lines as
+// appended. /stream tails the state-root events mirror (so worktree runs, whose
+// workdir .probevane is thrown away, still stream); /transcript tails the workdir.
 export async function streamFiles(
   dir: string,
   pattern: RegExp,
   res: ServerResponse,
   req: IncomingMessage,
-  sinceMs?: number, // only tail files modified at/after this time (the current run) — skips history
+  opts: {
+    sinceMs?: number; // only tail files modified at/after this time (the current run) — skips history
+    raw?: boolean; // treat `dir` as the events dir itself (the state mirror) rather than <dir>/.probevane
+  } = {},
 ) {
+  const { sinceMs, raw = false } = opts;
   res.writeHead(200, {
     'content-type': 'text/event-stream',
     'cache-control': 'no-cache',
     connection: 'keep-alive',
   });
   res.write('retry: 1000\n\n');
-  const evDir = join(resolve(dir), '.probevane');
+  const evDir = raw ? dir : join(resolve(dir), '.probevane');
   const offsets = new Map<string, number>();
   let alive = true;
   req.on('close', () => (alive = false));
@@ -308,9 +314,12 @@ export async function streamFiles(
   }
 }
 
-/** GET /stream — SSE-tail the CURRENT run's event log (files touched since connect,
- *  with a small grace for a run that started just before): skips replaying the dir's
- *  history, which would otherwise flood the UI and close it on an old run's stopReason. */
-export async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
-  return streamFiles(dir, /^events-.*\.jsonl$/, res, req, Date.now() - 5000);
+/** GET /stream — SSE-tail the CURRENT run's events from the state-root mirror
+ *  (statePath('events')/<runId>.jsonl), which every run writes to (including
+ *  worktree runs, whose workdir events are discarded). mtime-scoped to files
+ *  touched since connect (small grace) so the dir's history isn't replayed — that
+ *  would flood the UI and close it on an old run's stopReason. `dir` is unused: the
+ *  mirror is global and the mtime window isolates the run the tab just launched. */
+export async function streamEvents(_dir: string, res: ServerResponse, req: IncomingMessage) {
+  return streamFiles(statePath('events'), /^run-.*\.jsonl$/, res, req, { sinceMs: Date.now() - 5000, raw: true });
 }
