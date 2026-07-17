@@ -158,6 +158,24 @@ describe('validationGate', () => {
     }
   });
 
+  it('cognitive check: 0 tests collected → names it a discovery/config issue, not a red suite', async () => {
+    const a = fakeAdapter();
+    a._run = { passed: 0, failed: 0, skipped: 0, green: false, raw: 'no test files found' };
+    const rune = validationGate('unit');
+    const ctx = ctxWith(a);
+    await rune.prepare!(ctx);
+    ctx.editedFiles.add('src/widget.test.ts'); // we DID write a spec, yet 0 ran
+    const d = await rune.shouldStop!(ctx);
+    expect(d.kind).toBe('block');
+    if (d.kind === 'block') {
+      expect(d.reason).toContain('0 tests collected');
+      expect(d.inject).toContain('DISCOVERY problem');
+      expect(d.inject).not.toContain('FIX THIS FIRST'); // NOT the red-suite path
+    }
+    // surfaced once as a UI note (reuses ctx.notes → `note` event)
+    expect(ctx.notes.some((n) => n.includes('0 tests collected'))).toBe(true);
+  });
+
   it('shouldStop allows when edited + typecheck clean + suite green (full=true scope)', async () => {
     const a = fakeAdapter();
     a._run = { passed: 5, failed: 0, skipped: 0, green: true, raw: 'all good' };

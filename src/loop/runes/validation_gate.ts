@@ -19,6 +19,7 @@ import { sh } from '../../util/exec.js';
 interface ValidationState {
   baselineErrors: number;
   baselineTypecheckOk: boolean;
+  zeroCollectedWarned: boolean; // pushed the "0 tests collected" note once already
 }
 
 const VALIDATION_SYSTEM_PROMPT =
@@ -49,7 +50,9 @@ async function validationTypecheckCheck(ctx: RunCtx, state: ValidationState): Pr
 }
 
 /** Run the suite (our specs only, unless full) and block with the first failure front-and-center. */
-async function validationRunCheck(ctx: RunCtx, scope: RunScope, full: boolean): Promise<RuneDecision> {
+async function validationRunCheck(
+  ctx: RunCtx, scope: RunScope, full: boolean, state: ValidationState,
+): Promise<RuneDecision> {
   // Scope to the specs we wrote — a real app's pre-existing suite may be
   // red under our config and is not ours to fix (no_regression forbids
   // touching it). We validate the tests we added. (full=true → whole suite,
@@ -57,6 +60,14 @@ async function validationRunCheck(ctx: RunCtx, scope: RunScope, full: boolean): 
   const ours = full ? [] : newSpecs(ctx);
   const run = await ctx.adapter.run(ctx.workdir, scope, ours.length ? ours : undefined);
   ctx.validatedSinceEdit = true;
+  // Cognitive check: we named new spec file(s) but the runner collected ZERO
+  // tests. That's not a failing suite to fix by editing code — the runner isn't
+  // DISCOVERING the spec (scope/config, e.g. a monorepo where the command runs at
+  // the repo root instead of the sub-package) or the spec has no runnable test.
+  // Naming it stops the loop thrashing on "not green (0/0/0)" and misdiagnosing it.
+  if (ours.length && run.passed + run.failed + run.skipped === 0) {
+    return zeroCollected(ctx, ours, state);
+  }
   if (!run.green) {
     // Lead with the FIRST failing test + its assertion — weak/local models fix
     // a precise signal far better than a 2500-char raw dump (fourier-nca lesson:
@@ -69,6 +80,25 @@ async function validationRunCheck(ctx: RunCtx, scope: RunScope, full: boolean): 
     );
   }
   return ALLOW;
+}
+
+/** The "0 tests collected" diagnosis — a discovery/config problem, not a red suite.
+ *  Surfaces a one-time note (for the UI) and blocks with an accurate, actionable
+ *  message so the model checks scope/config instead of rewriting passing test code. */
+function zeroCollected(ctx: RunCtx, ours: string[], state: ValidationState): RuneDecision {
+  if (!state.zeroCollectedWarned) {
+    state.zeroCollectedWarned = true;
+    ctx.notes.push(`⚠ validation: 0 tests collected from the new spec(s) — the runner isn't discovering them (scope/config), not a code failure`);
+  }
+  return block(
+    'validation_gate: 0 tests collected (runner did not discover the new spec)',
+    `The test runner ran but collected 0 tests from your new spec(s): ${ours.join(', ')}.\n` +
+      'This is a DISCOVERY problem, not a failing test: either the spec has no runnable test (empty/placeholder), ' +
+      'or — more often — the runner is scoped wrong for this path (a monorepo where the command runs at the repo ' +
+      'root instead of the sub-package, or an include/testMatch that misses this file). Confirm the project\'s own ' +
+      'test command actually picks up this spec; if the harness runs the runner at the wrong root, editing test ' +
+      'code cannot make this pass.',
+  );
 }
 
 /** Gate body: something written → typecheck delta → suite green, in fail-fast order. */
@@ -86,12 +116,12 @@ async function validationShouldStop(
   }
   const tcDecision = await validationTypecheckCheck(ctx, state);
   if (tcDecision) return tcDecision;
-  return validationRunCheck(ctx, scope, full);
+  return validationRunCheck(ctx, scope, full, state);
 }
 
 /** Build the validation rune for a scope; full=true validates the WHOLE suite (repair path). */
 export function validationGate(scope: RunScope = 'unit', full = false): Rune {
-  const state: ValidationState = { baselineErrors: 0, baselineTypecheckOk: true };
+  const state: ValidationState = { baselineErrors: 0, baselineTypecheckOk: true, zeroCollectedWarned: false };
   return {
     name: 'validation_gate',
     systemPromptAddition: () => VALIDATION_SYSTEM_PROMPT,
