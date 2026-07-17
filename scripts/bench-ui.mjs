@@ -55,7 +55,7 @@ const B = [
   ['catalog 44 → cells', cellMs, 'ms', 15, 'time'],
   ['catalog 44 → svg', svgMs, 'ms', 15, 'time'],
   ['diff-flush ratio (1-cell change)', diffRatio * 100, '% of full', 3, 'det'],
-  ['control.html size', htmlKB, 'kB', 94, 'det'], // 80→88 Assistant tab; →94 for history (recent dirs + past-run loading + legend)
+  ['control.html size', htmlKB, 'kB', 96, 'det'], // 80→88 Assistant tab; →94 history; →96 readability + transcript clamp/calm
 ];
 let failed = 0;
 console.log('[bench:ui]');

@@ -96,6 +96,10 @@ tr.clickable:hover td { background:rgba(79,214,255,.06); }
 .turn.user { border-left-color:var(--acc); }
 .turn.user .thead { color:var(--acc); }
 .turn .txt { white-space:pre-wrap; word-break:break-word; }
+/* clamp a long turn text to a few lines with a fade; the toggle removes .clamp */
+.txt.clamp { max-height:6.4em; overflow:hidden; -webkit-mask-image:linear-gradient(180deg,#000 62%,transparent); mask-image:linear-gradient(180deg,#000 62%,transparent); }
+.txt-toggle { margin-top:4px; padding:0; background:none; border:0; color:var(--acc); font:inherit; font-size:12px; cursor:pointer; letter-spacing:.04em; }
+.txt-toggle:hover { text-decoration:underline; }
 
 /* Details */
 details { margin-top:8px; }
@@ -244,7 +248,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-region-label { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--fg); font-weight:600; margin:10px 0 6px; padding-left:8px; border-left:3px solid var(--acc); line-height:1.4; }
 .chat-region-label .muted { font-weight:400; }
 .chat-region { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px; overflow-y:auto; }
-.chat-convo { min-height:320px; max-height:60vh; display:flex; flex-direction:column; gap:12px; }
+.chat-convo { min-height:320px; max-height:60vh; display:flex; flex-direction:column; gap:16px; }
 .chat-signals { min-height:320px; max-height:60vh; display:flex; flex-direction:column; gap:10px; }
 .chat-tools { min-height:74px; max-height:18vh; }
 
@@ -280,10 +284,11 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-status.chat-live-off .chat-live-dot { animation:none; background:var(--ok); }
 .chat-status .chat-tok { color:var(--dim); font-family:var(--num); font-size:12px; margin-left:8px; }
 .chat-status .chat-err { color:var(--err); }
-/* full transcript turns rendered inline in the conversation history */
-.chat-convo .turn { font-size:13px; align-self:stretch; margin-bottom:0; padding:12px 14px; }
+/* full transcript turns rendered inline — a calm left-ruled thread, not boxes */
+.chat-convo .turn { font-size:13px; align-self:stretch; margin-bottom:0; padding:4px 0 6px 14px; border:0; border-left:2px solid var(--line); border-radius:0; background:transparent; }
+.chat-convo .turn.user { border-left-color:var(--acc); }
 .chat-convo .turn .txt { line-height:1.6; color:var(--fg); }
-.chat-convo .turn .thead { letter-spacing:.1em; }
+.chat-convo .turn .thead { letter-spacing:.1em; font-size:11.5px; color:var(--dim); }
 
 /* labelled dividers bracketing a loaded past run */
 .chat-divider { align-self:stretch; font-family:var(--num); font-size:11px; letter-spacing:.06em; color:var(--dim); border-top:1px dashed var(--line); padding-top:6px; margin-top:4px; }
