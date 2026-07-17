@@ -1112,6 +1112,11 @@
       "key": "mfe",
       "label": "mfe",
       "detail": "Adds mfe_gate — enforces Module Federation standards on a micro-frontend project (no-op off-federation)."
+    },
+    {
+      "key": "euphony",
+      "label": "euphony",
+      "detail": "Adds euphony_gate (advisory) — nudges function names to rhyme / share meter with siblings, then scores the run’s naming music. Never blocks."
     }
   ],
   "phases": [

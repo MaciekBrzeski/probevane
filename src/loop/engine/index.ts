@@ -140,8 +140,6 @@ async function finalizeRun(lr: LoopRun): Promise<RunOutcome> {
   const { ctx, st, runes, opts, log, runId } = lr;
   ctx.accepted = st.accepted;
   ctx.stopReason = st.stopReason;
-  emit(lr, { stopReason: st.stopReason, accepted: st.accepted, proposal: st.proposalText });
-  if (st.proposalText) log(`[engine] PROPOSAL:\n${st.proposalText}`);
   await recordRun({
     ts: new Date().toISOString(), runId, label: opts.label ?? 'run', model: st.brain.model,
     dir: lr.ctx.workdir,
@@ -151,6 +149,11 @@ async function finalizeRun(lr: LoopRun): Promise<RunOutcome> {
     durationMs: Date.now() - lr.startedMs,
   });
   for (const r of runes) await r.onStop?.(ctx);
+  // Advisory harvest notes (e.g. euphony score) BEFORE the terminal event — the UI
+  // closes the stream on stopReason, so notes must land first to be shown.
+  for (const note of ctx.notes) emit(lr, { note });
+  if (st.proposalText) log(`[engine] PROPOSAL:\n${st.proposalText}`);
+  emit(lr, { stopReason: st.stopReason, accepted: st.accepted, proposal: st.proposalText });
 
   return {
     accepted: st.accepted,

@@ -38,10 +38,11 @@ async function euphonyReport(ctx: RunCtx): Promise<void> {
   const r = analyzeNames(names);
   const fams = r.families.slice(0, 3).map((f) => f.names.join('/')).join(', ');
   const plural = r.families.length === 1 ? 'family' : 'families';
-  console.log(
-    `[euphony] score ${r.score}/100 · ${r.families.length} rhyming ${plural}` +
-      `${fams ? ` — ${fams}` : ''} · meter ${r.meterMean.toFixed(1)}±${r.meterStdev.toFixed(1)}`,
-  );
+  const report =
+    `♪ euphony ${r.score}/100 · ${r.families.length} rhyming ${plural}` +
+    `${fams ? ` — ${fams}` : ''} · meter ${r.meterMean.toFixed(1)}±${r.meterStdev.toFixed(1)}`;
+  console.log(`[euphony] ${report}`); // CLI log
+  ctx.notes.push(report); // surfaced as a `note` event for the UI
 }
 
 /** Build the euphony rune — a preamble naming nudge + an on-stop euphony report

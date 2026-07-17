@@ -43,15 +43,27 @@ function setRunning(on: boolean): void {
 
 // --- run row (shared by plan + proposal cards) ------------------------------
 
-/** A model-select + gated RUN, always passing an explicit --model. */
+// Opt-in gate toggles offered on every run row — append the flag when checked.
+const GATES: { flag: string; label: string; title: string }[] = [
+  { flag: '--euphony', label: 'euphony', title: 'advisory: nudge + score function-name rhyme/meter' },
+  { flag: '--quality', label: 'quality', title: 'block finishing if the edited source regresses in quality' },
+  { flag: '--mutation', label: 'mutation', title: 'require the new tests to catch mutants (slow)' },
+  { flag: '--flake-guard', label: 'flake', title: 'run the new specs several times; reject nondeterminism' },
+];
+
+/** A model-select + opt-in gate toggles + gated RUN (always explicit --model). */
 function runRow(dir: string, op: string, baseFlags: string[], label: string): Node {
   const modelSel = <select class="chat-model">{MODELS.map((m) => <option value={m}>{m}</option>)}</select> as HTMLSelectElement;
+  const gateBoxes = GATES.map((g) => <input type="checkbox" value={g.flag} /> as HTMLInputElement);
+  const toggles = GATES.map((g, i) => <label class="chat-gate" title={g.title}>{gateBoxes[i]} {g.label}</label>);
   return (
     <div class="chat-run-row">
-      model {modelSel}
+      <span class="chat-run-model">model {modelSel}</span>
+      <span class="chat-gates">gates {toggles}</span>
       <button class="act chat-run-btn" onClick={() => {
         if (running) return;
-        void runLaunch(dir, op, withModel(baseFlags, modelSel.value), label);
+        const gateFlags = gateBoxes.filter((b) => b.checked).map((b) => b.value);
+        void runLaunch(dir, op, [...withModel(baseFlags, modelSel.value), ...gateFlags], label);
       }}>run ▶</button>
     </div>
   );
@@ -115,7 +127,7 @@ interface PipeRune { name: string; phase: string; summary: string }
 interface RunEvent {
   runId?: string; step?: number; tool?: string; gate?: string;
   gateBlockReasons?: string[]; tokensIn?: number; tokensOut?: number;
-  accepted?: boolean; stopReason?: string; delta?: string;
+  accepted?: boolean; stopReason?: string; delta?: string; note?: string;
 }
 
 /** Map a launch op to the loop profile whose pipeline the strip should show. */
@@ -191,11 +203,13 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
 
   const pipe = <div class="chat-pipeline"></div> as HTMLElement;
   const status = <div class="chat-status">{statusLine({})}</div> as HTMLElement;
+  const notes = <div class="chat-notes"></div> as HTMLElement;
   setTools(
     <div>
       <div class="chat-signal-sub">pipeline · {profileFor(op)} {pipelineLegend()}</div>
       {pipe}
       {status}
+      {notes}
     </div>,
   );
 
@@ -214,6 +228,7 @@ async function runLaunch(dir: string, op: string, flags: string[], label: string
 
   streamRun(dir, {
     onEvent: (e) => {
+      if (e.note) { notes.appendChild(<div class="chat-note">{e.note}</div>); return; }
       state = pipelineReducer(state, e, runes.map((x) => x.name));
       renderPipeline(pipe, runes, state);
       status.replaceChildren(statusLine(e));

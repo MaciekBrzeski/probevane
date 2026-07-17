@@ -277,6 +277,7 @@ export async function streamFiles(
   pattern: RegExp,
   res: ServerResponse,
   req: IncomingMessage,
+  sinceMs?: number, // only tail files modified at/after this time (the current run) — skips history
 ) {
   res.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -289,7 +290,13 @@ export async function streamFiles(
   let alive = true;
   req.on('close', () => (alive = false));
   while (alive) {
-    const files = (await readdir(evDir).catch(() => [])).filter((f) => pattern.test(f));
+    let files = (await readdir(evDir).catch(() => [])).filter((f) => pattern.test(f));
+    if (sinceMs !== undefined) {
+      const withMtime = await Promise.all(
+        files.map(async (f) => ({ f, m: (await stat(join(evDir, f)).catch(() => ({ mtimeMs: 0 }))).mtimeMs })),
+      );
+      files = withMtime.filter((x) => x.m >= sinceMs).map((x) => x.f);
+    }
     for (const f of files.sort()) {
       const p = join(evDir, f);
       const content = await readFile(p, 'utf8').catch(() => '');
@@ -301,7 +308,9 @@ export async function streamFiles(
   }
 }
 
-/** GET /stream — SSE-tail the run's event logs (the transcript route reuses streamFiles). */
+/** GET /stream — SSE-tail the CURRENT run's event log (files touched since connect,
+ *  with a small grace for a run that started just before): skips replaying the dir's
+ *  history, which would otherwise flood the UI and close it on an old run's stopReason. */
 export async function streamEvents(dir: string, res: ServerResponse, req: IncomingMessage) {
-  return streamFiles(dir, /^events-.*\.jsonl$/, res, req);
+  return streamFiles(dir, /^events-.*\.jsonl$/, res, req, Date.now() - 5000);
 }

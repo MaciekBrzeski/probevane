@@ -33,6 +33,8 @@ export interface LoopEvent {
   accepted?: boolean;
   /** Difficulty-gate proposal emitted when the loop stops circling (stopReason "difficulty"). */
   proposal?: string;
+  /** Advisory harvest note from an onStop rune (e.g. euphony score) — surfaced in the UI. */
+  note?: string;
 }
 
 /**

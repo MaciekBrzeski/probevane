@@ -50,6 +50,10 @@ export class RunCtx {
   /** Per-run recent tool-call signatures (repetition detection, P-later). */
   recentCalls: string[] = [];
 
+  /** Advisory notes pushed by onStop runes (e.g. euphony score) — the engine
+   *  flushes each as a `note` LoopEvent after harvest so the UI can surface them. */
+  notes: string[] = [];
+
   /** Wires the run identity only — every counter/flag starts at its field default. */
   constructor(workdir: string, adapter: StackAdapter, task: string) {
     this.workdir = workdir;

@@ -273,8 +273,15 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-signal-sub { font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin:4px 0 2px; }
 .chat-assume { margin:6px 0 0 4px; color:var(--warn); font-size:13px; }
 .chat-ctx { margin:6px 0 0 0; font-size:13px; }
-.chat-run-row { margin-top:8px; display:flex; align-items:center; gap:8px; }
+.chat-run-row { margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; }
+.chat-run-model { display:inline-flex; align-items:center; gap:6px; }
 .chat-model { min-width:88px; }
+.chat-gates { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); }
+.chat-gate { display:inline-flex; align-items:center; gap:3px; cursor:pointer; }
+.chat-gate input { accent-color:var(--acc); cursor:pointer; }
+/* advisory harvest notes (euphony score, etc.) surfaced from `note` events */
+.chat-notes { margin-top:6px; display:flex; flex-direction:column; gap:3px; }
+.chat-note { font-family:var(--num); font-size:12.5px; color:var(--mag); border-left:2px solid var(--mag); padding:2px 8px; background:rgba(199,146,234,.08); border-radius:3px; }
 .chat-run-btn:disabled, #chat-send:disabled { opacity:.4; cursor:not-allowed; }
 
 .chat-stream { max-height:22vh; overflow-y:auto; white-space:pre-wrap; font-size:12px; margin:4px 0 0; }
@@ -1103,11 +1110,20 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       b.disabled = on;
     });
   }
+  var GATES = [
+    { flag: "--euphony", label: "euphony", title: "advisory: nudge + score function-name rhyme/meter" },
+    { flag: "--quality", label: "quality", title: "block finishing if the edited source regresses in quality" },
+    { flag: "--mutation", label: "mutation", title: "require the new tests to catch mutants (slow)" },
+    { flag: "--flake-guard", label: "flake", title: "run the new specs several times; reject nondeterminism" }
+  ];
   function runRow(dir, op, baseFlags, label) {
     const modelSel = /* @__PURE__ */ h("select", { class: "chat-model" }, MODELS.map((m) => /* @__PURE__ */ h("option", { value: m }, m)));
-    return /* @__PURE__ */ h("div", { class: "chat-run-row" }, "model ", modelSel, /* @__PURE__ */ h("button", { class: "act chat-run-btn", onClick: () => {
+    const gateBoxes = GATES.map((g) => /* @__PURE__ */ h("input", { type: "checkbox", value: g.flag }));
+    const toggles = GATES.map((g, i) => /* @__PURE__ */ h("label", { class: "chat-gate", title: g.title }, gateBoxes[i], " ", g.label));
+    return /* @__PURE__ */ h("div", { class: "chat-run-row" }, /* @__PURE__ */ h("span", { class: "chat-run-model" }, "model ", modelSel), /* @__PURE__ */ h("span", { class: "chat-gates" }, "gates ", toggles), /* @__PURE__ */ h("button", { class: "act chat-run-btn", onClick: () => {
       if (running) return;
-      void runLaunch(dir, op, withModel(baseFlags, modelSel.value), label);
+      const gateFlags = gateBoxes.filter((b) => b.checked).map((b) => b.value);
+      void runLaunch(dir, op, [...withModel(baseFlags, modelSel.value), ...gateFlags], label);
     } }, "run \u25B6"));
   }
   function withModel(flags, model) {
@@ -1192,8 +1208,9 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     convo("assistant", "asst", /* @__PURE__ */ h("span", null, "running ", /* @__PURE__ */ h("b", null, op), " with model ", /* @__PURE__ */ h("b", null, model), "\u2026"));
     const pipe = /* @__PURE__ */ h("div", { class: "chat-pipeline" });
     const status = /* @__PURE__ */ h("div", { class: "chat-status" }, statusLine({}));
+    const notes = /* @__PURE__ */ h("div", { class: "chat-notes" });
     setTools(
-      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "pipeline \xB7 ", profileFor(op), " ", pipelineLegend()), pipe, status)
+      /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("div", { class: "chat-signal-sub" }, "pipeline \xB7 ", profileFor(op), " ", pipelineLegend()), pipe, status, notes)
     );
     const runes = await pipelineRunes(op);
     let state = {};
@@ -1208,6 +1225,10 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     }
     streamRun(dir, {
       onEvent: (e) => {
+        if (e.note) {
+          notes.appendChild(/* @__PURE__ */ h("div", { class: "chat-note" }, e.note));
+          return;
+        }
         state = pipelineReducer(state, e, runes.map((x) => x.name));
         renderPipeline(pipe, runes, state);
         status.replaceChildren(statusLine(e));
