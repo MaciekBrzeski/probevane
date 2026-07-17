@@ -51,15 +51,19 @@ const SCHEMA: Record<Exclude<keyof ProbevaneConfig, 'arch'>, 'string' | 'number'
 const isStringArray = (v: unknown): boolean => Array.isArray(v) && v.every((s) => typeof s === 'string');
 
 /** Validate the nested `arch` block: glue/shared/feature string[] + maxFiles number. */
+/** Validate one `arch.<key>` entry; returns an error message or null. */
+function checkArchKey(key: string, val: unknown): string | null {
+  if (key === 'maxFiles') return typeof val === 'number' ? null : '"arch.maxFiles" must be number';
+  if (key !== 'glue' && key !== 'shared' && key !== 'feature') return `unknown key "arch.${key}"`;
+  return isStringArray(val) ? null : `"arch.${key}" must be string[]`;
+}
+
+/** Validate the `arch` config block (object of glue/shared/feature/maxFiles); error or null. */
 function checkArch(v: unknown): string | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return '"arch" must be an object ({ glue?, shared?, feature?, maxFiles? })';
   for (const [k, val] of Object.entries(v)) {
-    if (k === 'maxFiles') {
-      if (typeof val !== 'number') return '"arch.maxFiles" must be number';
-      continue;
-    }
-    if (k !== 'glue' && k !== 'shared' && k !== 'feature') return `unknown key "arch.${k}"`;
-    if (!isStringArray(val)) return `"arch.${k}" must be string[]`;
+    const err = checkArchKey(k, val);
+    if (err) return err;
   }
   return null;
 }
