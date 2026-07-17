@@ -55,24 +55,32 @@ function prefixClusters(basenames: string[]): PrefixCluster[] {
  *  precedence), index.* (a dir's public base is wired from outside by design),
  *  and ≥3 files all pulled toward the SAME dir (registry pattern — sibling
  *  plugins each imported once by an external orchestrator, e.g. runes/). */
+/** A zero-cohesion member pulled by exactly one OUTSIDE dir → its move suggestion;
+ *  null if it uses/serves a sibling (cohesive), is shared, unused, or an index file. */
+function misplaceOf(
+  path: string, members: Set<string>, clustered: Set<string>, graph: ModuleGraph,
+): MisplacedFile | null {
+  const base = baseOf(path);
+  if (clustered.has(base) || /^index\./.test(base)) return null;
+  if (graph.nodes.get(path)!.imports.some((i) => members.has(i))) return null; // uses a sibling → cohesive
+  const pulls = new Map<string, number>();
+  for (const other of graph.nodes.values()) {
+    if (!other.imports.includes(path)) continue;
+    if (members.has(other.path)) return null; // a sibling imports it → cohesive
+    pulls.set(dirOf(other.path), (pulls.get(dirOf(other.path)) ?? 0) + 1);
+  }
+  if (pulls.size !== 1) return null; // shared or unused
+  const [suggest, count] = [...pulls.entries()][0];
+  return { file: base, suggest, pulls: count };
+}
+
+/** Zero-cohesion files in a dir that a single other dir pulls (move candidates),
+ *  suppressing suggestions that would over-fill any one target (<3). */
 function misplacedFiles(members: Set<string>, clustered: Set<string>, graph: ModuleGraph): MisplacedFile[] {
   const out: MisplacedFile[] = [];
   for (const path of members) {
-    const base = baseOf(path);
-    if (clustered.has(base) || /^index\./.test(base)) continue;
-    const n = graph.nodes.get(path)!;
-    if (n.imports.some((i) => members.has(i))) continue; // uses a sibling → cohesive
-    const pulls = new Map<string, number>();
-    let siblingImporter = false;
-    for (const other of graph.nodes.values()) {
-      if (!other.imports.includes(path)) continue;
-      if (members.has(other.path)) { siblingImporter = true; break; }
-      const d = dirOf(other.path);
-      pulls.set(d, (pulls.get(d) ?? 0) + 1);
-    }
-    if (siblingImporter || pulls.size !== 1) continue; // cohesive, shared, or unused
-    const [suggest, count] = [...pulls.entries()][0];
-    out.push({ file: base, suggest, pulls: count });
+    const m = misplaceOf(path, members, clustered, graph);
+    if (m) out.push(m);
   }
   const bySuggest = new Map<string, number>();
   for (const m of out) bySuggest.set(m.suggest, (bySuggest.get(m.suggest) ?? 0) + 1);
