@@ -144,3 +144,14 @@ curl -s -X POST http://localhost:7766/run -H 'content-type: application/json' \
 or `./bin/probevane <command> <dir> [flags]` (see the generated `probevane` skill).
 Prefer the GUI for everything it can drive; drop to CLI for the rest, then verify
 the outcome back in the tab via ⟲ HISTORY.
+
+## Validated
+
+Dogfooded end-to-end, zero CLI fallback: opened the Assistant tab → set
+`fixtures/node-calc` → NL task → SEND ($0 `feature` plan) → picked
+`ollama:qwen3.5:397b` + checked the **euphony** toggle → RUN → watched the live
+pipeline + streaming transcript (TDD red→green; the model even recovered from
+hallucinating a `run_shell` tool) → §4 verified ACCEPTED: all runes `s-ok`,
+`accepted — all gates green`, and the `♪ euphony 20/100` note rendered. Ledger:
+`feature:node-calc qwen3.5:397b accepted 10`. The single-package target + a
+capable model gave the reliable accept the Gotchas prescribe.
