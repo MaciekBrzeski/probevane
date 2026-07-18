@@ -15,7 +15,7 @@ interface ProjectInfo {
 
 // Read what the app already is (React major, bundler, dev command/port) so the
 // install matches it instead of assuming Vite defaults.
-function inspect(pkg: any): ProjectInfo {
+export function inspect(pkg: any): ProjectInfo {
   const all = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;
   const reactMajor = majorOf(all.react) ?? 18;
   const scripts = pkg.scripts ?? {};
@@ -28,14 +28,14 @@ function inspect(pkg: any): ProjectInfo {
 }
 
 // Major version out of a semver range ("^18.2.0" -> 18).
-function majorOf(range?: string): number | null {
+export function majorOf(range?: string): number | null {
   if (!range) return null;
   const m = range.match(/(\d+)/);
   return m ? parseInt(m[1], 10) : null;
 }
 
 // React-version-matched testing-library + user-event (don't force a React upgrade).
-function unitDeps(reactMajor: number): string[] {
+export function unitDeps(reactMajor: number): string[] {
   const base = ['vitest@^2.1.0', '@vitest/coverage-v8@^2.1.0', '@testing-library/jest-dom@^6.4.0', 'jsdom@^25.0.0', 'msw@^2.4.0', 'vite-tsconfig-paths@^5.0.0', '@vitejs/plugin-react@^4.3.0'];
   if (reactMajor >= 18) return [...base, '@testing-library/react@^16.0.0', '@testing-library/user-event@^14.5.0'];
   if (reactMajor === 17) return [...base, '@testing-library/react@^12.1.5', '@testing-library/user-event@^14.5.0'];
