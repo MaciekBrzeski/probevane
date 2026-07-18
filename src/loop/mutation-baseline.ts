@@ -43,13 +43,15 @@ function baselinePath(dir: string): string {
   return join(dir, BASELINE_FILE);
 }
 
-/** Floors are rounded DOWN to 0.1 bands. The site list is budget-sampled, so it
- *  drifts as code is added/removed and per-dir scores wobble by a few percent
- *  between commits; a 0.1 band absorbs that noise while still catching a real
- *  regression (a directory dropping a whole band). Gradual drift within a band is
- *  tracked by the improvement-log time-series, not this gate. */
+/** Floors are rounded DOWN to 0.1 bands and CAPPED at 0.9. The site list is
+ *  budget-sampled, so it drifts as code is added/removed and per-dir scores wobble
+ *  a few percent between commits; a 0.1 band absorbs that noise while still catching
+ *  a real regression (a directory dropping a whole band). The 0.9 cap means a
+ *  perfectly-killed dir never demands a brittle 1.0 (one survivor under a shifted
+ *  sample would trip it) — the 90↔100 gap is within sampling noise. Gradual
+ *  within-band drift is tracked by the improvement-log time-series, not this gate. */
 export function floorBand(score: number): number {
-  return Math.floor(score * 10) / 10;
+  return Math.min(0.9, Math.floor(score * 10) / 10);
 }
 
 /** Record the run's per-dir scores (rounded to 0.1 bands) as the accepted floors.

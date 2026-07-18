@@ -29,13 +29,13 @@ describe('mutation ratchet — write/read/check', () => {
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pv-mut-base-')); });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('writes per-dir floors (rounded down to 0.1 bands) and reads them back', () => {
+  it('writes per-dir floors (0.1 bands, capped at 0.9) and reads them back', () => {
     const n = writeMutationBaseline(dir, run({ 'src/loop/a.ts': { total: 4, killed: 3 }, 'src/ui/x.ts': { total: 2, killed: 2 } }));
     expect(n).toBe(2);
     const base = readMutationBaseline(dir);
-    expect(base).toEqual({ loop: 0.7, ui: 1 }); // 0.75 → band 0.7
+    expect(base).toEqual({ loop: 0.7, ui: 0.9 }); // 0.75 → band 0.7; 1.0 → capped 0.9
     // persisted as JSON on disk
-    expect(JSON.parse(readFileSync(join(dir, '.probevane', 'mutation-baseline.json'), 'utf8'))).toEqual({ loop: 0.7, ui: 1 });
+    expect(JSON.parse(readFileSync(join(dir, '.probevane', 'mutation-baseline.json'), 'utf8'))).toEqual({ loop: 0.7, ui: 0.9 });
   });
 
   it('flags a dir that dropped a full band, passes noise within the band', () => {
