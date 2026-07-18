@@ -638,3 +638,4 @@ timestamp,target,kind,pass,audit_score,tests,coverage,flake,library_good,library
 2026-07-16T15:10:28.252Z,py-calc,feature,1,5,6,100,0,,,path-replay,,,11343,641
 2026-07-16T15:10:28.252Z,py-calc,repair,1,5,5,100,0,,,path-replay,,,5869,346
 2026-07-18T15:39:17.794Z,self,mutation,,,,,,,,per-dir util:1.00 quality:0.72 audit:0.50 adapters:0.87 vane:1.00 mock:0.67 arch:0.83 cost:0.86 brain:0.00 commands:0.28 loop:0.79 review:1.00 observe:0.71 server:0.79 visual:0.67 library:0.67 spec-run:1.00 mfe:1.00 factory:1.00 planner:0.00 tui:0.91 ui:0.20 engine:0.30,0.6560,,,
+2026-07-18T16:25:54.900Z,self,mutation,,,,,,,,per-dir util:0.90 quality:0.76 audit:0.75 adapters:0.73 vane:1.00 mock:0.90 arch:0.67 cost:0.75 brain:0.00 commands:0.21 loop:0.73 review:1.00 observe:0.71 server:0.77 visual:1.00 distill:1.00 library:1.00 spec-run:0.40 mfe:1.00 planner:1.00 tui:0.59 ui:0.22 engine:0.27,0.6200,,,
