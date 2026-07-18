@@ -34,6 +34,7 @@ You point probevane at a project. An **adapter** detects the stack (React first)
 - [Brains](Brains.md) — the LLM driver
 - [Audit & Library](Audit-and-Library.md) — quality gate + few-shot flywheel
 - [Eval & Fixtures](Eval-and-Fixtures.md) — how the harness tests itself
+- [Test Effectiveness](Test-Effectiveness.md) — mutation gate, per-dir ratchet, cross-project research
 - [CLI](CLI.md) — commands
 - [Decisions (ADR)](Decisions.md) — why we chose what we chose
 - [Phase Log](Phase-Log.md) — what shipped, phase by phase
