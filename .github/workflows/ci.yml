@@ -49,8 +49,14 @@ jobs:
         run: node scripts/build-ui.mjs --check
       - name: source-quality gate (dogfood — probevane grades its own source)
         run: ./bin/probevane quality . --strict
-      - name: mutation gate (dogfood — do the tests actually catch bugs?)
-        run: ./bin/probevane mutation . --budget 60 --min-score 0.6
+      # Per-dir ratchet: fails only when a directory regresses below its recorded
+      # 0.1-band floor (.probevane/mutation-baseline.json) — a localized, can-only-
+      # improve gate. --min-score 0.5 is a global catastrophe backstop. The --budget
+      # MUST match the budget the committed baseline was seeded with, so the
+      # deterministic even-stride sample aligns (re-seed with --write-baseline if you
+      # change it). Cost: reruns the full suite per mutant (~min per 10 mutants).
+      - name: mutation ratchet (dogfood — do the tests actually catch bugs, per dir?)
+        run: ./bin/probevane mutation . --budget 250 --ratchet --min-score 0.5
       - name: quality SARIF → code scanning (inline annotations)
         if: always()
         run: ./bin/probevane quality . --sarif > quality.sarif || true

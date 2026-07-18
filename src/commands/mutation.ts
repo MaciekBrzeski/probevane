@@ -2,6 +2,8 @@ import { join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { selectAdapterOrThrow } from '../adapters/registry.js';
 import { runMutation, type MutationRun } from '../loop/mutation.js';
+import { byDir, writeMutationBaseline, readMutationBaseline, checkRatchet, type DirScore } from '../loop/mutation-baseline.js';
+import { appendLog } from '../library/improvement-log.js';
 import type { CommandCtx } from '../vane/run-command.js';
 
 /** The compact mutation summary the Checks tab reads (.probevane/mutation-report.json).
@@ -14,6 +16,7 @@ export interface MutationArtifact {
   total: number;
   sampled: boolean;
   at: string; // ISO timestamp
+  byDir: Record<string, DirScore>; // per-top-dir tallies — feeds the ratchet + Checks tab
 }
 
 /** Persist the compact summary for the Checks tab. Best-effort — a write failure
@@ -21,7 +24,7 @@ export interface MutationArtifact {
 async function writeArtifact(dir: string, r: MutationRun): Promise<void> {
   const artifact: MutationArtifact = {
     score: r.score, killed: r.killed, survived: r.survived, total: r.total,
-    sampled: r.sampled, at: new Date().toISOString(),
+    sampled: r.sampled, at: new Date().toISOString(), byDir: byDir(r),
   };
   try {
     await mkdir(join(dir, '.probevane'), { recursive: true });
@@ -73,6 +76,36 @@ export async function run(ctx: CommandCtx): Promise<void> {
   await writeArtifact(ctx.dir, r);
   if (ctx.flags.json === true) console.log(JSON.stringify(r, null, 2));
   else report(r);
+
+  // Append-only time-series of the score (fourier-nca discipline). Logged before
+  // any gate exits so a failing run still records its number. The runner commits
+  // the file — CI/loop drives the trend.
+  const logPath = ctx.flags.log as string | undefined;
+  if (logPath) {
+    const dirs = Object.entries(byDir(r)).map(([d, s]) => `${d}:${s.score.toFixed(2)}`).join(' ');
+    await appendLog(logPath, {
+      timestamp: new Date().toISOString(), target: 'self', kind: 'mutation',
+      mutation: r.score.toFixed(4), note: `per-dir ${dirs}`,
+    });
+    console.error(`[probevane] mutation: logged score to ${logPath}`);
+  }
+
+  if (ctx.flags['write-baseline'] === true) {
+    const n = writeMutationBaseline(ctx.dir, r);
+    console.error(`[probevane] mutation: wrote ${n} per-dir floor(s) to .probevane/mutation-baseline.json`);
+    return; // recording the baseline is not also a gate
+  }
+
+  if (ctx.flags.ratchet === true) {
+    const regressions = checkRatchet(r, readMutationBaseline(ctx.dir));
+    if (regressions.length) {
+      console.error(`[probevane] mutation: ${regressions.length} dir(s) regressed below baseline:`);
+      for (const g of regressions)
+        console.error(`  ${g.dir}/  ${(g.actual * 100).toFixed(0)}% < floor ${(g.floor * 100).toFixed(0)}%`);
+      process.exit(1);
+    }
+    console.error('[probevane] mutation: ratchet ok — no dir below its floor');
+  }
 
   const min = ctx.flags['min-score'] as number | undefined;
   if (min !== undefined && r.score < min) {

@@ -20,7 +20,7 @@ The CLI is `./bin/probevane <command> <dir> [flags]`. Loop commands need `ANTHRO
 | `review` | Read-only quality grade (0–100) of a suite: green, coverage, audit, flake. |
 | `a11y` | Static accessibility audit of components (missing alt/name/label, click-no-role, positive tabindex) → grade. |
 | `bench` | Measure a suite: coverage, audit, and mutation score (does it catch bugs?). |
-| `mutation` | Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --budget caps mutants (sampled evenly); string/comment literals skipped. |
+| `mutation` | Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --ratchet exits 1 when any dir regresses below its recorded floor (--write-baseline records them); --budget caps mutants (sampled evenly); string/comment literals skipped. |
 | `ci` | PR helper: report changed-untested files + coverage; --generate adds tests; --review-fix reviews the diff (gated) and auto-fixes. |
 | `mock` | Synthesize the mock boundary (MSW handlers, fixtures, contracts) from the module graph. |
 | `graph` | Render the module dependency graph (ASCII tree + Mermaid). |
@@ -180,11 +180,11 @@ probevane bench <dir> [--mutants N]
 ```
 
 ### mutation
-Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --budget caps mutants (sampled evenly); string/comment literals skipped.
+Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --ratchet exits 1 when any dir regresses below its recorded floor (--write-baseline records them); --budget caps mutants (sampled evenly); string/comment literals skipped.
 
 ```bash
-probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--all] [--json]
-# e.g. probevane mutation . --budget 60 --min-score 0.6
+probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--ratchet] [--write-baseline] [--all] [--json]
+# e.g. probevane mutation . --budget 250 --ratchet
 ```
 
 ### ci

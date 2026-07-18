@@ -30,6 +30,7 @@ fixtures/**/cover.out
 !/.probevane/
 /.probevane/*
 !/.probevane/quality-baseline.json
+!/.probevane/mutation-baseline.json
 SPEC.md
 .probevane-live/
 test-results/

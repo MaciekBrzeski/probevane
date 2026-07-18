@@ -87,13 +87,16 @@ command bench
   handler bench#run
 
 command mutation
-  summary Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --budget caps mutants (sampled evenly); string/comment literals skipped.
-  usage probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--all] [--json]
-  example probevane mutation . --budget 60 --min-score 0.6
+  summary Full per-site mutation test — flips operators (===/!==/>=/<=/&&/true/+) one at a time, reruns the suite, reports killed vs SURVIVED (mutants the tests miss = coverage that does not catch bugs) with per-file scores + the exact surviving sites. --min-score P exits 1 below (CI gate); --ratchet exits 1 when any dir regresses below its recorded floor (--write-baseline records them); --budget caps mutants (sampled evenly); string/comment literals skipped.
+  usage probevane mutation <dir> [--budget N] [--only a,b] [--min-score P] [--ratchet] [--write-baseline] [--all] [--json]
+  example probevane mutation . --budget 250 --ratchet
   dir
   flag --budget int = 50 "max mutants to run (sampled evenly across sites)"
   flag --only str "comma-separated file list to mutate"
   flag --min-score num "exit 1 when the score falls below (CI gate)"
+  flag --ratchet bool "exit 1 when any dir regresses below its .probevane/mutation-baseline.json floor"
+  flag --write-baseline bool "record current per-dir scores as the ratchet floors"
+  flag --log str "append the score as a row to this improvement-log CSV (append-only time-series)"
   flag --all bool "include glue files normally skipped"
   flag --json bool "machine output"
   handler mutation#run
