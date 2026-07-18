@@ -34,7 +34,9 @@ describe('buildPlan', () => {
     });
     expect(plan.items.map((i) => i.action)).toEqual(['mfe-fix', 'refactor', 'generate', 'generate']);
     expect(plan.items[0].action).toBe('mfe-fix');
-    expect(plan.summary).toContain('2 generate');
+    // exact per-action counts — asymmetric so a flipped === in byAction is caught
+    // (0 fix / 1 refactor / 1 mfe-fix all differ from their !== complements)
+    expect(plan.summary).toBe('4 action(s): 2 generate, 1 refactor, 0 fix, 1 mfe-fix');
   });
 
   it('dedups the same action+target', () => {

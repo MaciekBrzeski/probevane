@@ -219,6 +219,10 @@ describe('pyramid.pyramidReport', () => {
     expect(d).toContain('[feature→feature] a → b (1)');
     expect(d).toContain('fix: route through glue');
     expect(d).toContain(`Pyramid score: ${r.score}/100`);
+    // the isolation section lists FEATURE dirs only — a flipped role filter would
+    // list glue/shared there instead
+    expect(d).toMatch(/\ba\/\s+\d+% isolated/);
+    expect(d).not.toMatch(/\bcli\/\s+\d+% isolated/);
   });
   it('digest says so when the structure already fits', () => {
     const clean = pyramidReport(graph([{ path: 'src/a/x.ts', kind: 'util', imports: [] }]));
@@ -298,5 +302,17 @@ describe('crowding.crowdingReport', () => {
     ]);
     const d = crowdingDigest(crowdingReport(flat, 2), 2);
     expect(d).toContain('no mechanical split found — needs a judgement call');
+  });
+
+  it('does NOT claim "no mechanical split" when a cluster IS found (misplaced empty)', () => {
+    // clusters present, misplaced empty → the guard must stay AND, not OR
+    const clustered = graph([
+      { path: 'src/big/run-a.ts', kind: 'util', imports: ['src/big/run-b.ts'] },
+      { path: 'src/big/run-b.ts', kind: 'util', imports: [] },
+      { path: 'src/big/run-c.ts', kind: 'util', imports: ['src/big/run-a.ts'] },
+    ]);
+    const d = crowdingDigest(crowdingReport(clustered, 2), 2);
+    expect(d).toContain('subfolder candidate src/big/run/');
+    expect(d).not.toContain('no mechanical split found');
   });
 });
