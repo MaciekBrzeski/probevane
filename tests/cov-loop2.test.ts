@@ -39,7 +39,7 @@ import {
   type LoopRun,
   type LoopState,
 } from '../src/loop/engine/phases.js';
-import { lineOf, mutationScore, survivingMutants, mutantDigest, MUTATIONS } from '../src/loop/mutation.js';
+import { lineOf, mutationScore, survivingMutants, mutantDigest, survivorSummary, MUTATIONS } from '../src/loop/mutation.js';
 import { buildDepDigest } from '../src/loop/dep-digest.js';
 import {
   docStructureGate,
@@ -484,6 +484,14 @@ describe('mutation — pure scoring & generation', () => {
     expect(r.total).toBeGreaterThan(0);
     expect(r.killed).toBe(r.total);
     expect(r.score).toBe(1);
+  });
+
+  it('survivorSummary names the top sites for a gate reason, capping the rest', () => {
+    const m = (sourcePath: string, line: number, mutation: string) => ({ sourcePath, line, mutation, snippet: '' });
+    expect(survivorSummary([])).toBe('');
+    expect(survivorSummary([m('a.ts', 1, '=== → !==')])).toBe('a.ts:1 `=== → !==`');
+    const four = survivorSummary([m('a.ts', 1, 'x'), m('b.ts', 2, 'y'), m('c.ts', 3, 'z'), m('d.ts', 4, 'w')]);
+    expect(four).toBe('a.ts:1 `x`, b.ts:2 `y`, c.ts:3 `z`, +1 more');
   });
 
   it('no applicable operators → total 0, score 1', async () => {

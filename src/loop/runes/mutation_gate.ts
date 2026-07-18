@@ -1,7 +1,8 @@
 import type { Rune, RuneDecision } from '../rune.js';
 import { ALLOW, block } from '../rune.js';
 import type { RunCtx } from '../ctx.js';
-import { mutationScore } from '../mutation.js';
+import { mutationScore, survivingMutants } from '../mutation.js';
+import { mutantDigest, survivorSummary } from '../mutants.js';
 
 // mutation_gate — does the suite actually CATCH bugs, or just run green? Mutate
 // a few operators in the source and require the suite to fail (kill the mutant).
@@ -38,9 +39,17 @@ export function mutationGate(opts: {
         return ALLOW;
       }
       if (total > 0 && score < minScore) {
+        // Name the concrete survivors so the block is actionable, and so the
+        // harvested caveat (caveat_harvest → caveats.md → context_inject) carries
+        // the WHERE, not just the score, into future runs. This re-mutates a few
+        // sites — only on the (rare) block path, where the loop is about to iterate
+        // anyway; the scoring path above stays untouched.
+        const survivors = await survivingMutants(ctx.workdir, ctx.adapter, opts.maxMutants ?? 5, 3);
+        const sites = survivorSummary(survivors);
+        const digest = mutantDigest(survivors);
         return block(
-          `mutation_gate: mutation score ${pct}% < ${Math.round(minScore * 100)}%`,
-          `The suite only caught ${killed}/${total} injected bugs (${pct}%). Add assertions that pin the actual computed values / branches so mutations are detected.`,
+          `mutation_gate: mutation score ${pct}% < ${Math.round(minScore * 100)}%${sites ? ` — survivors: ${sites}` : ''}`,
+          `The suite only caught ${killed}/${total} injected bugs (${pct}%). Add assertions that pin the actual computed values / branches so mutations are detected.${digest ? `\n\n${digest}` : ''}`,
         );
       }
       return ALLOW;
