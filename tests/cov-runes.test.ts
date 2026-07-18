@@ -158,6 +158,24 @@ describe('validationGate', () => {
     }
   });
 
+  it('a nonzero red suite is "not green", never mistaken for 0-collected', async () => {
+    // guards BOTH + sites on validation_gate:79 (passed+failed+skipped===0).
+    // With passed=0, failed=skipped=1 either flipped + gives 0 (0-1+1 or 0+1-1)
+    // while the true sum is 2 — so a flip wrongly routes to the 0-collected branch.
+    const a = fakeAdapter();
+    a._run = { passed: 0, failed: 1, skipped: 1, green: false, raw: '× a\n  AssertionError: nope' };
+    const rune = validationGate('unit');
+    const ctx = ctxWith(a);
+    await rune.prepare!(ctx);
+    ctx.editedFiles.add('src/widget.test.ts');
+    const d = await rune.shouldStop!(ctx);
+    expect(d.kind).toBe('block');
+    if (d.kind === 'block') {
+      expect(d.reason).toContain('unit tests not green'); // NOT the 0-collected diagnosis
+      expect(d.inject).toContain('failed=1');
+    }
+  });
+
   it('cognitive check: 0 tests collected → names it a discovery/config issue, not a red suite', async () => {
     const a = fakeAdapter();
     a._run = { passed: 0, failed: 0, skipped: 0, green: false, raw: 'no test files found' };
@@ -454,6 +472,28 @@ describe('redFirst', () => {
     expect((await rune.shouldStop!(ctx)).kind).toBe('allow');
     // source edits now unlocked
     expect((await rune.beforeToolCall!(call('edit_file', { path: 'src/widget.ts' }), ctx)).kind).toBe('allow');
+  });
+
+  it('afterToolCall confirms red when the spec is written via edit_file, not only write_file', async () => {
+    // guards red_first:37 — the write_file branch short-circuits the ||, so the
+    // edit_file === must be exercised on its own to catch a flip there.
+    const a = fakeAdapter();
+    a._run = { passed: 0, failed: 1, skipped: 0, green: false, raw: 'red' };
+    const rune = redFirst();
+    const ctx = ctxWith(a);
+    await rune.afterToolCall!(call('edit_file', { path: 'src/widget.test.ts' }), okResult, ctx);
+    expect((await rune.shouldStop!(ctx)).kind).toBe('allow'); // edit_file spec → red confirmed
+  });
+
+  it('afterToolCall does NOT confirm red when the edited file is not a spec (guards the && )', async () => {
+    // guards red_first:37 (&&): a red run + a write to a NON-spec source file must
+    // not flip redConfirmed — an && → || there would confirm on the write alone.
+    const a = fakeAdapter();
+    a._run = { passed: 0, failed: 1, skipped: 0, green: false, raw: 'red' };
+    const rune = redFirst();
+    const ctx = ctxWith(a);
+    await rune.afterToolCall!(call('write_file', { path: 'src/widget.ts' }), okResult, ctx); // not a spec
+    expect((await rune.shouldStop!(ctx)).kind).toBe('block'); // still not confirmed
   });
 
   it('afterToolCall does not confirm red on an error result, a green run, or a non-spec', async () => {
