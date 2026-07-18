@@ -26,6 +26,7 @@ export interface ProbevaneConfig {
   takeover?: string;
   budget?: number; // hard output-token ceiling per run
   arch?: ArchRoles; // declared pyramid-model roles for `arch --pyramid` (flags override)
+  oracles?: Record<string, OracleSpec>; // module → typed correctness contract (ADR-022)
 }
 
 /** Declared pyramid-model roles for `arch --pyramid` — authored in the target repo's config. */
@@ -36,12 +37,26 @@ export interface ArchRoles {
   maxFiles?: number; // crowding threshold: dirs with more direct files get split suggestions (default 15)
 }
 
+/** The typed acceptance-oracle kinds (ADR-022) — how a module's correctness is verified. */
+export const ORACLE_KINDS = ['golden', 'byte-stable', 'invariant', 'property'] as const;
+/** One acceptance-oracle kind (a member of ORACLE_KINDS); set per module in config/RunSpec. */
+export type OracleKind = (typeof ORACLE_KINDS)[number];
+
+/** A per-module correctness contract (ADR-022). Phase 0 declares + persists it;
+ *  enforcement (golden lock, invariant steering) lands in later phases. */
+export interface OracleSpec {
+  kind: OracleKind; // golden / byte-stable → locked artifact; invariant / property → asserted relation
+  desc: string; // the contract in words — feeds generation + the `spec` oracle report
+  golden?: string; // path to the locked golden artifact (golden / byte-stable); set on first green
+  blocking?: boolean; // true → regression-guards EVERY run (determinism / conservation oracles)
+}
+
 const NAMES = ['probevane.config.ts', 'probevane.config.js', 'probevane.config.mjs', 'probevane.config.json'];
 
 // The known config keys + their expected primitive type — drives validation so a
 // typo (`maxStep`) or wrong type (`minTests: "5"`) is a clear error, not silently
 // ignored. Keep in sync with ProbevaneConfig.
-const SCHEMA: Record<Exclude<keyof ProbevaneConfig, 'arch'>, 'string' | 'number' | 'boolean'> = {
+const SCHEMA: Record<Exclude<keyof ProbevaneConfig, 'arch' | 'oracles'>, 'string' | 'number' | 'boolean'> = {
   model: 'string', kind: 'string', minTests: 'number', minCoverage: 'number',
   maxTargets: 'number', maxSteps: 'number', mock: 'boolean', mutation: 'boolean',
   strict: 'boolean', flakeGuard: 'boolean', a11y: 'boolean', visual: 'boolean', quality: 'boolean',
@@ -68,10 +83,33 @@ function checkArch(v: unknown): string | null {
   return null;
 }
 
+/** Validate one OracleSpec (kind enum + desc + optional golden/blocking); error or null.
+ *  `label` prefixes the message so config and RunSpec callers get an accurate path. */
+export function oracleSpecError(v: unknown, label = 'oracle'): string | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return `"${label}" must be an object ({ kind, desc, golden?, blocking? })`;
+  const s = v as Record<string, unknown>;
+  if (!ORACLE_KINDS.includes(s.kind as OracleKind)) return `"${label}.kind" must be one of: ${ORACLE_KINDS.join(', ')}`;
+  if (typeof s.desc !== 'string' || !s.desc) return `"${label}.desc" must be a non-empty string`;
+  if (s.golden !== undefined && typeof s.golden !== 'string') return `"${label}.golden" must be a string`;
+  if (s.blocking !== undefined && typeof s.blocking !== 'boolean') return `"${label}.blocking" must be a boolean`;
+  return null;
+}
+
+/** Validate the `oracles` config block (module → OracleSpec); error or null. */
+function checkOracles(v: unknown): string | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return '"oracles" must be an object (module → { kind, desc, … })';
+  for (const [mod, spec] of Object.entries(v)) {
+    const err = oracleSpecError(spec, `oracles.${mod}`);
+    if (err) return err;
+  }
+  return null;
+}
+
 /** Validate a single config entry; returns an error string or null. */
 function checkEntry(k: string, v: unknown): string | null {
   if (k === 'arch') return checkArch(v);
-  const expected = SCHEMA[k as Exclude<keyof ProbevaneConfig, 'arch'>];
+  if (k === 'oracles') return checkOracles(v);
+  const expected = SCHEMA[k as Exclude<keyof ProbevaneConfig, 'arch' | 'oracles'>];
   if (!expected) return `unknown key "${k}"`;
   if (typeof v !== expected) return `"${k}" must be ${expected} (got ${typeof v})`;
   if (k === 'kind' && v !== 'unit' && v !== 'e2e') return `"kind" must be "unit" or "e2e"`;

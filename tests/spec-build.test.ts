@@ -79,6 +79,23 @@ describe('spec.buildSpec (deterministic, no narration)', () => {
     expect(spec).toContain('- `GET /api/items`');
   });
 
+  it('omits the oracles section when none are declared', () => {
+    expect(spec).not.toContain('## Acceptance oracles');
+  });
+
+  it('renders declared oracles from probevane.config as a table', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'pv-spec-ora-'));
+    mkdirSync(join(d, 'src'), { recursive: true });
+    writeFileSync(join(d, 'src', 'rng.ts'), 'export const next = (s: number) => s + 1;\n');
+    writeFileSync(join(d, 'probevane.config.json'), JSON.stringify({
+      oracles: { 'src/rng.ts': { kind: 'byte-stable', desc: 'seed → identical stream', blocking: true } },
+    }));
+    const s = await buildSpec({ dir: d, adapter, stamp: '2026-01-01' });
+    expect(s).toContain('## Acceptance oracles');
+    expect(s).toContain('| src/rng.ts | byte-stable | seed → identical stream | yes |');
+    rmSync(d, { recursive: true, force: true });
+  });
+
   it('a brain narrates modules as `path: sentence` lines woven into their sections', async () => {
     // Deterministic in-memory brain — no model, no network. Replies one line per
     // module plus noise lines that parseNarratives must ignore.

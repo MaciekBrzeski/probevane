@@ -26,6 +26,11 @@ describe('validateRunSpec', () => {
   it('rejects a non-object', () => {
     expect(validateRunSpec(null)).toEqual(['spec must be an object']);
   });
+  it('accepts a valid oracle, rejects a malformed one', () => {
+    expect(validateRunSpec(spec({ oracle: { kind: 'golden', desc: 'locked snapshot' } }))).toEqual([]);
+    const errs = validateRunSpec(spec({ oracle: { kind: 'nope', desc: 'x' } as never }));
+    expect(errs.some((e) => e.includes('oracle.kind'))).toBe(true);
+  });
 });
 
 describe('specToLaunchPlan', () => {

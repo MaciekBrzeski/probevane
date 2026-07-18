@@ -335,6 +335,16 @@ describe('config loadConfig / validateConfig / pick', () => {
     expect(validateConfig({ arch: { feature: [null] } })).toEqual(['"arch.feature" must be string[]']);
   });
 
+  it('validateConfig accepts the oracles block, rejects malformed oracle specs', () => {
+    expect(validateConfig({ oracles: { 'src/rng.ts': { kind: 'byte-stable', desc: 'seed → identical stream' } } })).toEqual([]);
+    expect(validateConfig({ oracles: { 'src/eco.ts': { kind: 'invariant', desc: 'mass conserved', blocking: true } } })).toEqual([]);
+    expect(validateConfig({ oracles: 'x' })).toEqual(['"oracles" must be an object (module → { kind, desc, … })']);
+    expect(validateConfig({ oracles: { m: { kind: 'nope', desc: 'x' } } })).toEqual(['"oracles.m.kind" must be one of: golden, byte-stable, invariant, property']);
+    expect(validateConfig({ oracles: { m: { kind: 'golden' } } })).toEqual(['"oracles.m.desc" must be a non-empty string']);
+    expect(validateConfig({ oracles: { m: { kind: 'golden', desc: 'x', golden: 7 } } })).toEqual(['"oracles.m.golden" must be a string']);
+    expect(validateConfig({ oracles: { m: { kind: 'golden', desc: 'x', blocking: 'y' } } })).toEqual(['"oracles.m.blocking" must be a boolean']);
+  });
+
   it('pick returns the first defined value, else undefined', () => {
     expect(pick(undefined, 2, 3)).toBe(2);
     expect(pick('a')).toBe('a');

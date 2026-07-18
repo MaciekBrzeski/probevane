@@ -1,6 +1,7 @@
 import { writeFile, readFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { statePath } from '../util/state.js';
+import { oracleSpecError, type OracleSpec } from '../util/config.js';
 import { LAUNCH_OPS, type LaunchPlan } from '../observe/launch.js';
 
 // RunSpec — the first-class, persisted specification a dark-factory run executes.
@@ -51,6 +52,7 @@ export interface RunSpec {
   worktree?: boolean;
   ship?: boolean;
   decompose?: { perFile: boolean };
+  oracle?: OracleSpec; // typed correctness contract for this target (ADR-022, Phase 0: declared + persisted)
 }
 
 // Optional scalar fields + their expected type (only checked when present).
@@ -71,6 +73,7 @@ export function validateRunSpec(spec: unknown): string[] {
   req(s.kind === 'unit' || s.kind === 'e2e', '"kind" must be "unit" or "e2e"');
   req(typeof s.acceptance === 'object' && s.acceptance !== null, '"acceptance" must be an object');
   for (const [k, want] of OPTIONAL_TYPES) req(s[k] === undefined || typeof s[k] === want, `"${k}" must be ${want}`);
+  if (s.oracle !== undefined) { const e = oracleSpecError(s.oracle); if (e) errs.push(e); }
   return errs;
 }
 
