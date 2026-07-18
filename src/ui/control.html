@@ -74,7 +74,6 @@ table { width:100%; border-collapse:collapse; }
 td, th { text-align:left; padding:14px 16px; border-bottom:1px solid var(--line); vertical-align:middle; color:var(--fg); }
 td { font-family:var(--num); font-size:13.5px; }
 th { color:var(--acc); font-weight:700; text-transform:uppercase; letter-spacing:0.14em; font-size:0.8rem; border-bottom:2px solid var(--line); }
-.text-right { text-align: right; }
 tr.clickable { cursor:pointer; }
 tr.clickable:hover td { background:rgba(79,214,255,.06); }
 
@@ -127,23 +126,6 @@ details.ok summary { color:var(--ok); }
 .panel a { color: var(--fg); text-decoration: none; }
 .panel a:hover { color: var(--acc); }
 .panel ul ul { padding-left: 1.5rem; }
-
-/* Empty State Centering */
-.empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-height: 300px;
-    color: var(--dim);
-    text-align: center;
-    border: none;
-    background: transparent;
-    font-style: italic;
-    opacity: 1;
-}
-.empty-state h3 { font-size: 16px; color: var(--fg); margin-bottom: 8px; font-style: normal; opacity: 1; }
 
 /* --- Console (LCARS): frames, gauges, sparks, node graphs ------------------ */
 /* Panes are absolutely positioned from the shared CONSOLE_PANES manifest
@@ -288,7 +270,6 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-cancel:hover { background:rgba(210,153,34,.12); }
 .chat-cancel:disabled { opacity:.4; cursor:not-allowed; }
 
-.chat-stream { max-height:22vh; overflow-y:auto; white-space:pre-wrap; font-size:12px; margin:4px 0 0; }
 .chat-live { display:flex; align-items:center; font-size:12px; color:var(--warn); }
 .chat-live.chat-live-off { color:var(--ok); }
 .chat-live.chat-live-off .chat-live-dot { animation:none; background:var(--ok); }
