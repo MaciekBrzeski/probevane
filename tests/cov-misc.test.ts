@@ -342,6 +342,8 @@ describe('config loadConfig / validateConfig / pick', () => {
     expect(validateConfig({ oracles: { m: { kind: 'nope', desc: 'x' } } })).toEqual(['"oracles.m.kind" must be one of: golden, byte-stable, invariant, property']);
     expect(validateConfig({ oracles: { m: { kind: 'golden' } } })).toEqual(['"oracles.m.desc" must be a non-empty string']);
     expect(validateConfig({ oracles: { m: { kind: 'golden', desc: 'x', golden: 7 } } })).toEqual(['"oracles.m.golden" must be a string']);
+    expect(validateConfig({ oracles: { m: { kind: 'golden', desc: 'x', producer: 5 } } })).toEqual(['"oracles.m.producer" must be a string']);
+    expect(validateConfig({ oracles: { m: { kind: 'golden', desc: 'x', producer: 'npm run ca:snapshot' } } })).toEqual([]);
     expect(validateConfig({ oracles: { m: { kind: 'golden', desc: 'x', blocking: 'y' } } })).toEqual(['"oracles.m.blocking" must be a boolean']);
   });
 

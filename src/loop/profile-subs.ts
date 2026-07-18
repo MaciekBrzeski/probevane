@@ -3,7 +3,7 @@ import type { TestKind, RunScope } from '../adapters/adapter.js';
 import type { AcceptanceOpts } from './runes/index.js';
 import {
   contextInject, pathGuard, planFirst, noRegression, validationGate, auditGate,
-  acceptanceGate, hermeticGate, mutationGate, a11yGate, visualGate, flakeGate,
+  acceptanceGate, oracleGate, hermeticGate, mutationGate, a11yGate, visualGate, flakeGate,
   redFirst, qualityGate, mfeGate, assertionGate, structureGate, euphonyGate,
   sessionDiary, caveatHarvest, distillTrace, libraryPromote,
 } from './runes/index.js';
@@ -43,6 +43,7 @@ export function greenGates(scope: RunScope, o: { fullSuite?: boolean; acceptance
     auditGate,
     hermeticGate,
     ...(o.acceptance ? [acceptanceGate(o.acceptance)] : []),
+    oracleGate(), // ADR-022 Phase 1 — self-configuring from the target's config.oracles (no-op when none)
   ];
 }
 

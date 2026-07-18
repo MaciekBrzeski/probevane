@@ -3,6 +3,7 @@ import type { RunCtx } from '../ctx.js';
 import { loadPrompt } from '../../library/prompt.js';
 import { retrieveFewShot } from '../../library/retrieve.js';
 import { recentCaveats } from '../../library/caveats.js';
+import { loadConfig, type OracleSpec, type ProbevaneConfig } from '../../util/config.js';
 
 // context_inject — RAG/few-shot. Ported from runestone's context_inject rune.
 // prepare() assembles, once per run: the quality rules + the kind-specific
@@ -20,6 +21,16 @@ export function contextInject(kind: 'unit' | 'e2e'): Rune {
 
       const patterns = await ctx.adapter.patternsDoc(kind);
       if (patterns) parts.push(patterns);
+
+      // Typed acceptance oracles (ADR-022): steer generation toward the declared
+      // per-module correctness contracts (enforced separately by oracle_gate).
+      const cfg = await loadConfig(ctx.workdir).catch((): ProbevaneConfig => ({}));
+      const oracles: Record<string, OracleSpec> = cfg.oracles ?? {};
+      const oracleRows = Object.entries(oracles);
+      if (oracleRows.length) {
+        const rows = oracleRows.map(([mod, o]) => `- ${mod} [${o.kind}]: ${o.desc}`).join('\n');
+        parts.push(`ACCEPTANCE ORACLES — the code must satisfy these declared contracts:\n${rows}`);
+      }
 
       // Deterministic mode (record/replay eval): skip mutable cross-run state
       // (caveats + learning-library few-shot) so the prompt — and thus the

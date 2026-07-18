@@ -754,3 +754,47 @@ describe('rune-stamped block decisions', () => {
     expect(d.kind).toBe('block');
   });
 });
+
+// ─── oracle_gate (ADR-022 Phase 1) ───────────────────────────────────────────
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { oracleGate } from '../src/loop/runes/oracle_gate.js';
+
+describe('oracleGate', () => {
+  const withOracles = (oracles: unknown): string => {
+    const d = mkdtempSync(join(tmpdir(), 'pv-oracle-gate-'));
+    writeFileSync(join(d, 'probevane.config.json'), JSON.stringify({ oracles }));
+    return d;
+  };
+  const ctxAt = (d: string): RunCtx => new RunCtx(d, fakeAdapter(), 'build the CA');
+
+  it('ALLOWs when no oracles are declared', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'pv-oracle-none-'));
+    expect((await oracleGate().shouldStop!(ctxAt(d))).kind).toBe('allow');
+  });
+
+  it('golden oracle: first run locks, second run matches (both allow)', async () => {
+    const d = withOracles({ k: { kind: 'golden', desc: 'locked out', producer: 'printf abc' } });
+    expect((await oracleGate().shouldStop!(ctxAt(d))).kind).toBe('allow'); // first green → lock
+    expect((await oracleGate().shouldStop!(ctxAt(d))).kind).toBe('allow'); // match
+  });
+
+  it('golden oracle: drift blocks with a diff', async () => {
+    const d = withOracles({ k: { kind: 'golden', desc: 'locked out', producer: 'printf abc' } });
+    await oracleGate().shouldStop!(ctxAt(d)); // lock "abc"
+    writeFileSync(join(d, 'probevane.config.json'), JSON.stringify({ oracles: { k: { kind: 'golden', desc: 'd', producer: 'printf abd' } } }));
+    const drift = await oracleGate().shouldStop!(ctxAt(d));
+    expect(drift.kind).toBe('block');
+    if (drift.kind === 'block') expect(drift.reason).toContain('golden drifted');
+  });
+
+  it('invariant oracle: producer exit 0 allows, non-zero blocks', async () => {
+    expect((await oracleGate().shouldStop!(ctxAt(withOracles({ k: { kind: 'invariant', desc: 'holds', producer: 'true' } })))).kind).toBe('allow');
+    const bad = await oracleGate().shouldStop!(ctxAt(withOracles({ k: { kind: 'invariant', desc: 'holds', producer: 'exit 2' } })));
+    expect(bad.kind).toBe('block');
+    if (bad.kind === 'block') expect(bad.reason).toContain('invariant oracle failed');
+  });
+
+  it('declared-only oracle (no producer) is not enforced → allow', async () => {
+    expect((await oracleGate().shouldStop!(ctxAt(withOracles({ k: { kind: 'property', desc: 'advisory only' } })))).kind).toBe('allow');
+  });
+});

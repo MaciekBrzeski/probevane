@@ -10,6 +10,7 @@ export { noRegression } from './no_regression.js';
 export { validationGate, firstFailure } from './validation_gate.js';
 export { auditGate } from './audit_gate.js';
 export { acceptanceGate, type AcceptanceOpts } from './acceptance_gate.js';
+export { oracleGate } from './oracle_gate.js';
 export { hermeticGate } from './hermetic_gate.js';
 export { mutationGate } from './mutation_gate.js';
 export { a11yGate } from './a11y_gate.js';

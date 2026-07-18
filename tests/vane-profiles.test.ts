@@ -23,13 +23,13 @@ describe('profile pipelines — semantics pinned across the codegen swap', () =>
   it('write_tests: base and fully-loaded opts', () => {
     expect(shape('write_tests', BASE)).toEqual([
       'preamble:context_inject,path_guard,plan_first,no_regression',
-      'green-gates:validation_gate,audit_gate,hermetic_gate,acceptance_gate',
+      'green-gates:validation_gate,audit_gate,hermetic_gate,acceptance_gate,oracle_gate',
       'opt-in:',
       'harvest:session_diary,caveat_harvest,distill_trace,library_promote',
     ]);
     expect(shape('write_tests', LOADED)).toEqual([
       'preamble:context_inject,path_guard,plan_first,no_regression',
-      'green-gates:validation_gate,audit_gate,hermetic_gate,acceptance_gate',
+      'green-gates:validation_gate,audit_gate,hermetic_gate,acceptance_gate,oracle_gate',
       'opt-in:flake_gate,assertion_gate,mutation_gate,a11y_gate,visual_gate,quality_gate',
       'harvest:session_diary,caveat_harvest,distill_trace,library_promote',
     ]);
@@ -38,13 +38,13 @@ describe('profile pipelines — semantics pinned across the codegen swap', () =>
   it('feature / repair / fix', () => {
     expect(shape('feature', BASE)).toEqual([
       'preamble:context_inject,path_guard,red_first,plan_first,no_regression',
-      'green-gates:validation_gate,audit_gate,hermetic_gate,acceptance_gate',
+      'green-gates:validation_gate,audit_gate,hermetic_gate,acceptance_gate,oracle_gate',
       'opt-in:',
       'harvest:session_diary,caveat_harvest,distill_trace,library_promote',
     ]);
     expect(shape('repair', { ...BASE, mfe: true, quality: true })).toEqual([
       'preamble:context_inject,path_guard,plan_first',
-      'green-gates:validation_gate,audit_gate,hermetic_gate',
+      'green-gates:validation_gate,audit_gate,hermetic_gate,oracle_gate',
       'opt-in:quality_gate,mfe_gate',
       'harvest:session_diary,caveat_harvest,distill_trace,library_promote',
     ]);

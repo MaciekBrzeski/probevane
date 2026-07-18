@@ -71,6 +71,11 @@ export const RUNE_DESCRIPTIONS: Record<string, RuneDescription> = {
     detail:
       'The run is not done until the acceptance bar is met — a minimum number of passing tests (and optionally coverage and shell checks). Stops the loop from accepting a token-effort result.',
   },
+  oracle_gate: {
+    summary: 'Finish gate: typed acceptance oracles hold.',
+    detail:
+      "Self-configuring from the target's probevane.config `oracles` block (ADR-022). Golden/byte-stable oracles lock a producer's output on first green and byte-verify it after (drift blocks); invariant/property oracles run a blocking assertion command. No-op when no oracles are declared.",
+  },
   flake_gate: {
     summary: 'Finish gate: new specs are stable.',
     detail:

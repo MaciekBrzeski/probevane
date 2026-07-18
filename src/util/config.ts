@@ -48,6 +48,7 @@ export interface OracleSpec {
   kind: OracleKind; // golden / byte-stable → locked artifact; invariant / property → asserted relation
   desc: string; // the contract in words — feeds generation + the `spec` oracle report
   golden?: string; // path to the locked golden artifact (golden / byte-stable); set on first green
+  producer?: string; // shell command whose stdout IS the artifact to lock/verify (golden / byte-stable)
   blocking?: boolean; // true → regression-guards EVERY run (determinism / conservation oracles)
 }
 
@@ -83,15 +84,21 @@ function checkArch(v: unknown): string | null {
   return null;
 }
 
-/** Validate one OracleSpec (kind enum + desc + optional golden/blocking); error or null.
- *  `label` prefixes the message so config and RunSpec callers get an accurate path. */
+// OracleSpec's optional scalar fields + their expected type (checked only when present).
+const OPTIONAL_ORACLE_FIELDS: [string, 'string' | 'boolean'][] = [
+  ['golden', 'string'], ['producer', 'string'], ['blocking', 'boolean'],
+];
+
+/** Validate one OracleSpec (kind enum + desc + optional golden/producer/blocking);
+ *  error or null. `label` prefixes the message so config and RunSpec callers get an
+ *  accurate path. */
 export function oracleSpecError(v: unknown, label = 'oracle'): string | null {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return `"${label}" must be an object ({ kind, desc, golden?, blocking? })`;
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return `"${label}" must be an object ({ kind, desc, golden?, producer?, blocking? })`;
   const s = v as Record<string, unknown>;
   if (!ORACLE_KINDS.includes(s.kind as OracleKind)) return `"${label}.kind" must be one of: ${ORACLE_KINDS.join(', ')}`;
   if (typeof s.desc !== 'string' || !s.desc) return `"${label}.desc" must be a non-empty string`;
-  if (s.golden !== undefined && typeof s.golden !== 'string') return `"${label}.golden" must be a string`;
-  if (s.blocking !== undefined && typeof s.blocking !== 'boolean') return `"${label}.blocking" must be a boolean`;
+  for (const [k, t] of OPTIONAL_ORACLE_FIELDS)
+    if (s[k] !== undefined && typeof s[k] !== t) return `"${label}.${k}" must be a ${t}`;
   return null;
 }
 
