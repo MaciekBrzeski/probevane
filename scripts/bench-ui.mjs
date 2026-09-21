@@ -55,7 +55,7 @@ const B = [
   ['catalog 44 → cells', cellMs, 'ms', 15, 'time'],
   ['catalog 44 → svg', svgMs, 'ms', 15, 'time'],
   ['diff-flush ratio (1-cell change)', diffRatio * 100, '% of full', 3, 'det'],
-  ['control.html size', htmlKB, 'kB', 98, 'det'], // 80→88 tab; →94 history; →96 clamp/calm; →98 gate toggles + rune notes
+  ['control.html size', htmlKB, 'kB', 114, 'det'], // 80→88 tab; →94 history; →96 clamp/calm; →98 gate toggles + rune notes; →106 signals layer + reactive runs tab; →110 WaveStrip + live timers; →114 motion core + weather + animation pack
 ];
 let failed = 0;
 console.log('[bench:ui]');

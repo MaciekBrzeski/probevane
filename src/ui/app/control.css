@@ -321,3 +321,26 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 .chat-empty { color:var(--dim); font-size:13px; padding:18px 8px; text-align:center; animation:chat-pulse 2.6s ease-in-out infinite; }
 @keyframes chat-blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 .chat-live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--warn); margin-right:6px; animation:chat-blink 1s infinite; }
+
+/* --- WaveStrip: ambient water line under the header (see WaveStrip.tsx) --- */
+.wavestrip { height:26px; overflow:hidden; line-height:0; background:linear-gradient(180deg, rgba(79,214,255,.04), transparent); border-bottom:1px solid var(--line); }
+.wavestrip svg { width:100%; height:26px; display:block; }
+
+/* --- ambient animation pack (see docs/wiki/Signals.md) ---------------------
+   Every rule that MOVES lives inside prefers-reduced-motion: no-preference,
+   so one OS preference (and the e2e emulation of it) stills the whole UI. */
+.tabs { position:relative; }
+.tabind { position:absolute; bottom:-1px; left:0; height:2px; width:0; background:var(--acc); box-shadow:0 0 8px rgba(79,214,255,.6); pointer-events:none; }
+@media (prefers-reduced-motion: no-preference) {
+  .tabind { transition: transform .25s cubic-bezier(.2,.7,.3,1), width .25s cubic-bezier(.2,.7,.3,1); }
+  @keyframes enterSlide { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+  .anim-enter { animation: enterSlide .28s cubic-bezier(.2,.7,.3,1) both; }
+  @keyframes cardIn { from { opacity:0; transform:translateY(10px) scale(.98); } to { opacity:1; transform:none; } }
+  .cards .card { animation: cardIn .35s cubic-bezier(.2,.7,.3,1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+  .card:hover { transform:translateY(-3px); }
+  @keyframes barGrow { from { transform:scaleY(0); } }
+  .bars .bar { transform-origin:bottom; animation: barGrow .5s cubic-bezier(.2,.7,.3,1) both; animation-delay: calc(var(--i, 0) * 25ms); }
+  @keyframes tagShimmer { 0%,100% { box-shadow:0 0 5px rgba(79,214,255,.2); } 50% { box-shadow:0 0 14px rgba(79,214,255,.55); } }
+  .tag.running { animation: tagShimmer 1.6s ease-in-out infinite; }
+  .alert { animation: enterSlide .3s cubic-bezier(.2,.7,.3,1) both; }
+}

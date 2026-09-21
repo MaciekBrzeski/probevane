@@ -22,6 +22,7 @@ declare global {
   const Tabs: typeof import('./components/chrome/Tabs.tsx').Tabs;
   const TerminalPanel: typeof import('./components/panels/TerminalPanel.tsx').TerminalPanel;
   const Turn: typeof import('./components/items/Turn.tsx').Turn;
+  const WaveStrip: typeof import('./components/chrome/WaveStrip.tsx').WaveStrip;
   const WikiPanel: typeof import('./components/panels/WikiPanel.tsx').WikiPanel;
 }
 export {};

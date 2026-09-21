@@ -3,8 +3,9 @@
 import { mount } from '../runtime.ts';
 import { loadChecks } from './checks-tab.tsx';
 import { loadChat } from './chat-tab.tsx';
-import { $, j, esc, dirOf, applyPalette, type ProjectInfo, type RunRecord } from './lib.ts';
-import { RUN_COLUMNS } from '../../util/theme.ts';
+import { $, j, esc, applyPalette, type ProjectInfo } from './lib.ts';
+import { WaveStrip } from './components/chrome/WaveStrip.tsx';
+import { initRuns, loadRuns, openRunLive, filterRuns, switchTab, openDrawer, closeDrawer } from './runs.tsx';
 import { loadConsole, consolePipelineEvent, consolePipelineReset, startTheater } from './console.tsx';
 import { loadTerminal, terminalActivated } from './terminal.ts';
 applyPalette(); // shared palette SSOT → :root custom-props (see src/util/theme.ts)
@@ -20,6 +21,7 @@ mount(
   document.getElementById('app')!,
   <>
     <Header />
+    <WaveStrip />
     <Tabs />
     <ProjectsPanel />
     <RunsPanel />
@@ -38,12 +40,24 @@ mount(
 try { mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark' }); } catch {}
 
 // --- tabs ---
+// sliding underline indicator: repositioned on every tab switch (and resize)
+const tabInd = (<span class="tabind"></span>) as HTMLElement;
+$('tabs').appendChild(tabInd);
+function placeTabInd(): void {
+  const b = document.querySelector('nav.tabs button.active') as HTMLElement | null;
+  if (!b) return;
+  tabInd.style.width = b.offsetWidth + 'px';
+  tabInd.style.transform = `translateX(${b.offsetLeft}px)`;
+}
+window.addEventListener('resize', placeTabInd);
+queueMicrotask(placeTabInd);
 $('tabs').addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest('button[data-go]') as HTMLElement | null;
   if (!b) return;
   const go = b.dataset.go;
   document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x === b));
   document.querySelectorAll('section[data-tab]').forEach((s) => s.classList.toggle('active', (s as HTMLElement).dataset.tab === go));
+  placeTabInd();
   if (go === 'projects') loadProjects();
   if (go === 'runs') loadRuns();
   if (go === 'docs') loadWiki();
@@ -52,24 +66,17 @@ $('tabs').addEventListener('click', (e) => {
   if (go === 'terminal') { loadTerminal(); terminalActivated(); }
 });
 
-// --- drawer ---
-const drawer = $('drawer');
-// Open the right-hand drawer with a fresh title/empty body — every detail view
-// (project, run, live watch) starts here so stale content never flashes.
-function openDrawer(title: string) { $('drawerTitle').textContent = title; $('drawerBody').textContent = ''; drawer.classList.add('open'); }
-$('drawerClose').onclick = () => drawer.classList.remove('open');
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') drawer.classList.remove('open'); });
-let followES: EventSource | null = null;
-// Close any live transcript follow so reopening a drawer can't leak EventSources.
-function stopFollow() { if (followES) { followES.close(); followES = null; } }
-
 // --- Projects ---
 async function loadProjects() {
   try {
     const { projects } = await j('/projects');
     const box = $('projects'); box.textContent = '';
     if (!projects.length) { box.appendChild(<span class="muted">{'no projects yet — run `probevane spec <dir> --wiki`'}</span>); return; }
-    for (const p of projects) box.appendChild(<ProjectCard p={p} onOpen={openProject} />);
+    projects.forEach((p: ProjectInfo, i: number) => {
+      const card = (<ProjectCard p={p} onOpen={openProject} />) as HTMLElement;
+      card.style.setProperty('--i', String(i)); // entrance stagger (CSS cardIn)
+      box.appendChild(card);
+    });
   } catch { $('projects').textContent = 'failed to load projects'; }
 }
 // Drawer view for a project card: its wiki page plus a link that jumps to the
@@ -82,7 +89,7 @@ async function openProject(p: ProjectInfo) {
   await renderMarkdown(body, md);
   body.appendChild(<hr />);
   body.appendChild(
-    <a href="#" style="color:var(--acc)" onClick={(e: Event) => { e.preventDefault(); drawer.classList.remove('open'); switchTab('runs'); filterRuns(p.name); }}>
+    <a href="#" style="color:var(--acc)" onClick={(e: Event) => { e.preventDefault(); closeDrawer(); switchTab('runs'); filterRuns(p.name); }}>
       {'filter runs for ' + p.name}
     </a>,
   );
@@ -132,119 +139,6 @@ async function renderMarkdown(container: HTMLElement, md: string) {
   }
 }
 
-// --- Runs ---
-let RUN_FILTER = '';
-// Set the run-history filter (project name) and redraw the table.
-function filterRuns(name: string) { RUN_FILTER = name || ''; loadRuns(); }
-// Refresh the Runs tab: active-jobs box + filtered history table. Two separate
-// try blocks on purpose — a dead /jobs must not hide the history.
-async function loadRuns() {
-  try {
-    const { jobs } = await j('/jobs');
-    const active = jobs.filter((jb: { status: string }) => jb.status === 'running');
-    const ar = $('activeRuns');
-    if (!active.length) { ar.textContent = 'no active runs'; ar.className = 'muted'; }
-    else {
-      ar.className = ''; ar.textContent = '';
-      for (const jb of active) {
-        ar.appendChild(
-          <div>
-            <span class="tag running">running</span>
-            {' ' + jb.op + ' · ' + String(jb.dir).split('/').pop()}
-            <button class="ghost" style="margin-left:8px" onClick={() => openRunLive(jb.dir)}>watch</button>
-          </div>,
-        );
-      }
-    }
-  } catch {}
-  try {
-    let { total, runs } = await j('/runs?limit=100');
-    if (RUN_FILTER) runs = runs.filter((r: RunRecord) => (r.label || '').includes(RUN_FILTER));
-    $('runsMeta').textContent = RUN_FILTER ? `filtered by "${RUN_FILTER}" (${runs.length}/${total})` : `${total} total`;
-    const tb = (<tbody></tbody>) as HTMLElement;
-    if (!runs.length) tb.appendChild(<tr><td class="muted" colSpan={RUN_COLUMNS.length}>none</td></tr>);
-    for (const r of runs) tb.appendChild(<RunRow r={r} onOpen={openRun} />);
-    $('runs').querySelector('tbody')!.replaceWith(tb);
-  } catch {}
-}
-// Drawer view for a finished run: replay button, headline stats, event
-// timeline, then the captured transcript — each section fails soft.
-async function openRun(r: RunRecord) {
-  stopFollow();
-  openDrawer('run — ' + (r.label || r.runId));
-  const body = $('drawerBody');
-  const dir = (r as { dir?: string }).dir ?? dirOf(r.label);
-  body.appendChild(
-    <button class="ghost" style="margin-bottom:8px" onClick={() => replayShow(r.runId)}>replay show ▶</button>,
-  );
-  body.appendChild(<div class="muted">{`${r.runId} · ${r.model || ''} · ${r.accepted ? 'accepted' : r.stopReason} · $${r.cost ?? 0} · ${r.steps ?? '?'} steps`}</div>);
-  try {
-    const detail = await j('/run?dir=' + encodeURIComponent(dir) + '&runId=' + encodeURIComponent(r.runId));
-    if (detail.events && detail.events.timeline && detail.events.timeline.length) {
-      body.appendChild(
-        <details>
-          <summary>{`timeline · ${detail.events.steps} steps · ${detail.events.gateBlocks} gate blocks`}</summary>
-          <pre>{detail.events.timeline.map((t: { step: number; tool?: string; gateBlocks: number; editedFiles?: string[] }) => `step ${t.step}  ${t.tool || ''}  blocks=${t.gateBlocks}${t.editedFiles ? '  edited ' + t.editedFiles.join(',') : ''}`).join('\n')}</pre>
-        </details>,
-      );
-    }
-  } catch {}
-  body.appendChild(<h3>transcript</h3>);
-  const tbox = (<div></div>) as HTMLElement;
-  body.appendChild(tbox);
-  try {
-    const { turns } = await j('/transcript?dir=' + encodeURIComponent(dir) + '&runId=' + encodeURIComponent(r.runId));
-    if (!turns.length) tbox.appendChild(<span class="muted">no transcript captured (PROBEVANE_TRANSCRIPT=0?)</span>);
-    for (const t of turns) tbox.appendChild(<Turn t={t} />);
-  } catch { tbox.appendChild(<span class="muted">transcript unavailable</span>); }
-}
-// Live watch: stream events into a pre + follow the transcript as turns append.
-async function openRunLive(dir: string) {
-  stopFollow();
-  openDrawer('live — ' + String(dir).split('/').pop());
-  const body = $('drawerBody');
-  const pre = (<pre></pre>) as HTMLElement;
-  pre.textContent = ''; body.appendChild(<h3>events</h3>); body.appendChild(pre);
-  body.appendChild(<h3>transcript (live)</h3>);
-  const tbox = (<div></div>) as HTMLElement;
-  body.appendChild(tbox);
-  consolePipelineReset();
-  const es = new EventSource('/stream?dir=' + encodeURIComponent(dir));
-  es.onmessage = (ev) => {
-    try {
-      const e = JSON.parse(ev.data);
-      // Light show: every event also drives the console tab's pipeline graph.
-      consolePipelineEvent(e);
-      pre.textContent += (e.delta !== undefined ? e.delta : `[step ${e.step ?? '?'}] ${e.gate ? 'BLOCK ' + e.gate : e.tool ?? e.stopReason ?? ''}\n`);
-      pre.scrollTop = pre.scrollHeight;
-    } catch {}
-  };
-  drawer.addEventListener('transitionend', () => { if (!drawer.classList.contains('open')) es.close(); }, { once: true });
-  // Follow the newest transcript for this dir. runId unknown up front → the stream
-  // events carry it; grab the first runId then follow that transcript file.
-  const once = (ev: MessageEvent) => { try { const e = JSON.parse(ev.data); if (e.runId) { es.removeEventListener('message', once); followTranscript(dir, e.runId, tbox); } } catch {} };
-  es.addEventListener('message', once);
-}
-// Tail a run's transcript over SSE, appending turns as the model produces them.
-function followTranscript(dir: string, runId: string, tbox: HTMLElement) {
-  stopFollow();
-  followES = new EventSource('/transcript?dir=' + encodeURIComponent(dir) + '&runId=' + encodeURIComponent(runId) + '&follow=1');
-  followES.onmessage = (ev) => { try { tbox.appendChild(<Turn t={JSON.parse(ev.data)} />); } catch {} };
-}
-
-// Programmatic tab switch — click the real button so the tabs handler does all
-// the toggling/loading in one place.
-function switchTab(go: string) { (document.querySelector(`nav.tabs button[data-go="${go}"]`) as HTMLElement).click(); }
-
-// Theater: replay a captured run's recorded event stream in the console ($0).
-async function replayShow(runId: string) {
-  drawer.classList.remove('open');
-  switchTab('console');
-  if (!(await startTheater(runId)))
-    $('theaterTicker').textContent = 'no captured events for this run (older than the theater feature)';
-}
-
-
 // --- header + cost/alerts/audit polling (kept) ---
 async function loadOps() { try { const { ops } = await j('/ops'); $('op').innerHTML = ops.map((o: string) => `<option>${esc(o)}</option>`).join(''); } catch {} }
 
@@ -286,7 +180,7 @@ async function poll() {
   try {
     const a = await j('/aggregate'); const max = Math.max(1, ...a.daily.map((d: { cost: number }) => d.cost));
     if (changed('bars', a.daily))
-      $('bars').innerHTML = a.daily.map((d: { date: string; cost: number; accepted: number; runs: number; errors: number }) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} · ${esc(d.accepted)}/${esc(d.runs)} · ${esc(d.errors)} err" style="height:${Math.round((d.cost / max) * 100)}%"></div>`).join('');
+      $('bars').innerHTML = a.daily.map((d: { date: string; cost: number; accepted: number; runs: number; errors: number }, i: number) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} · ${esc(d.accepted)}/${esc(d.runs)} · ${esc(d.errors)} err" style="height:${Math.round((d.cost / max) * 100)}%;--i:${i}"></div>`).join('');
     $('aggMeta').textContent = `${a.totals.runs} runs · $${a.totals.totalCost} · accept ${(a.totals.acceptRate * 100).toFixed(0)}%`;
     setStat('cost', '$' + a.totals.totalCost); setStat('accept', (a.totals.acceptRate * 100).toFixed(0) + '%');
   } catch {}
@@ -295,6 +189,9 @@ async function poll() {
       $('alerts').innerHTML = alerts.length ? alerts.map((a: { severity: string; kind: string; message: string }) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.kind)}</b> — ${esc(a.message)}</div>`).join('') : '<span class="muted">none</span>';
   } catch {}
   try { const { entries } = await j('/audit'); $('audit').textContent = entries.slice(-30).reverse().map((e: { ts: string; action: string; target: string }) => `${e.ts.slice(0, 19)}  ${e.action}  ${e.target}`).join('\n') || 'no library mutations yet'; } catch {}
+  // signals-driven runs tab rides the heartbeat: identity-stable snapshots mean
+  // an unchanged poll is zero DOM operations, so this is churn-free.
+  loadRuns();
 }
 
 $('run').onclick = async () => {
@@ -320,4 +217,4 @@ $('qbtn').onclick = async () => {
   } catch (e) { $('quality').textContent = '✗ ' + String(e); }
 };
 
-loadOps(); loadProjects(); loadConsole(); poll(); setInterval(poll, 4000);
+initRuns(); loadOps(); loadProjects(); loadConsole(); poll(); setInterval(poll, 4000);

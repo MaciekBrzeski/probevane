@@ -331,6 +331,29 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
 @keyframes chat-blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 .chat-live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--warn); margin-right:6px; animation:chat-blink 1s infinite; }
 
+/* --- WaveStrip: ambient water line under the header (see WaveStrip.tsx) --- */
+.wavestrip { height:26px; overflow:hidden; line-height:0; background:linear-gradient(180deg, rgba(79,214,255,.04), transparent); border-bottom:1px solid var(--line); }
+.wavestrip svg { width:100%; height:26px; display:block; }
+
+/* --- ambient animation pack (see docs/wiki/Signals.md) ---------------------
+   Every rule that MOVES lives inside prefers-reduced-motion: no-preference,
+   so one OS preference (and the e2e emulation of it) stills the whole UI. */
+.tabs { position:relative; }
+.tabind { position:absolute; bottom:-1px; left:0; height:2px; width:0; background:var(--acc); box-shadow:0 0 8px rgba(79,214,255,.6); pointer-events:none; }
+@media (prefers-reduced-motion: no-preference) {
+  .tabind { transition: transform .25s cubic-bezier(.2,.7,.3,1), width .25s cubic-bezier(.2,.7,.3,1); }
+  @keyframes enterSlide { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+  .anim-enter { animation: enterSlide .28s cubic-bezier(.2,.7,.3,1) both; }
+  @keyframes cardIn { from { opacity:0; transform:translateY(10px) scale(.98); } to { opacity:1; transform:none; } }
+  .cards .card { animation: cardIn .35s cubic-bezier(.2,.7,.3,1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+  .card:hover { transform:translateY(-3px); }
+  @keyframes barGrow { from { transform:scaleY(0); } }
+  .bars .bar { transform-origin:bottom; animation: barGrow .5s cubic-bezier(.2,.7,.3,1) both; animation-delay: calc(var(--i, 0) * 25ms); }
+  @keyframes tagShimmer { 0%,100% { box-shadow:0 0 5px rgba(79,214,255,.2); } 50% { box-shadow:0 0 14px rgba(79,214,255,.55); } }
+  .tag.running { animation: tagShimmer 1.6s ease-in-out infinite; }
+  .alert { animation: enterSlide .3s cubic-bezier(.2,.7,.3,1) both; }
+}
+
 </style>
 </head>
 <body>
@@ -681,30 +704,6 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     return /* @__PURE__ */ h("div", { class: "card", dataset: { slug: p.slug, name: p.name }, onClick: () => onOpen(p) }, /* @__PURE__ */ h("h3", null, p.name), /* @__PURE__ */ h("div", { class: "muted" }, `${p.runCount} run(s) \xB7 ${(p.acceptRate * 100).toFixed(0)}% accepted`), p.lastRun && /* @__PURE__ */ h("span", { class: "tag " + esc(st) }, "last: " + st));
   }
 
-  // src/ui/app/components/items/RunRow.tsx
-  function RunRow({ r, onOpen }) {
-    return /* @__PURE__ */ h("tr", { class: "clickable", onClick: () => onOpen(r) }, RUN_COLUMNS.map(
-      (c) => c.id === "status" ? /* @__PURE__ */ h("td", null, /* @__PURE__ */ h("span", { class: "tag " + (r.accepted ? "accepted" : esc(r.stopReason)) }, r.accepted ? "accepted" : r.stopReason)) : /* @__PURE__ */ h("td", { class: c.muted ? "muted" : void 0 }, c.get(r))
-    ));
-  }
-
-  // src/ui/app/components/items/Turn.tsx
-  function isLong(text) {
-    return text.length > 400 || text.split("\n").length > 6;
-  }
-  function textBlock(text) {
-    if (!isLong(text)) return /* @__PURE__ */ h("div", { class: "txt" }, text);
-    const box = /* @__PURE__ */ h("div", { class: "txt clamp" }, text);
-    const btn = /* @__PURE__ */ h("button", { class: "txt-toggle", type: "button" }, "show more");
-    btn.onclick = () => {
-      btn.textContent = box.classList.toggle("clamp") ? "show more" : "show less";
-    };
-    return /* @__PURE__ */ h("div", { class: "txt-wrap" }, box, btn);
-  }
-  function Turn({ t }) {
-    return /* @__PURE__ */ h("div", { class: "turn " + (t.role === "user" ? "user" : "") }, /* @__PURE__ */ h("div", { class: "thead" }, `${t.role}${t.model ? " \xB7 " + t.model : ""} \xB7 step ${t.step}`), t.text ? textBlock(t.text) : null, (t.toolCalls || []).map((c) => /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, "\u2192 " + c.name), /* @__PURE__ */ h("pre", null, typeof c.input === "string" ? c.input : JSON.stringify(c.input, null, 2)))), (t.toolResults || []).map((r) => /* @__PURE__ */ h("details", { class: r.ok ? "ok" : "err" }, /* @__PURE__ */ h("summary", null, (r.ok ? "\u2713 " : "\u2717 ") + r.name), /* @__PURE__ */ h("pre", null, r.content))));
-  }
-
   // engine/render-dom/src/svg-painter.ts
   var esc2 = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
   var SvgPainter = class {
@@ -921,6 +920,23 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   function replayDelayMs(prevTs, ts) {
     const gap = prevTs && ts ? Date.parse(ts) - Date.parse(prevTs) : NaN;
     return Number.isFinite(gap) ? Math.min(1500, Math.max(250, gap / 4)) : 600;
+  }
+
+  // src/ui/app/components/items/Turn.tsx
+  function isLong(text) {
+    return text.length > 400 || text.split("\n").length > 6;
+  }
+  function textBlock(text) {
+    if (!isLong(text)) return /* @__PURE__ */ h("div", { class: "txt" }, text);
+    const box = /* @__PURE__ */ h("div", { class: "txt clamp" }, text);
+    const btn = /* @__PURE__ */ h("button", { class: "txt-toggle", type: "button" }, "show more");
+    btn.onclick = () => {
+      btn.textContent = box.classList.toggle("clamp") ? "show more" : "show less";
+    };
+    return /* @__PURE__ */ h("div", { class: "txt-wrap" }, box, btn);
+  }
+  function Turn({ t }) {
+    return /* @__PURE__ */ h("div", { class: "turn " + (t.role === "user" ? "user" : "") }, /* @__PURE__ */ h("div", { class: "thead" }, `${t.role}${t.model ? " \xB7 " + t.model : ""} \xB7 step ${t.step}`), t.text ? textBlock(t.text) : null, (t.toolCalls || []).map((c) => /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, "\u2192 " + c.name), /* @__PURE__ */ h("pre", null, typeof c.input === "string" ? c.input : JSON.stringify(c.input, null, 2)))), (t.toolResults || []).map((r) => /* @__PURE__ */ h("details", { class: r.ok ? "ok" : "err" }, /* @__PURE__ */ h("summary", null, (r.ok ? "\u2713 " : "\u2717 ") + r.name), /* @__PURE__ */ h("pre", null, r.content))));
   }
 
   // src/ui/app/chat-ui.tsx
@@ -1322,6 +1338,369 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     void fillDirs();
   }
 
+  // src/ui/signals.ts
+  var currentEffect = null;
+  var currentScope = null;
+  var dirty = /* @__PURE__ */ new Set();
+  var scheduled = false;
+  function schedule(subs2) {
+    for (const e of subs2) if (!e.dead) dirty.add(e);
+    if (!scheduled) {
+      scheduled = true;
+      queueMicrotask(flushSync);
+    }
+  }
+  function flushSync() {
+    scheduled = false;
+    while (dirty.size) {
+      const batch = [...dirty];
+      dirty.clear();
+      for (const e of batch) if (!e.dead) e.run();
+    }
+  }
+  var Signal = class {
+    constructor(v) {
+      this.v = v;
+    }
+    v;
+    subs = [];
+    get() {
+      const e = currentEffect;
+      if (e) {
+        if (e.deps[e.cursor] === this.subs) e.cursor++;
+        else if (!(e.cursor > 0 && e.deps[e.cursor - 1] === this.subs)) {
+          e.dropTail(e.cursor);
+          this.subs.push(e);
+          e.deps.push(this.subs);
+          e.cursor = e.deps.length;
+        }
+      }
+      return this.v;
+    }
+    set(nv) {
+      if (Object.is(nv, this.v)) return;
+      this.v = nv;
+      schedule(this.subs);
+    }
+    update(f) {
+      this.set(f(this.v));
+    }
+  };
+  var signal = (v) => new Signal(v);
+  var Effect = class {
+    constructor(fn) {
+      this.fn = fn;
+      this.run();
+      currentScope?.push(this);
+    }
+    fn;
+    deps = [];
+    cursor = 0;
+    cleanups = null;
+    dead = false;
+    /** Unsubscribe from deps[k..] — the stale tail after a re-run read fewer or
+     *  different signals than the previous run. */
+    dropTail(k) {
+      for (let i = k; i < this.deps.length; i++) {
+        const subs2 = this.deps[i];
+        const j2 = subs2.indexOf(this);
+        if (j2 >= 0) {
+          subs2[j2] = subs2[subs2.length - 1];
+          subs2.pop();
+        }
+      }
+      this.deps.length = k;
+    }
+    run() {
+      if (this.cleanups) {
+        for (const c of this.cleanups) c();
+        this.cleanups = null;
+      }
+      this.cursor = 0;
+      const prev = currentEffect;
+      currentEffect = this;
+      try {
+        const c = this.fn();
+        if (typeof c === "function") (this.cleanups ??= []).push(c);
+      } finally {
+        currentEffect = prev;
+        this.dropTail(this.cursor);
+      }
+    }
+    dispose() {
+      this.dead = true;
+      if (this.cleanups) {
+        for (const c of this.cleanups) c();
+        this.cleanups = null;
+      }
+      this.dropTail(0);
+      dirty.delete(this);
+    }
+  };
+  var effect = (fn) => new Effect(fn);
+  function computed(fn) {
+    let s;
+    effect(() => {
+      const v = fn();
+      if (s) s.set(v);
+      else s = signal(v);
+    });
+    return () => s.get();
+  }
+  function runInScope(fn) {
+    const effects = [];
+    const prev = currentScope;
+    currentScope = effects;
+    try {
+      const value = fn();
+      return { value, dispose: () => {
+        for (const e of effects) e.dispose();
+      } };
+    } finally {
+      currentScope = prev;
+    }
+  }
+  function eachInto(parent, items, key, render) {
+    const cache = /* @__PURE__ */ new Map();
+    let prev = [];
+    const disposeAll = () => {
+      for (const s of cache.values()) s.dispose();
+      cache.clear();
+    };
+    const make = (item) => {
+      const { value: node, dispose } = runInScope(() => render(item));
+      const slot = { item, node, dispose };
+      node.__k = key(item);
+      cache.set(key(item), slot);
+      return slot;
+    };
+    const drop = (item) => {
+      const k = key(item);
+      const s = cache.get(k);
+      if (s) {
+        s.node.remove();
+        s.dispose();
+        cache.delete(k);
+      }
+    };
+    return effect(() => {
+      const next = items();
+      if (next.length === 0) {
+        parent.textContent = "";
+        disposeAll();
+        prev = [];
+        return;
+      }
+      let aS = 0, aE = prev.length - 1, bS = 0, bE = next.length - 1;
+      while (aS <= aE && bS <= bE) {
+        if (prev[aS] === next[bS]) {
+          aS++;
+          bS++;
+          continue;
+        }
+        if (prev[aE] === next[bE]) {
+          aE--;
+          bE--;
+          continue;
+        }
+        if (prev[aS] === next[bE] && prev[aE] === next[bS]) {
+          const a = cache.get(key(prev[aS])).node;
+          const b = cache.get(key(prev[aE])).node;
+          const afterB = b.nextSibling;
+          parent.insertBefore(b, a);
+          parent.insertBefore(a, afterB);
+          aS++;
+          bS++;
+          aE--;
+          bE--;
+          continue;
+        }
+        if (prev[aS] === next[bE]) {
+          parent.insertBefore(cache.get(key(prev[aS])).node, cache.get(key(prev[aE])).node.nextSibling);
+          aS++;
+          bE--;
+          continue;
+        }
+        if (prev[aE] === next[bS]) {
+          parent.insertBefore(cache.get(key(prev[aE])).node, cache.get(key(prev[aS])).node);
+          aE--;
+          bS++;
+          continue;
+        }
+        break;
+      }
+      if (aS > aE) {
+        const ref = bE + 1 < next.length ? cache.get(key(next[bE + 1])).node : null;
+        for (; bS <= bE; bS++) parent.insertBefore(make(next[bS]).node, ref);
+      } else if (bS > bE) {
+        for (; aS <= aE; aS++) drop(prev[aS]);
+      } else {
+        const endNode = bE + 1 < next.length ? cache.get(key(next[bE + 1])).node : null;
+        let cursor = bS > 0 ? cache.get(key(next[bS - 1])).node.nextSibling : parent.firstChild;
+        for (let i = bS; i <= bE; i++) {
+          const item = next[i];
+          const k = key(item);
+          let slot = cache.get(k);
+          if (!slot) slot = make(item);
+          else if (slot.item !== item) {
+            slot.dispose();
+            const { value, dispose } = runInScope(() => render(item));
+            if (slot.node === cursor) cursor = cursor.nextSibling;
+            slot.node.remove();
+            slot.node = value;
+            slot.node.__k = k;
+            slot.dispose = dispose;
+            slot.item = item;
+          }
+          if (slot.node === cursor) cursor = cursor.nextSibling;
+          else parent.insertBefore(slot.node, cursor);
+        }
+        while (cursor && cursor !== endNode) {
+          const dead = cursor;
+          cursor = cursor.nextSibling;
+          parent.removeChild(dead);
+          const k = dead.__k;
+          cache.get(k)?.dispose();
+          cache.delete(k);
+        }
+      }
+      prev = next.slice();
+    });
+  }
+  function when(cond, render) {
+    const anchor = document.createComment("when");
+    const frag = document.createDocumentFragment();
+    frag.appendChild(anchor);
+    const on = computed(() => !!cond());
+    effect(() => {
+      if (!on()) return;
+      const { value, dispose } = runInScope(render);
+      const nodes = value instanceof DocumentFragment ? [...value.childNodes] : [value];
+      anchor.after(value);
+      return () => {
+        for (const n of nodes) n.remove();
+        dispose();
+      };
+    });
+    return frag;
+  }
+
+  // src/ui/app/motion.ts
+  var MOTION = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var subs = /* @__PURE__ */ new Set();
+  var raf = 0;
+  function loop(now) {
+    raf = requestAnimationFrame(loop);
+    for (const f of subs) f(now / 1e3);
+  }
+  function ensure() {
+    if (!raf && subs.size && !document.hidden && MOTION) raf = requestAnimationFrame(loop);
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    } else ensure();
+  });
+  function onFrame(fn) {
+    if (!MOTION) return () => {
+    };
+    subs.add(fn);
+    ensure();
+    return () => {
+      subs.delete(fn);
+      if (!subs.size) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+  }
+
+  // src/ui/app/components/chrome/WaveStrip.tsx
+  var waveEnergy = signal(0);
+  var waveWeather = signal("clear");
+  var W = 1200;
+  var H = 26;
+  var LAYERS = [
+    { amp: 3.5, len: 210, speed: 1.6, op: 0.35 },
+    { amp: 5.5, len: 140, speed: 2.6, op: 0.22 },
+    { amp: 8, len: 95, speed: 4.2, op: 0.14 }
+  ];
+  var STEP = 24;
+  var DROPS = 16;
+  function wavePath(t, energy, L) {
+    const amp = L.amp * (0.35 + 1.65 * energy);
+    let d = `M 0 ${H}`;
+    for (let x = 0; x <= W; x += STEP) {
+      const y = H * 0.55 + amp * Math.sin(x / L.len * Math.PI * 2 + t * L.speed);
+      d += ` L ${x} ${y.toFixed(1)}`;
+    }
+    return d + ` L ${W} ${H} Z`;
+  }
+  var NS = "http://www.w3.org/2000/svg";
+  function WaveStrip() {
+    const host = /* @__PURE__ */ h("div", { class: "wavestrip", "aria-hidden": "true" });
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("preserveAspectRatio", "none");
+    const paths = LAYERS.map((L) => {
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("fill", "var(--acc)");
+      p.setAttribute("opacity", String(L.op));
+      svg.appendChild(p);
+      return p;
+    });
+    const drops = Array.from({ length: DROPS }, (_, i) => {
+      const l = document.createElementNS(NS, "line");
+      l.setAttribute("stroke", "var(--acc)");
+      l.setAttribute("stroke-width", "1");
+      l.setAttribute("opacity", "0");
+      l.dataset.seed = String(i * 733 % 1200);
+      svg.appendChild(l);
+      return l;
+    });
+    host.appendChild(svg);
+    const draw = (t) => {
+      const e = waveEnergy.get();
+      for (let i = 0; i < LAYERS.length; i++) paths[i].setAttribute("d", wavePath(t, e, LAYERS[i]));
+      const raining = waveWeather.get() === "rain";
+      for (const l of drops) {
+        if (!raining) {
+          if (l.getAttribute("opacity") !== "0") l.setAttribute("opacity", "0");
+          continue;
+        }
+        const seed = Number(l.dataset.seed);
+        const y = (t * 60 + seed) % (H + 8) - 4;
+        const x = (seed + t * 14) % W;
+        l.setAttribute("x1", x.toFixed(1));
+        l.setAttribute("y1", y.toFixed(1));
+        l.setAttribute("x2", (x - 2).toFixed(1));
+        l.setAttribute("y2", (y + 5).toFixed(1));
+        l.setAttribute("opacity", "0.45");
+      }
+    };
+    if (!MOTION) {
+      draw(0);
+      return host;
+    }
+    let last = 0;
+    onFrame((t) => {
+      if (t - last < 0.033) return;
+      last = t;
+      draw(t);
+    });
+    return host;
+  }
+
+  // src/ui/app/components/items/RunRow.tsx
+  function RunRow({ r, onOpen }) {
+    const tr = /* @__PURE__ */ h("tr", { class: "clickable anim-enter", onClick: () => onOpen(r) }, RUN_COLUMNS.map(
+      (c) => c.id === "status" ? /* @__PURE__ */ h("td", null, /* @__PURE__ */ h("span", { class: "tag " + (r.accepted ? "accepted" : esc(r.stopReason)) }, r.accepted ? "accepted" : r.stopReason)) : /* @__PURE__ */ h("td", { class: c.muted ? "muted" : void 0 }, c.get(r))
+    ));
+    tr.addEventListener("animationend", () => tr.classList.remove("anim-enter"), { once: true });
+    return tr;
+  }
+
   // src/ui/app/components/viz/NodeGraph.tsx
   function NodeGraph(props) {
     const dag = props.nodes.map((n) => ({ id: n.id, deps: n.deps }));
@@ -1472,6 +1851,201 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     play(0);
   }
 
+  // src/ui/app/runs.tsx
+  var drawer;
+  function openDrawer(title) {
+    $("drawerTitle").textContent = title;
+    $("drawerBody").textContent = "";
+    drawer.classList.add("open");
+  }
+  function closeDrawer() {
+    drawer.classList.remove("open");
+  }
+  var followES = null;
+  function stopFollow() {
+    if (followES) {
+      followES.close();
+      followES = null;
+    }
+  }
+  var tickSig = signal(Date.now());
+  setInterval(() => {
+    tickSig.set(Date.now());
+    flushSync();
+  }, 1e3);
+  function fmtElapsed(startedAt) {
+    if (!startedAt) return "";
+    const s = Math.max(0, Math.floor((tickSig.get() - Date.parse(startedAt)) / 1e3));
+    return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+  }
+  var runFilter = signal("");
+  var runsTotal = signal(0);
+  var runRows = signal([]);
+  var activeJobs = signal([]);
+  var visibleRuns = computed(() => {
+    const f = runFilter.get();
+    const rows = runRows.get();
+    return f ? rows.filter((r) => (r.label || "").includes(f)) : rows;
+  });
+  function stabilize(seen, key, list2) {
+    return list2.map((item) => {
+      const k = key(item);
+      const json = JSON.stringify(item);
+      const prev = seen.get(k);
+      if (prev && prev.json === json) return prev.item;
+      seen.set(k, { json, item });
+      return item;
+    });
+  }
+  var runIdent = /* @__PURE__ */ new Map();
+  var jobIdent = /* @__PURE__ */ new Map();
+  function filterRuns(name) {
+    runFilter.set(name || "");
+    flushSync();
+  }
+  async function loadRuns() {
+    try {
+      const { jobs } = await j("/jobs");
+      const active = jobs.filter((jb) => jb.status === "running");
+      activeJobs.set(stabilize(jobIdent, (jb) => String(jb.id), active));
+      waveEnergy.set(Math.min(1, active.length / 2));
+    } catch {
+    }
+    try {
+      const { total, runs } = await j("/runs?limit=100");
+      runsTotal.set(total);
+      runRows.set(stabilize(runIdent, (r) => r.runId, runs));
+    } catch {
+    }
+    flushSync();
+  }
+  async function openRun(r) {
+    stopFollow();
+    openDrawer("run \u2014 " + (r.label || r.runId));
+    const body = $("drawerBody");
+    const dir = r.dir ?? dirOf(r.label);
+    body.appendChild(/* @__PURE__ */ h("button", { class: "ghost", style: "margin-bottom:8px", onClick: () => replayShow(r.runId) }, "replay show \u25B6"));
+    body.appendChild(/* @__PURE__ */ h("div", { class: "muted" }, `${r.runId} \xB7 ${r.model || ""} \xB7 ${r.accepted ? "accepted" : r.stopReason} \xB7 $${r.cost ?? 0} \xB7 ${r.steps ?? "?"} steps`));
+    try {
+      const detail = await j("/run?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(r.runId));
+      if (detail.events && detail.events.timeline && detail.events.timeline.length) {
+        body.appendChild(
+          /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, `timeline \xB7 ${detail.events.steps} steps \xB7 ${detail.events.gateBlocks} gate blocks`), /* @__PURE__ */ h("pre", null, detail.events.timeline.map((t) => `step ${t.step}  ${t.tool || ""}  blocks=${t.gateBlocks}${t.editedFiles ? "  edited " + t.editedFiles.join(",") : ""}`).join("\n")))
+        );
+      }
+    } catch {
+    }
+    body.appendChild(/* @__PURE__ */ h("h3", null, "transcript"));
+    const tbox = /* @__PURE__ */ h("div", null);
+    body.appendChild(tbox);
+    try {
+      const { turns } = await j("/transcript?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(r.runId));
+      if (!turns.length) tbox.appendChild(/* @__PURE__ */ h("span", { class: "muted" }, "no transcript captured (PROBEVANE_TRANSCRIPT=0?)"));
+      for (const t of turns) tbox.appendChild(/* @__PURE__ */ h(Turn, { t }));
+    } catch {
+      tbox.appendChild(/* @__PURE__ */ h("span", { class: "muted" }, "transcript unavailable"));
+    }
+  }
+  async function openRunLive(dir) {
+    stopFollow();
+    openDrawer("live \u2014 " + String(dir).split("/").pop());
+    const body = $("drawerBody");
+    const pre = /* @__PURE__ */ h("pre", null);
+    pre.textContent = "";
+    body.appendChild(/* @__PURE__ */ h("h3", null, "events"));
+    body.appendChild(pre);
+    body.appendChild(/* @__PURE__ */ h("h3", null, "transcript (live)"));
+    const tbox = /* @__PURE__ */ h("div", null);
+    body.appendChild(tbox);
+    consolePipelineReset();
+    const es2 = new EventSource("/stream?dir=" + encodeURIComponent(dir));
+    es2.onmessage = (ev) => {
+      try {
+        const e = JSON.parse(ev.data);
+        consolePipelineEvent(e);
+        pre.textContent += e.delta !== void 0 ? e.delta : `[step ${e.step ?? "?"}] ${e.gate ? "BLOCK " + e.gate : e.tool ?? e.stopReason ?? ""}
+`;
+        pre.scrollTop = pre.scrollHeight;
+      } catch {
+      }
+    };
+    drawer.addEventListener("transitionend", () => {
+      if (!drawer.classList.contains("open")) es2.close();
+    }, { once: true });
+    const once = (ev) => {
+      try {
+        const e = JSON.parse(ev.data);
+        if (e.runId) {
+          es2.removeEventListener("message", once);
+          followTranscript2(dir, e.runId, tbox);
+        }
+      } catch {
+      }
+    };
+    es2.addEventListener("message", once);
+  }
+  function followTranscript2(dir, runId, tbox) {
+    stopFollow();
+    followES = new EventSource("/transcript?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(runId) + "&follow=1");
+    followES.onmessage = (ev) => {
+      try {
+        tbox.appendChild(/* @__PURE__ */ h(Turn, { t: JSON.parse(ev.data) }));
+      } catch {
+      }
+    };
+  }
+  function switchTab(go) {
+    document.querySelector(`nav.tabs button[data-go="${go}"]`).click();
+  }
+  async function replayShow(runId) {
+    closeDrawer();
+    switchTab("console");
+    if (!await startTheater(runId))
+      $("theaterTicker").textContent = "no captured events for this run (older than the theater feature)";
+  }
+  function initRuns() {
+    drawer = $("drawer");
+    $("drawerClose").onclick = closeDrawer;
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeDrawer();
+    });
+    const ar = $("activeRuns");
+    ar.textContent = "";
+    ar.className = "";
+    const jobList = document.createElement("div");
+    ar.append(jobList, when(() => activeJobs.get().length === 0, () => /* @__PURE__ */ h("span", { class: "muted" }, "no active runs")));
+    eachInto(jobList, () => activeJobs.get(), (jb) => jb.id, (jb) => {
+      const elapsed = /* @__PURE__ */ h("span", { class: "muted", style: "margin-left:6px" });
+      effect(() => {
+        elapsed.textContent = fmtElapsed(jb.startedAt);
+      });
+      return /* @__PURE__ */ h("div", { class: "anim-enter" }, /* @__PURE__ */ h("span", { class: "tag running" }, "running"), " " + jb.op + " \xB7 " + String(jb.dir).split("/").pop(), elapsed, /* @__PURE__ */ h("button", { class: "ghost", style: "margin-left:8px", onClick: () => openRunLive(jb.dir) }, "watch"));
+    });
+    const tbody = $("runs").querySelector("tbody");
+    eachInto(tbody, () => visibleRuns(), (r) => r.runId, (r) => /* @__PURE__ */ h(RunRow, { r, onOpen: openRun }));
+    $("runs").after(when(() => visibleRuns().length === 0, () => /* @__PURE__ */ h("div", { class: "muted" }, "none")));
+    effect(() => {
+      const f = runFilter.get();
+      $("runsMeta").textContent = f ? `filtered by "${f}" (${visibleRuns().length}/${runsTotal.get()})` : `${runsTotal.get()} total`;
+    });
+    let lastNewest = "";
+    let rainTimer = 0;
+    effect(() => {
+      const newest = runRows.get()[0];
+      if (!newest || newest.runId === lastNewest) return;
+      const first = lastNewest === "";
+      lastNewest = newest.runId;
+      if (!first && !newest.accepted) {
+        waveWeather.set("rain");
+        clearTimeout(rainTimer);
+        rainTimer = window.setTimeout(() => {
+          waveWeather.set("clear");
+          flushSync();
+        }, 12e3);
+      }
+    });
+  }
+
   // src/ui/app/terminal.ts
   var term = null;
   var fit = null;
@@ -1585,18 +2159,29 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
   applyPalette();
   mount(
     document.getElementById("app"),
-    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ChecksPanel, null), /* @__PURE__ */ h(ChatPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
+    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Header, null), /* @__PURE__ */ h(WaveStrip, null), /* @__PURE__ */ h(Tabs, null), /* @__PURE__ */ h(ProjectsPanel, null), /* @__PURE__ */ h(RunsPanel, null), /* @__PURE__ */ h(WikiPanel, null), /* @__PURE__ */ h(LaunchPanel, null), /* @__PURE__ */ h(CostPanel, null), /* @__PURE__ */ h(QualityPanel, null), /* @__PURE__ */ h(ChecksPanel, null), /* @__PURE__ */ h(ChatPanel, null), /* @__PURE__ */ h(ConsolePanel, null), /* @__PURE__ */ h(TerminalPanel, null), /* @__PURE__ */ h(Drawer, null))
   );
   try {
     mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "dark" });
   } catch {
   }
+  var tabInd = /* @__PURE__ */ h("span", { class: "tabind" });
+  $("tabs").appendChild(tabInd);
+  function placeTabInd() {
+    const b = document.querySelector("nav.tabs button.active");
+    if (!b) return;
+    tabInd.style.width = b.offsetWidth + "px";
+    tabInd.style.transform = `translateX(${b.offsetLeft}px)`;
+  }
+  window.addEventListener("resize", placeTabInd);
+  queueMicrotask(placeTabInd);
   $("tabs").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-go]");
     if (!b) return;
     const go = b.dataset.go;
     document.querySelectorAll("nav.tabs button").forEach((x) => x.classList.toggle("active", x === b));
     document.querySelectorAll("section[data-tab]").forEach((s) => s.classList.toggle("active", s.dataset.tab === go));
+    placeTabInd();
     if (go === "projects") loadProjects();
     if (go === "runs") loadRuns();
     if (go === "docs") loadWiki();
@@ -1607,23 +2192,6 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       terminalActivated();
     }
   });
-  var drawer = $("drawer");
-  function openDrawer(title) {
-    $("drawerTitle").textContent = title;
-    $("drawerBody").textContent = "";
-    drawer.classList.add("open");
-  }
-  $("drawerClose").onclick = () => drawer.classList.remove("open");
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") drawer.classList.remove("open");
-  });
-  var followES = null;
-  function stopFollow() {
-    if (followES) {
-      followES.close();
-      followES = null;
-    }
-  }
   async function loadProjects() {
     try {
       const { projects } = await j("/projects");
@@ -1633,7 +2201,11 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
         box.appendChild(/* @__PURE__ */ h("span", { class: "muted" }, "no projects yet \u2014 run `probevane spec <dir> --wiki`"));
         return;
       }
-      for (const p of projects) box.appendChild(/* @__PURE__ */ h(ProjectCard, { p, onOpen: openProject }));
+      projects.forEach((p, i) => {
+        const card2 = /* @__PURE__ */ h(ProjectCard, { p, onOpen: openProject });
+        card2.style.setProperty("--i", String(i));
+        box.appendChild(card2);
+      });
     } catch {
       $("projects").textContent = "failed to load projects";
     }
@@ -1651,7 +2223,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
     body.appendChild(
       /* @__PURE__ */ h("a", { href: "#", style: "color:var(--acc)", onClick: (e) => {
         e.preventDefault();
-        drawer.classList.remove("open");
+        closeDrawer();
         switchTab("runs");
         filterRuns(p.name);
       } }, "filter runs for " + p.name)
@@ -1708,127 +2280,6 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       }
     }
   }
-  var RUN_FILTER = "";
-  function filterRuns(name) {
-    RUN_FILTER = name || "";
-    loadRuns();
-  }
-  async function loadRuns() {
-    try {
-      const { jobs } = await j("/jobs");
-      const active = jobs.filter((jb) => jb.status === "running");
-      const ar = $("activeRuns");
-      if (!active.length) {
-        ar.textContent = "no active runs";
-        ar.className = "muted";
-      } else {
-        ar.className = "";
-        ar.textContent = "";
-        for (const jb of active) {
-          ar.appendChild(
-            /* @__PURE__ */ h("div", null, /* @__PURE__ */ h("span", { class: "tag running" }, "running"), " " + jb.op + " \xB7 " + String(jb.dir).split("/").pop(), /* @__PURE__ */ h("button", { class: "ghost", style: "margin-left:8px", onClick: () => openRunLive(jb.dir) }, "watch"))
-          );
-        }
-      }
-    } catch {
-    }
-    try {
-      let { total, runs } = await j("/runs?limit=100");
-      if (RUN_FILTER) runs = runs.filter((r) => (r.label || "").includes(RUN_FILTER));
-      $("runsMeta").textContent = RUN_FILTER ? `filtered by "${RUN_FILTER}" (${runs.length}/${total})` : `${total} total`;
-      const tb = /* @__PURE__ */ h("tbody", null);
-      if (!runs.length) tb.appendChild(/* @__PURE__ */ h("tr", null, /* @__PURE__ */ h("td", { class: "muted", colSpan: RUN_COLUMNS.length }, "none")));
-      for (const r of runs) tb.appendChild(/* @__PURE__ */ h(RunRow, { r, onOpen: openRun }));
-      $("runs").querySelector("tbody").replaceWith(tb);
-    } catch {
-    }
-  }
-  async function openRun(r) {
-    stopFollow();
-    openDrawer("run \u2014 " + (r.label || r.runId));
-    const body = $("drawerBody");
-    const dir = r.dir ?? dirOf(r.label);
-    body.appendChild(
-      /* @__PURE__ */ h("button", { class: "ghost", style: "margin-bottom:8px", onClick: () => replayShow(r.runId) }, "replay show \u25B6")
-    );
-    body.appendChild(/* @__PURE__ */ h("div", { class: "muted" }, `${r.runId} \xB7 ${r.model || ""} \xB7 ${r.accepted ? "accepted" : r.stopReason} \xB7 $${r.cost ?? 0} \xB7 ${r.steps ?? "?"} steps`));
-    try {
-      const detail = await j("/run?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(r.runId));
-      if (detail.events && detail.events.timeline && detail.events.timeline.length) {
-        body.appendChild(
-          /* @__PURE__ */ h("details", null, /* @__PURE__ */ h("summary", null, `timeline \xB7 ${detail.events.steps} steps \xB7 ${detail.events.gateBlocks} gate blocks`), /* @__PURE__ */ h("pre", null, detail.events.timeline.map((t) => `step ${t.step}  ${t.tool || ""}  blocks=${t.gateBlocks}${t.editedFiles ? "  edited " + t.editedFiles.join(",") : ""}`).join("\n")))
-        );
-      }
-    } catch {
-    }
-    body.appendChild(/* @__PURE__ */ h("h3", null, "transcript"));
-    const tbox = /* @__PURE__ */ h("div", null);
-    body.appendChild(tbox);
-    try {
-      const { turns } = await j("/transcript?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(r.runId));
-      if (!turns.length) tbox.appendChild(/* @__PURE__ */ h("span", { class: "muted" }, "no transcript captured (PROBEVANE_TRANSCRIPT=0?)"));
-      for (const t of turns) tbox.appendChild(/* @__PURE__ */ h(Turn, { t }));
-    } catch {
-      tbox.appendChild(/* @__PURE__ */ h("span", { class: "muted" }, "transcript unavailable"));
-    }
-  }
-  async function openRunLive(dir) {
-    stopFollow();
-    openDrawer("live \u2014 " + String(dir).split("/").pop());
-    const body = $("drawerBody");
-    const pre = /* @__PURE__ */ h("pre", null);
-    pre.textContent = "";
-    body.appendChild(/* @__PURE__ */ h("h3", null, "events"));
-    body.appendChild(pre);
-    body.appendChild(/* @__PURE__ */ h("h3", null, "transcript (live)"));
-    const tbox = /* @__PURE__ */ h("div", null);
-    body.appendChild(tbox);
-    consolePipelineReset();
-    const es2 = new EventSource("/stream?dir=" + encodeURIComponent(dir));
-    es2.onmessage = (ev) => {
-      try {
-        const e = JSON.parse(ev.data);
-        consolePipelineEvent(e);
-        pre.textContent += e.delta !== void 0 ? e.delta : `[step ${e.step ?? "?"}] ${e.gate ? "BLOCK " + e.gate : e.tool ?? e.stopReason ?? ""}
-`;
-        pre.scrollTop = pre.scrollHeight;
-      } catch {
-      }
-    };
-    drawer.addEventListener("transitionend", () => {
-      if (!drawer.classList.contains("open")) es2.close();
-    }, { once: true });
-    const once = (ev) => {
-      try {
-        const e = JSON.parse(ev.data);
-        if (e.runId) {
-          es2.removeEventListener("message", once);
-          followTranscript2(dir, e.runId, tbox);
-        }
-      } catch {
-      }
-    };
-    es2.addEventListener("message", once);
-  }
-  function followTranscript2(dir, runId, tbox) {
-    stopFollow();
-    followES = new EventSource("/transcript?dir=" + encodeURIComponent(dir) + "&runId=" + encodeURIComponent(runId) + "&follow=1");
-    followES.onmessage = (ev) => {
-      try {
-        tbox.appendChild(/* @__PURE__ */ h(Turn, { t: JSON.parse(ev.data) }));
-      } catch {
-      }
-    };
-  }
-  function switchTab(go) {
-    document.querySelector(`nav.tabs button[data-go="${go}"]`).click();
-  }
-  async function replayShow(runId) {
-    drawer.classList.remove("open");
-    switchTab("console");
-    if (!await startTheater(runId))
-      $("theaterTicker").textContent = "no captured events for this run (older than the theater feature)";
-  }
   async function loadOps() {
     try {
       const { ops } = await j("/ops");
@@ -1868,7 +2319,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       const a = await j("/aggregate");
       const max = Math.max(1, ...a.daily.map((d) => d.cost));
       if (changed("bars", a.daily))
-        $("bars").innerHTML = a.daily.map((d) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} \xB7 ${esc(d.accepted)}/${esc(d.runs)} \xB7 ${esc(d.errors)} err" style="height:${Math.round(d.cost / max * 100)}%"></div>`).join("");
+        $("bars").innerHTML = a.daily.map((d, i) => `<div class="bar" title="${esc(d.date)}: $${esc(d.cost)} \xB7 ${esc(d.accepted)}/${esc(d.runs)} \xB7 ${esc(d.errors)} err" style="height:${Math.round(d.cost / max * 100)}%;--i:${i}"></div>`).join("");
       $("aggMeta").textContent = `${a.totals.runs} runs \xB7 $${a.totals.totalCost} \xB7 accept ${(a.totals.acceptRate * 100).toFixed(0)}%`;
       setStat("cost", "$" + a.totals.totalCost);
       setStat("accept", (a.totals.acceptRate * 100).toFixed(0) + "%");
@@ -1886,6 +2337,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       $("audit").textContent = entries.slice(-30).reverse().map((e) => `${e.ts.slice(0, 19)}  ${e.action}  ${e.target}`).join("\n") || "no library mutations yet";
     } catch {
     }
+    loadRuns();
   }
   $("run").onclick = async () => {
     const dir = $("dir").value.trim();
@@ -1926,6 +2378,7 @@ tbody tr:nth-child(4) { animation-delay:.09s; } tbody tr:nth-child(5) { animatio
       $("quality").textContent = "\u2717 " + String(e);
     }
   };
+  initRuns();
   loadOps();
   loadProjects();
   loadConsole();
