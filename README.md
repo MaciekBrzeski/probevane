@@ -51,3 +51,10 @@ GitHub Action: `action.yml` runs `probevane ci` on PRs and comments changed-but-
 ## License
 
 MIT
+
+## Examples
+
+- [`examples/langgraph-gated-agent`](examples/langgraph-gated-agent) — probevane's gated-loop
+  idea rebuilt on **LangGraph.js + LangChain.js** (a `StateGraph` with plan → write → gate ↺,
+  a real ChatOllama option, and an offline deterministic run). Self-contained; not part of the
+  main build.
