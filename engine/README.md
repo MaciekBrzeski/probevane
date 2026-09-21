@@ -2,7 +2,7 @@
 
 **facet** — a dual-target 2D drawing engine. One vector `Painter` API, two backends: crisp SVG (browser) + braille/box cells (terminal). Every widget is authored **once** against `Painter` and rendered by both.
 
-Vendored into probevane as internal npm-workspace packages so probevane ships as **one self-contained package** (no external dependency; `bin/probevane` + `dist/` bundle it). Originally developed as a standalone repo (`~/Dokumenty/facet`, archived `facet-archive-2026-07-05.tgz`).
+Vendored into probevane as internal npm-workspace packages so probevane ships as **one self-contained package** (no external dependency; `bin/probevane` + `dist/` bundle it). Originally developed as a standalone repo (`facet`, since archived).
 
 ## Packages
 - `core/` (`@facet/core`) — `Painter` interface, `Style` + colour/anim math, geometry, `layoutDag`, and all 44 widgets (charts / controls / inputs / feedback / display / navigation / collections / state).

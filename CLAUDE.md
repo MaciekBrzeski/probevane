@@ -60,4 +60,4 @@ State root: `PROBEVANE_STATE ?? ~/.local/share/probevane` (library, `runs.jsonl`
 
 ## Phase status
 
-ALL phases (P0–P6) complete; post-phase growth added the extra adapters, task paths, daemon/factory/review/quality/distill subsystems. Proven on a fresh unseen React app (0→22 unit @100% cov + 5 e2e @0 flake) and Python (0→22 pytest). Full record in `docs/wiki/Phase-Log.md`; long-form guide `docs/probevane-guide.md`; plan at `/home/wruszbit/.claude/plans/hi-we-recently-had-jaunty-axolotl.md`.
+ALL phases (P0–P6) complete; post-phase growth added the extra adapters, task paths, daemon/factory/review/quality/distill subsystems. Proven on a fresh unseen React app (0→22 unit @100% cov + 5 e2e @0 flake) and Python (0→22 pytest). Full record in `docs/wiki/Phase-Log.md`; long-form guide `docs/probevane-guide.md`.

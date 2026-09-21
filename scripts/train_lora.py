@@ -3,8 +3,8 @@
 
 Scaffold — DO NOT assume a GPU is free. Run only when the RDNA4 is idle.
 
-RDNA4 / ROCm notes (hard-won, see workspace memory feedback_rdna4_rocm_lora_train):
-  - Use the working venv:  ~/Dokumenty/100-monkeys/.lora-venv
+RDNA4 / ROCm notes (hard-won):
+  - Use a venv with a ROCm build of torch + peft (system torch may not match your GPU)
   - export HIP_VISIBLE_DEVICES=0
   - export PYTORCH_HIP_ALLOC_CONF=expandable_segments:True
   - DO NOT set HSA_OVERRIDE_GFX_VERSION (breaks RDNA4)

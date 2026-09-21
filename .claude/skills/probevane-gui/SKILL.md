@@ -23,7 +23,7 @@ restart**, or the UI/back-end you're testing is stale:
 
 Bootstrap — probe first, only (re)start when needed:
 ```sh
-cd <probevane>            # e.g. /home/wruszbit/Dokumenty/probevane
+cd <probevane>            # your probevane checkout
 # already up? then just use it (unless you changed code — then rebuild + restart):
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:7766/ 2>/dev/null   # 200 = ready
 # (re)start after a code change — the daemon serves dist/, not src/:

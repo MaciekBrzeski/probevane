@@ -111,6 +111,18 @@
         "e2eOnly": false
       },
       {
+        "name": "oracle_gate",
+        "hooks": [
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typed acceptance oracles hold.",
+        "detail": "Self-configuring from the target's probevane.config `oracles` block (ADR-022). Golden/byte-stable oracles lock a producer's output on first green and byte-verify it after (drift blocks); invariant/property oracles run a blocking assertion command. No-op when no oracles are declared.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
         "name": "flake_gate",
         "hooks": [
           "systemPromptAddition",
@@ -366,6 +378,18 @@
         "summary": "Finish gate: enough tests / coverage.",
         "detail": "The run is not done until the acceptance bar is met — a minimum number of passing tests (and optionally coverage and shell checks). Stops the loop from accepting a token-effort result.",
         "rule": "ACCEPTANCE: the run is not done until there are at least 1 passing tests.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "oracle_gate",
+        "hooks": [
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typed acceptance oracles hold.",
+        "detail": "Self-configuring from the target's probevane.config `oracles` block (ADR-022). Golden/byte-stable oracles lock a producer's output on first green and byte-verify it after (drift blocks); invariant/property oracles run a blocking assertion command. No-op when no oracles are declared.",
         "requiredBy": null,
         "e2eOnly": false
       },
@@ -643,6 +667,18 @@
         "e2eOnly": false
       },
       {
+        "name": "oracle_gate",
+        "hooks": [
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typed acceptance oracles hold.",
+        "detail": "Self-configuring from the target's probevane.config `oracles` block (ADR-022). Golden/byte-stable oracles lock a producer's output on first green and byte-verify it after (drift blocks); invariant/property oracles run a blocking assertion command. No-op when no oracles are declared.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
         "name": "quality_gate",
         "hooks": [
           "systemPromptAddition",
@@ -801,6 +837,18 @@
         "summary": "Finish gate: no real network/clock/random.",
         "detail": "Scans the specs this run wrote and rejects any that hit a live URL or use Date.now()/Math.random() unmocked — tests must route through mocks and control time/seed, so they are deterministic and not flaky.",
         "rule": "HERMETIC: tests must not hit a real network or real clock/random. Route all network through the provided mocks (MSW handlers / vi.mock / page.route), and control time/random with fake timers or seeds. A test that calls fetch/axios directly or uses Date.now()/Math.random() unmocked is rejected.",
+        "requiredBy": null,
+        "e2eOnly": false
+      },
+      {
+        "name": "oracle_gate",
+        "hooks": [
+          "shouldStop"
+        ],
+        "phase": "gate",
+        "subroutine": "green-gates",
+        "summary": "Finish gate: typed acceptance oracles hold.",
+        "detail": "Self-configuring from the target's probevane.config `oracles` block (ADR-022). Golden/byte-stable oracles lock a producer's output on first green and byte-verify it after (drift blocks); invariant/property oracles run a blocking assertion command. No-op when no oracles are declared.",
         "requiredBy": null,
         "e2eOnly": false
       },

@@ -50,8 +50,7 @@ gate.
 
 ## Cross-project research
 
-Findings from sibling repos in `~/Dokumenty` (via the overseer MCP and probevane's own
-`src/library`) that back this direction:
+Findings from sibling projects (via probevane's own `src/library`) that back this direction:
 
 - **cauldron-ts** — a TS game engine **built $0 by probevane's bridge factory** (14 modules /
   104 tests, Phase-2 entirely at $0 actual). Its `spec/oracles.md` defines a richer correctness
